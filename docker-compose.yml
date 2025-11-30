@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./database/migrations:/app/database/migrations
+      - .:/app
+    environment:
+      - DB_URL=sqlite+aiosqlite:///./data/nursia.db
+    command: >
+      sh -c "mkdir -p data &&
+             python -c 'import os; os.path.exists(\"data/nursia.db\") or __import__(\"subprocess\").run([\"python\", \"scripts/create_db.py\"])' &&
+             python scripts/init_categories.py &&
+             python scripts/init_settings.py &&
+             uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload"

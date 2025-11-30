@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nursia Mobile</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+        .container { max-width: 400px; margin: 0 auto; }
+        .card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 20px; 
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button { 
+            width: 100%;
+            background: #007AFF; 
+            color: white; 
+            padding: 15px; 
+            border: none; 
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+        .expense-item { 
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #007AFF;
+        }
+        .report-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .amount { font-size: 24px; font-weight: bold; }
+        .category { color: #666; font-size: 14px; }
+        .hidden { display: none; }
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            border-top: 1px solid #ddd;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        .tab.active { background: #007AFF; color: white; }
+        .content { padding-bottom: 80px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <!-- Авторизация -->
+            <div id="auth-section" class="card">
+                <h2>Вход в систему</h2>
+                <div class="form-group">
+                    <label>Telegram ID:</label>
+                    <input type="number" id="telegram-id" placeholder="Ваш Telegram ID">
+                </div>
+                <div class="form-group">
+                    <label>Имя:</label>
+                    <input type="text" id="full-name" placeholder="Ваше имя">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="remember-me" checked>
+                        Запомнить меня
+                    </label>
+                </div>
+                <button onclick="login()">Войти</button>
+            </div>
+
+            <!-- Добавление расхода -->
+            <div id="add-section" class="card hidden">
+                <div id="message-area" style="display: none; padding: 10px; margin-bottom: 15px; border-radius: 8px; font-weight: 500;"></div>
+                <h2>Новый расход</h2>
+                <div class="form-group">
+                    <label>Категория:</label>
+                    <select id="category-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>Получатель:</label>
+                    <select id="recipient-select">
+                        <option value="">Не указан</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Сумма:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="amount" step="0.01" placeholder="0.00" style="flex: 1;">
+                        <select id="currency-select" style="width: 80px;"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Описание:</label>
+                    <textarea id="description" placeholder="Описание расхода" rows="3"></textarea>
+                </div>
+                <button onclick="addExpense()">Добавить расход</button>
+            </div>
+
+            <!-- Отчеты -->
+            <div id="reports-section" class="card hidden">
+                <h2>Отчеты</h2>
+                <div class="form-group">
+                    <select id="period-select" onchange="loadReports()">
+                        <option value="day">Сегодня</option>
+                        <option value="week">Неделя</option>
+                        <option value="month" selected>Месяц</option>
+                        <option value="year">Год</option>
+                    </select>
+                </div>
+                <div id="reports-container"></div>
+            </div>
+
+            <!-- Последние расходы -->
+            <div id="expenses-section" class="card hidden">
+                <h2>Последние расходы</h2>
+                <div id="expenses-container"></div>
+            </div>
+        </div>
+
+        <!-- Модальное окно редактирования -->
+        <div id="edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
+                <h3>Редактировать расход</h3>
+                <div class="form-group">
+                    <label>Категория:</label>
+                    <select id="edit-category-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>Получатель:</label>
+                    <select id="edit-recipient-select">
+                        <option value="">Не указан</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Сумма:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="edit-amount" step="0.01" style="flex: 1;">
+                        <select id="edit-currency-select" style="width: 80px;"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Описание:</label>
+                    <textarea id="edit-description" rows="3"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" onclick="saveExpense()" style="flex: 1; background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px;">Сохранить</button>
+                    <button type="button" onclick="closeEditModal()" style="flex: 1; background: #6c757d; color: white; padding: 12px; border: none; border-radius: 8px;">Отмена</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Нижняя панель навигации -->
+        <div id="tab-bar" class="tab-bar hidden">
+            <button class="tab active" onclick="showTab('add')">Добавить</button>
+            <button class="tab" onclick="showTab('expenses')">Расходы</button>
+            <button class="tab" onclick="showTab('reports')">Отчеты</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let authToken = null;
+        let currentTab = 'add';
+
+        // Проверяем сохраненные данные при загрузке
+        window.addEventListener('load', function() {
+            const savedData = localStorage.getItem('nursia_user');
+            if (savedData) {
+                const userData = JSON.parse(savedData);
+                const now = new Date().getTime();
+                if (now < userData.expires) {
+                    document.getElementById('telegram-id').value = userData.telegramId;
+                    document.getElementById('full-name').value = userData.fullName;
+                    // Автоматически входим
+                    login();
+                } else {
+                    localStorage.removeItem('nursia_user');
+                }
+            }
+        });
+
+        async function login() {
+            const telegramId = document.getElementById('telegram-id').value;
+            const fullName = document.getElementById('full-name').value;
+            const rememberMe = document.getElementById('remember-me').checked;
+            
+            if (!telegramId || !fullName) {
+                alert('Заполните все поля');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telegram_id: parseInt(telegramId),
+                        full_name: fullName
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    
+                    // Сохраняем данные если выбран чекбокс
+                    if (rememberMe) {
+                        const expires = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 часа
+                        const userData = {
+                            telegramId: telegramId,
+                            fullName: fullName,
+                            expires: expires
+                        };
+                        localStorage.setItem('nursia_user', JSON.stringify(userData));
+                    }
+                    
+                    document.getElementById('auth-section').classList.add('hidden');
+                    document.getElementById('tab-bar').classList.remove('hidden');
+                    await loadCategories();
+                    await loadCurrencies();
+                    await loadRecipients();
+                    showTab('add');
+                } else {
+                    alert('Ошибка авторизации');
+                }
+            } catch (error) {
+                alert('Ошибка подключения к серверу');
+            }
+        }
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/expenses/categories`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const categories = await response.json();
+                    const select = document.getElementById('category-select');
+                    select.innerHTML = '';
+                    categories.forEach(cat => {
+                        const option = document.createElement('option');
+                        option.value = cat.id;
+                        option.textContent = cat.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки категорий:', error);
+            }
+        }
+
+        async function loadCurrencies() {
+            try {
+                const response = await fetch(`${API_BASE}/currencies/`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const select = document.getElementById('currency-select');
+                    select.innerHTML = '';
+                    data.currencies.forEach(currency => {
+                        const option = document.createElement('option');
+                        option.value = currency;
+                        const symbol = data.symbols[currency] || currency;
+                        option.textContent = `${currency} (${symbol})`;
+                        if (currency === data.default) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки валют:', error);
+            }
+        }
+
+        async function loadRecipients() {
+            try {
+                const response = await fetch(`${API_BASE}/recipients/`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const recipients = await response.json();
+                    const select = document.getElementById('recipient-select');
+                    // Оставляем первую опцию "Не указан"
+                    const firstOption = select.firstElementChild;
+                    select.innerHTML = '';
+                    select.appendChild(firstOption);
+                    
+                    recipients.forEach(recipient => {
+                        const option = document.createElement('option');
+                        option.value = recipient.id;
+                        let typeLabel = '🏢'; // организация
+                        if (recipient.type === 'user') typeLabel = '👤'; // пользователь
+                        if (recipient.type === 'person' || recipient.type === 'организация') typeLabel = '👥'; // физлицо
+                        option.textContent = `${typeLabel} ${recipient.name}`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки получателей:', error);
+            }
+        }
+
+        async function addExpense() {
+            const categoryId = document.getElementById('category-select').value;
+            const recipientId = document.getElementById('recipient-select').value;
+            const amount = document.getElementById('amount').value;
+            const currency = document.getElementById('currency-select').value;
+            const description = document.getElementById('description').value;
+            
+            if (!categoryId || !amount) {
+                alert('Заполните обязательные поля');
+                return;
+            }
+            
+            const expenseData = {
+                category_id: parseInt(categoryId),
+                amount: parseFloat(amount),
+                currency: currency,
+                description: description,
+                expense_date: new Date().toISOString()
+            };
+            
+            if (recipientId) {
+                expenseData.recipient_id = parseInt(recipientId);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/expenses/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(expenseData)
+                });
+                
+                if (response.ok) {
+                    const categoryName = document.getElementById('category-select').selectedOptions[0].text;
+                    const currencySymbols = {'UAH': '₴', 'EUR': '€', 'USD': '$', 'RUB': '₽'};
+                    const symbol = currencySymbols[currency] || currency;
+                    
+                    showMessage(`Добавлен расход: ${categoryName} - ${amount} ${symbol}`, 'success');
+                    document.getElementById('amount').value = '';
+                    document.getElementById('description').value = '';
+                    
+                    // Обновляем отчеты если находимся на вкладке отчетов
+                    if (currentTab === 'reports') {
+                        loadReports();
+                    }
+                } else {
+                    showMessage('Ошибка добавления расхода', 'error');
+                }
+            } catch (error) {
+                alert('Ошибка подключения к серверу');
+            }
+        }
+
+        async function loadReports() {
+            const period = document.getElementById('period-select').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/expenses/reports?period=${period}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const container = document.getElementById('reports-container');
+                    container.innerHTML = '';
+                    
+                    if (data.expenses.length === 0) {
+                        container.innerHTML = '<p>Нет данных за выбранный период</p>';
+                        return;
+                    }
+                    
+                    // Общая сумма сверху
+                    const totalDiv = document.createElement('div');
+                    totalDiv.className = 'report-item';
+                    totalDiv.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                    
+                    // Получаем символы валют
+                    const currencySymbols = {'UAH': '₴', 'EUR': '€', 'USD': '$', 'RUB': '₽'};
+                    const totalsByText = Object.entries(data.totals_by_currency)
+                        .map(([currency, amount]) => `${amount.toFixed(2)} ${currencySymbols[currency] || currency}`)
+                        .join(', ');
+                    
+                    totalDiv.innerHTML = `
+                        <div style="text-align: center; padding: 10px;">
+                            <div style="font-size: 14px; font-weight: bold;">Итого: ${totalsByText}</div>
+                        </div>
+                    `;
+                    container.appendChild(totalDiv);
+                    
+                    // Таблица расходов
+                    const tableDiv = document.createElement('div');
+                    tableDiv.style.background = 'white';
+                    tableDiv.style.borderRadius = '12px';
+                    tableDiv.style.padding = '15px';
+                    tableDiv.style.margin = '10px 0';
+                    
+                    let tableHTML = `
+                        <div style="display: grid; grid-template-columns: 30px 1fr 1fr 60px 60px 60px; gap: 6px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px; font-size: 11px;">
+                            <div>№</div>
+                            <div>Категория</div>
+                            <div>Получатель</div>
+                            <div>Сумма</div>
+                            <div>Дата</div>
+                            <div>Действия</div>
+                        </div>
+                    `;
+                    
+                    data.expenses.forEach((expense, index) => {
+                        const date = new Date(expense.expense_date);
+                        const dateStr = date.toLocaleDateString('ru-RU');
+                        const timeStr = date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+                        
+                        tableHTML += `
+                            <div style="display: grid; grid-template-columns: 30px 1fr 1fr 60px 60px 60px; gap: 6px; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 12px;">
+                                <div>${data.expenses.length - index}</div>
+                                <div>
+                                    <div style="font-weight: 500; font-size: 11px;">${expense.category_name}</div>
+                                    <div style="font-size: 9px; color: #666;">${expense.description || ''}</div>
+                                </div>
+                                <div style="font-size: 11px; color: #555;">${expense.recipient_name || '-'}</div>
+                                <div style="font-weight: bold; font-size: 11px;">${expense.amount} ${expense.currency}</div>
+                                <div>
+                                    <div style="font-size: 10px;">${dateStr}</div>
+                                    <div style="font-size: 9px; color: #999;">${timeStr}</div>
+                                </div>
+                                <div>
+                                    <button type="button" onclick="editExpense(${expense.id})" style="background: #007AFF; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; margin-bottom: 2px; width: 100%;">✏️</button>
+                                    <button type="button" onclick="deleteExpense(${expense.id})" style="background: #FF3B30; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; width: 100%;">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    tableDiv.innerHTML = tableHTML;
+                    container.appendChild(tableDiv);
+                    
+                    // Общая сумма снизу
+                    const totalDiv2 = document.createElement('div');
+                    totalDiv2.className = 'report-item';
+                    totalDiv2.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                    totalDiv2.innerHTML = `
+                        <div style="text-align: center; padding: 10px;">
+                            <div style="font-size: 14px; font-weight: bold;">Итого: ${totalsByText}</div>
+                        </div>
+                    `;
+                    container.appendChild(totalDiv2);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки отчетов:', error);
+            }
+        }
+
+        async function loadExpenses() {
+            try {
+                const response = await fetch(`${API_BASE}/expenses/?limit=10`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const expenses = await response.json();
+                    const container = document.getElementById('expenses-container');
+                    container.innerHTML = '';
+                    
+                    if (expenses.length === 0) {
+                        container.innerHTML = '<p>Нет расходов</p>';
+                        return;
+                    }
+                    
+                    expenses.forEach(expense => {
+                        const div = document.createElement('div');
+                        div.className = 'expense-item';
+                        const date = new Date(expense.expense_date).toLocaleDateString('ru-RU');
+                        div.innerHTML = `
+                            <div class="amount">${expense.amount} ${expense.currency || 'UAH'}</div>
+                            <div class="category">${expense.category?.name || 'Без категории'}</div>
+                            <div>${expense.description || ''}</div>
+                            <div style="font-size: 12px; color: #999;">${date}</div>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки расходов:', error);
+            }
+        }
+
+        function showTab(tab) {
+            // Скрываем все секции
+            document.querySelectorAll('.card:not(#auth-section)').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Убираем активный класс с табов
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Показываем нужную секцию и активируем таб
+            document.getElementById(`${tab}-section`).classList.remove('hidden');
+            event.target.classList.add('active');
+            
+            currentTab = tab;
+            
+            // Загружаем данные для соответствующего таба
+            if (tab === 'expenses') {
+                loadExpenses();
+            } else if (tab === 'reports') {
+                loadReports();
+            }
+        }
+
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('message-area');
+            messageArea.textContent = text;
+            messageArea.style.display = 'block';
+            messageArea.style.background = type === 'success' ? '#d4edda' : '#f8d7da';
+            messageArea.style.color = type === 'success' ? '#155724' : '#721c24';
+            messageArea.style.border = type === 'success' ? '1px solid #c3e6cb' : '1px solid #f5c6cb';
+            
+            setTimeout(() => {
+                messageArea.style.display = 'none';
+            }, 5000);
+        }
+
+        async function deleteExpense(expenseId) {
+            if (!confirm('Удалить этот расход?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/expenses/${expenseId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    showMessage('Расход удален', 'success');
+                    loadReports();
+                } else {
+                    showMessage('Ошибка удаления', 'error');
+                }
+            } catch (error) {
+                showMessage('Ошибка подключения', 'error');
+            }
+        }
+
+        let editingExpenseId = null;
+        let currentExpenseData = null;
+
+        async function editExpense(expenseId) {
+            editingExpenseId = expenseId;
+            
+            // Находим данные расхода в текущем отчете
+            try {
+                const response = await fetch(`${API_BASE}/expenses/reports?period=year`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const expense = data.expenses.find(e => e.id === expenseId);
+                    if (expense) {
+                        currentExpenseData = expense;
+                        await populateEditForm(expense);
+                        document.getElementById('edit-modal').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                showMessage('Ошибка загрузки данных', 'error');
+            }
+        }
+
+        async function populateEditForm(expense) {
+            // Заполняем категории
+            const categorySelect = document.getElementById('edit-category-select');
+            const mainCategorySelect = document.getElementById('category-select');
+            categorySelect.innerHTML = mainCategorySelect.innerHTML;
+            categorySelect.value = expense.category_id || '';
+            
+            // Заполняем получателей
+            const recipientSelect = document.getElementById('edit-recipient-select');
+            const mainRecipientSelect = document.getElementById('recipient-select');
+            recipientSelect.innerHTML = mainRecipientSelect.innerHTML;
+            recipientSelect.value = expense.recipient_id || '';
+            
+            // Заполняем валюты
+            const currencySelect = document.getElementById('edit-currency-select');
+            const mainCurrencySelect = document.getElementById('currency-select');
+            currencySelect.innerHTML = mainCurrencySelect.innerHTML;
+            currencySelect.value = expense.currency || 'UAH';
+            
+            // Заполняем остальные поля
+            document.getElementById('edit-amount').value = expense.amount;
+            document.getElementById('edit-description').value = expense.description || '';
+        }
+
+        async function saveExpense(event) {
+            if (event) event.preventDefault();
+            
+            const categoryId = document.getElementById('edit-category-select').value;
+            const recipientId = document.getElementById('edit-recipient-select').value;
+            const amount = document.getElementById('edit-amount').value;
+            const currency = document.getElementById('edit-currency-select').value;
+            const description = document.getElementById('edit-description').value;
+            
+            const expenseData = {
+                category_id: parseInt(categoryId),
+                amount: parseFloat(amount),
+                currency: currency,
+                description: description,
+                expense_date: currentExpenseData.expense_date
+            };
+            
+            if (recipientId) {
+                expenseData.recipient_id = parseInt(recipientId);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/expenses/${editingExpenseId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(expenseData)
+                });
+                
+                if (response.ok) {
+                    showMessage('Расход обновлен', 'success');
+                    closeEditModal();
+                    loadReports();
+                } else {
+                    showMessage('Ошибка обновления', 'error');
+                }
+            } catch (error) {
+                showMessage('Ошибка подключения', 'error');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            editingExpenseId = null;
+            currentExpenseData = null;
+        }
+    </script>
+</body>
+</html>
