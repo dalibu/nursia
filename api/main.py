@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, expenses, settings, currencies, recipients
+from api.routers import auth, expenses, settings, currencies, recipients, admin
+import os
 
 app = FastAPI(
     title="Nursia Expense Tracker API",
@@ -16,37 +17,42 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(expenses.router)
-app.include_router(settings.router)
-app.include_router(currencies.router)
-app.include_router(recipients.router)
+# API роуты с префиксом /api
+app.include_router(auth.router, prefix="/api")
+app.include_router(expenses.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
+app.include_router(currencies.router, prefix="/api")
+app.include_router(recipients.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
-# Статические файлы
-app.mount("/web", StaticFiles(directory="web"), name="web")
+# React статические файлы
+if os.path.exists("frontend/build"):
+    app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 
-@app.get("/")
-async def root():
+@app.get("/api")
+async def api_root():
     return {"message": "Nursia Expense Tracker API"}
-
-@app.get("/app")
-async def web_app():
-    return FileResponse("web/templates/index.html")
-
-@app.get("/mobile")
-async def mobile_app():
-    return FileResponse("web/templates/mobile.html")
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/health")
+async def api_health_check():
+    return {"status": "healthy"}
+
+# React SPA - все остальные маршруты
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    if os.path.exists("frontend/build/index.html"):
+        return FileResponse("frontend/build/index.html")
+    return {"message": "React app not built. Run 'npm run build' in frontend directory."}
 
 if __name__ == "__main__":
     import uvicorn

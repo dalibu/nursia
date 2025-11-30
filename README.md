@@ -8,7 +8,7 @@ Expense tracking service for household spending management with multi-currency s
 - **OAuth Authentication** with JWT tokens
 - **Database** with migrations (Alembic + SQLite)
 - **Telegram Bot** for mobile access
-- **Web Interface** (desktop and mobile responsive)
+- **React Frontend** (SPA с Material-UI)
 - **Multi-currency Support** (UAH, EUR, USD, RUB)
 - **Expense Categories** and recipient management
 - **Detailed Reports** with filtering by period and currency
@@ -24,8 +24,7 @@ docker-compose up -d
 docker-compose exec api python scripts/create_admin.py
 
 # Access the application
-# Web UI: http://localhost:8000/app
-# Mobile UI: http://localhost:8000/mobile
+# React App: http://localhost:3000
 # API Docs: http://localhost:8000/docs
 ```
 
@@ -33,7 +32,11 @@ docker-compose exec api python scripts/create_admin.py
 
 ### 1. Install Dependencies
 ```bash
+# Backend
 pip install -r requirements.txt
+
+# Frontend
+cd frontend && npm install
 ```
 
 ### 2. Database Setup
@@ -57,6 +60,9 @@ python scripts/create_admin.py
 ```bash
 # REST API
 python scripts/run_api.py
+
+# React Frontend (в отдельном терминале)
+cd frontend && npm start
 
 # Telegram Bot
 python bot/main.py
@@ -103,7 +109,16 @@ python scripts/run_tests.py --coverage
 
 ```
 nursia/
-├── api/                    # REST API
+├── frontend/              # React приложение
+│   ├── public/            # Статические файлы
+│   ├── src/
+│   │   ├── components/    # React компоненты
+│   │   ├── pages/         # Страницы приложения
+│   │   ├── services/      # API клиенты
+│   │   ├── App.js         # Главный компонент
+│   │   └── index.js       # Точка входа
+│   └── package.json       # NPM зависимости
+├── api/                   # REST API
 │   ├── auth/              # OAuth authentication
 │   ├── routers/           # API endpoints
 │   ├── schemas/           # Pydantic models
@@ -116,8 +131,6 @@ nursia/
 │   ├── alembic.ini        # Migration config
 │   ├── models.py          # SQLAlchemy models
 │   └── core.py            # Database connection
-├── web/                   # Web interfaces
-│   └── templates/         # HTML templates
 ├── scripts/               # Utility scripts
 │   ├── deploy.py          # Deployment script
 │   ├── run_api.py         # API server launcher

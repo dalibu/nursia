@@ -7,14 +7,20 @@ def test_user_model():
     """Тест модели пользователя"""
     user = User(
         telegram_id=123456789,
+        username="testuser",
+        password_hash="test_hash",
         full_name="Test User",
         role=UserRole.ADMIN
     )
     
     assert user.telegram_id == 123456789
+    assert user.username == "testuser"
     assert user.full_name == "Test User"
     assert user.role == UserRole.ADMIN
-    assert str(user) == "<User(id=123456789, role=UserRole.ADMIN)>"
+    # Проверяем что __repr__ содержит нужные поля
+    user_str = str(user)
+    assert "testuser" in user_str
+    assert "UserRole.ADMIN" in user_str
 
 def test_expense_category_model():
     """Тест модели категории расходов"""

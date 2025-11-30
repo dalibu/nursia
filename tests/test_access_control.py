@@ -11,7 +11,7 @@ async def test_create_user(db_session):
 @pytest.mark.asyncio
 async def test_admin_approval_flow(db_session):
     # 1. Create pending user
-    user = await create_user(db_session, telegram_id=456, full_name="Pending User")
+    user = await create_user(db_session, telegram_id=456, full_name="Pending User", username="pendinguser")
     assert user.role == UserRole.PENDING
     
     # 2. Approve user
@@ -31,7 +31,8 @@ async def test_auto_admin_registration(db_session):
     user = await create_user(
         db_session, 
         telegram_id=admin_id, 
-        full_name="Admin User", 
+        full_name="Admin User",
+        username="adminuser", 
         role=UserRole.ADMIN
     )
     assert user.role == UserRole.ADMIN

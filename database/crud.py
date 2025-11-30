@@ -8,19 +8,22 @@ from datetime import datetime
 from sqlalchemy import select
 
 async def get_user(session: AsyncSession, telegram_id: int) -> Optional[User]:
-    return await session.get(User, telegram_id)
+    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+    return result.scalar_one_or_none()
 
 async def create_user(
     session: AsyncSession, 
     telegram_id: int, 
     full_name: str, 
-    username: Optional[str] = None,
+    username: str,
+    password_hash: str = "temp_hash",
     role: UserRole = UserRole.PENDING
 ) -> User:
     user = User(
         telegram_id=telegram_id,
         full_name=full_name,
         username=username,
+        password_hash=password_hash,
         role=role
     )
     session.add(user)
@@ -29,7 +32,8 @@ async def create_user(
     return user
 
 async def update_user_role(session: AsyncSession, telegram_id: int, new_role: UserRole) -> Optional[User]:
-    user = await get_user(session, telegram_id)
+    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+    user = result.scalar_one_or_none()
     if user:
         user.role = new_role
         await session.commit()

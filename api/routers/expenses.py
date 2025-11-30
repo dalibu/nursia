@@ -2,11 +2,12 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import joinedload
 from database.core import get_db
 from database.models import User, Expense, ExpenseCategory, Recipient
 from api.schemas.expense import (
@@ -41,20 +42,30 @@ async def get_categories(
     return result.scalars().all()
 
 
-@router.post("/", response_model=ExpenseSchema)
+@router.post("/")
 async def create_expense(
     expense: ExpenseCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    db_expense = Expense(**expense.model_dump(), user_id=current_user.telegram_id)
+    expense_data = expense.model_dump()
+    # Если expense_date без времени, добавляем текущее время
+    if expense_data['expense_date'].time() == datetime.min.time():
+        now = datetime.now()
+        expense_data['expense_date'] = expense_data['expense_date'].replace(
+            hour=now.hour,
+            minute=now.minute,
+            second=now.second
+        )
+    
+    db_expense = Expense(**expense_data, user_id=current_user.id)
     db.add(db_expense)
     await db.commit()
     await db.refresh(db_expense)
-    return db_expense
+    return {"id": db_expense.id, "message": "Expense created successfully"}
 
 
-@router.get("/", response_model=List[ExpenseSchema])
+@router.get("/")
 async def get_expenses(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -64,7 +75,15 @@ async def get_expenses(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = select(Expense).where(Expense.user_id == current_user.telegram_id)
+    query = select(Expense).options(
+        joinedload(Expense.category),
+        joinedload(Expense.recipient),
+        joinedload(Expense.user)
+    )
+    
+    # Админ видит все расходы, пользователи только свои
+    if current_user.role != "admin":
+        query = query.where(Expense.user_id == current_user.id)
     
     if category_id:
         query = query.where(Expense.category_id == category_id)
@@ -73,9 +92,43 @@ async def get_expenses(
     if end_date:
         query = query.where(Expense.expense_date <= end_date)
     
-    query = query.offset(skip).limit(limit)
+    query = query.offset(skip).limit(limit).order_by(Expense.expense_date.desc())
     result = await db.execute(query)
-    return result.scalars().all()
+    expenses = result.scalars().all()
+    
+    # Формируем ответ вручную
+    response = []
+    for expense in expenses:
+        expense_dict = {
+            "id": expense.id,
+            "category_id": expense.category_id,
+            "recipient_id": expense.recipient_id,
+            "amount": str(expense.amount),
+            "currency": expense.currency,
+            "description": expense.description,
+            "expense_date": expense.expense_date.isoformat(),
+            "user_id": expense.user_id,
+            "created_at": expense.created_at.isoformat(),
+            "category": {
+                "id": expense.category.id,
+                "name": expense.category.name,
+                "description": expense.category.description,
+                "created_at": expense.category.created_at.isoformat()
+            } if expense.category else None,
+            "recipient": {
+                "id": expense.recipient.id,
+                "name": expense.recipient.name,
+                "type": expense.recipient.type
+            } if expense.recipient else None,
+            "user": {
+                "id": expense.user.id,
+                "full_name": expense.user.full_name,
+                "username": expense.user.username
+            } if expense.user else None
+        }
+        response.append(expense_dict)
+    
+    return response
 
 
 @router.get("/reports")
@@ -106,7 +159,7 @@ async def get_expense_reports(
         Recipient, Expense.recipient_id == Recipient.id
     ).where(
         and_(
-            Expense.user_id == current_user.telegram_id,
+            Expense.user_id == current_user.id,
             Expense.expense_date >= start_date,
             Expense.expense_date <= end_date
         )
@@ -143,27 +196,42 @@ async def get_expense_reports(
     }
 
 
-@router.put("/{expense_id}", response_model=ExpenseSchema)
+@router.put("/{expense_id}")
 async def update_expense(
     expense_id: int,
     expense: ExpenseCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Expense).where(
-        Expense.id == expense_id,
-        Expense.user_id == current_user.telegram_id
-    ))
+    # Админ может редактировать любые расходы, пользователи только свои
+    if current_user.role == "admin":
+        result = await db.execute(select(Expense).where(Expense.id == expense_id))
+    else:
+        result = await db.execute(select(Expense).where(
+            Expense.id == expense_id,
+            Expense.user_id == current_user.id
+        ))
+    
     db_expense = result.scalar_one_or_none()
     if not db_expense:
         raise HTTPException(status_code=404, detail="Expense not found")
     
-    for field, value in expense.model_dump().items():
+    expense_data = expense.model_dump()
+    # Применяем ту же логику с временем что и при создании
+    if expense_data['expense_date'].time() == datetime.min.time():
+        now = datetime.now()
+        expense_data['expense_date'] = expense_data['expense_date'].replace(
+            hour=now.hour,
+            minute=now.minute,
+            second=now.second
+        )
+    
+    for field, value in expense_data.items():
         setattr(db_expense, field, value)
     
     await db.commit()
     await db.refresh(db_expense)
-    return db_expense
+    return {"id": db_expense.id, "message": "Expense updated successfully"}
 
 
 @router.delete("/{expense_id}")
@@ -172,10 +240,15 @@ async def delete_expense(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Expense).where(
-        Expense.id == expense_id,
-        Expense.user_id == current_user.telegram_id
-    ))
+    # Админ может удалять любые расходы, пользователи только свои
+    if current_user.role == "admin":
+        result = await db.execute(select(Expense).where(Expense.id == expense_id))
+    else:
+        result = await db.execute(select(Expense).where(
+            Expense.id == expense_id,
+            Expense.user_id == current_user.id
+        ))
+    
     db_expense = result.scalar_one_or_none()
     if not db_expense:
         raise HTTPException(status_code=404, detail="Expense not found")

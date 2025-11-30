@@ -26,7 +26,7 @@ class ExpenseBase(BaseModel):
     recipient_id: Optional[int] = None
     amount: Decimal = Field(..., gt=0, decimal_places=2)
     currency: str = Field(default="UAH", max_length=3)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)
     expense_date: datetime
 
 
@@ -34,10 +34,31 @@ class ExpenseCreate(ExpenseBase):
     pass
 
 
+class RecipientInfo(BaseModel):
+    id: int
+    name: str
+    type: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserInfo(BaseModel):
+    id: int
+    full_name: str
+    username: str
+
+    class Config:
+        from_attributes = True
+
+
 class Expense(ExpenseBase):
     id: int
     user_id: int
     created_at: datetime
+    category: Optional[ExpenseCategory] = None
+    recipient: Optional[RecipientInfo] = None
+    user: Optional[UserInfo] = None
 
     class Config:
         from_attributes = True

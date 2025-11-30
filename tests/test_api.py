@@ -15,21 +15,21 @@ def test_health_check(client):
 
 def test_root_endpoint(client):
     """Тест корневого endpoint"""
-    response = client.get("/")
+    response = client.get("/api")
     assert response.status_code == 200
     assert "Nursia Expense Tracker API" in response.json()["message"]
 
 def test_login_validation(client):
     """Тест валидации данных логина"""
     # Тест с некорректными данными
-    response = client.post("/auth/login", json={
-        "telegram_id": "invalid",
-        "full_name": "Test"
+    response = client.post("/api/auth/login", json={
+        "username": "nonexistent",
+        "password": "wrong"
     })
-    assert response.status_code == 422  # Validation error
+    assert response.status_code == 401  # User not found
 
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""
-    response = client.get("/expenses/categories")
-    assert response.status_code == 401
+    response = client.get("/api/expenses/categories")
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]

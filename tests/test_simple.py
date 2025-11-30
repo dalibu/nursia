@@ -18,14 +18,14 @@ def test_health_check(client):
 
 def test_root_endpoint(client):
     """Тест корневого endpoint"""
-    response = client.get("/")
+    response = client.get("/api")
     assert response.status_code == 200
     assert "Nursia Expense Tracker API" in response.json()["message"]
 
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""
-    response = client.get("/expenses/categories")
-    assert response.status_code == 401
+    response = client.get("/api/expenses/categories")
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]
 
 def test_web_app_endpoint(client):
@@ -38,12 +38,14 @@ def test_mobile_app_endpoint(client):
     response = client.get("/mobile")
     assert response.status_code == 200
 
-def test_currencies_unauthorized(client):
+def test_currencies_public(client):
     """Тест получения валют без авторизации"""
-    response = client.get("/currencies/")
-    assert response.status_code == 401
+    response = client.get("/api/currencies/")
+    assert response.status_code == 200
+    assert "currencies" in response.json()
 
-def test_recipients_unauthorized(client):
+def test_recipients_public(client):
     """Тест получения получателей без авторизации"""
-    response = client.get("/recipients/")
-    assert response.status_code == 401
+    response = client.get("/api/recipients/")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)

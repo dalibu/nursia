@@ -14,16 +14,36 @@ class TokenData(BaseModel):
 
 
 class UserLogin(BaseModel):
-    telegram_id: int
-    username: Optional[str] = None
+    username: str
+    password: str
+
+
+class UserRegister(BaseModel):
+    username: str
+    password: str
+    email: Optional[str] = None
     full_name: str
+
+
+class RegistrationRequestResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class UserResponse(BaseModel):
-    telegram_id: int
-    username: Optional[str]
+    id: int
+    username: str
     full_name: str
+    email: Optional[str]
     role: str
+    status: str
     created_at: datetime
 
     class Config:

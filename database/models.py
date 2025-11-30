@@ -18,10 +18,14 @@ class UserRole(str, Enum):
 class User(Base):
     __tablename__ = "users"
 
-    telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     full_name: Mapped[str] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(String, default=UserRole.PENDING)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
@@ -29,7 +33,24 @@ class User(Base):
     tokens: Mapped[list["OAuthToken"]] = relationship("OAuthToken", back_populates="user")
 
     def __repr__(self) -> str:
-        return f"<User(id={self.telegram_id}, role={self.role})>"
+        return f"<User(id={self.id}, username={self.username}, role={self.role})>"
+
+
+class RegistrationRequest(Base):
+    __tablename__ = "registration_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(50))
+    email: Mapped[str] = mapped_column(String(100))
+    full_name: Mapped[str] = mapped_column(String(100))
+    password_hash: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
 class Action(Base):
@@ -66,7 +87,7 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("expense_categories.id"))
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recipients.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
@@ -87,7 +108,7 @@ class OAuthToken(Base):
     __tablename__ = "oauth_tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     access_token: Mapped[str] = mapped_column(String(500))
     refresh_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

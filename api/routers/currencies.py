@@ -15,8 +15,7 @@ router = APIRouter(prefix="/currencies", tags=["currencies"])
 
 @router.get("/")
 async def get_currencies(
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ) -> Dict:
     # Получаем доступные валюты
     result = await db.execute(select(SystemSetting).where(SystemSetting.key == "available_currencies"))
