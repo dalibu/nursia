@@ -26,6 +26,7 @@ function ExpensesPage() {
   const [currencies, setCurrencies] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, expenseId: null, expenseName: '' });
+  const [totals, setTotals] = useState({});
 
   useEffect(() => {
     loadExpenses();
@@ -127,6 +128,17 @@ function ExpensesPage() {
     
 
     setFilteredList(filtered);
+    
+    // Вычисляем итоги по валютам
+    const newTotals = {};
+    filtered.forEach(expense => {
+      const currency = expense.currency;
+      if (!newTotals[currency]) {
+        newTotals[currency] = 0;
+      }
+      newTotals[currency] += parseFloat(expense.amount);
+    });
+    setTotals(newTotals);
   };
 
   const handleSort = (field) => {
@@ -199,7 +211,7 @@ function ExpensesPage() {
         </Button>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
         <Typography variant="h6" gutterBottom>Фильтры</Typography>
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
           <TextField
@@ -252,7 +264,7 @@ function ExpensesPage() {
 
       <TableContainer component={Paper}>
         <Table>
-          <TableHead>
+          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
               <TableCell sx={{ width: 60 }}>
                 <TableSortLabel
@@ -282,15 +294,7 @@ function ExpensesPage() {
                   Сумма
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ width: 80 }}>
-                <TableSortLabel
-                  active={sortField === 'currency'}
-                  direction={sortField === 'currency' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('currency')}
-                >
-                  Валюта
-                </TableSortLabel>
-              </TableCell>
+
               <TableCell>
                 <TableSortLabel
                   active={sortField === 'category'}
@@ -328,7 +332,7 @@ function ExpensesPage() {
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 10 : 9} align="center">
+                <TableCell colSpan={isAdmin ? 9 : 8} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -343,8 +347,7 @@ function ExpensesPage() {
                   <TableCell>{displayNumber}</TableCell>
                   <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
                   <TableCell>{new Date(expense.expense_date).toLocaleTimeString()}</TableCell>
-                  <TableCell>{expense.amount}</TableCell>
-                  <TableCell>{expense.currency}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{expense.amount} {expense.currency}</TableCell>
                   <TableCell>{expense.category?.name || '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>{expense.user?.full_name || '-'}</TableCell>
@@ -363,6 +366,17 @@ function ExpensesPage() {
               );
             })}
 
+          </TableBody>
+          <TableBody>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
+              <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5', whiteSpace: 'nowrap' }}>
+                {Object.entries(totals).map(([currency, amount]) => 
+                  `${amount.toFixed(2)} ${currency}`
+                ).join(' / ') || '0.00'}
+              </TableCell>
+              <TableCell colSpan={isAdmin ? 5 : 4} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </TableContainer>

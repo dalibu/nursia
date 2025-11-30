@@ -6,6 +6,7 @@ import axios from 'axios';
 function Layout({ onLogout }) {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     checkUserRole();
@@ -18,6 +19,7 @@ function Layout({ onLogout }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsAdmin(response.data.role === 'admin');
+      setUserName(response.data.full_name || response.data.username);
     } catch (error) {
       console.error('Failed to get user info:', error);
     }
@@ -34,7 +36,7 @@ function Layout({ onLogout }) {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Nursia
+            NURSIA | {userName}
           </Typography>
           <Button color="inherit" component={Link} to="/">
             Расходы
