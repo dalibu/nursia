@@ -137,6 +137,9 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/requests" onClick={() => setSettingsAnchor(null)}>
                     Заявки {hasRequests && '⚠️'}
                   </MenuItem>
+                  <MenuItem component={Link} to="/user-status" onClick={() => setSettingsAnchor(null)}>
+                    Статусы пользователей
+                  </MenuItem>
                   <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
                     Категории
                   </MenuItem>

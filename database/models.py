@@ -15,6 +15,12 @@ class UserRole(str, Enum):
     PENDING = "pending"
     BLOCKED = "blocked"
 
+class UserStatusType(str, Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    RESETED = "reseted"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -35,6 +41,24 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username}, role={self.role})>"
+
+
+class UserStatus(Base):
+    __tablename__ = "user_status"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    status: Mapped[UserStatusType] = mapped_column(String(20), default=UserStatusType.PENDING)
+    changed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    changed_by_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[changed_by])
+
+    def __repr__(self) -> str:
+        return f"<UserStatus(id={self.id}, user_id={self.user_id}, status={self.status})>"
 
 
 class RegistrationRequest(Base):

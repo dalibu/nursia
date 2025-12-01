@@ -16,6 +16,7 @@ from api.schemas.expense import (
     ExpenseReport
 )
 from api.auth.oauth import get_current_user, get_admin_user
+from utils.timezone import now_server
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -58,7 +59,7 @@ async def create_expense(
     
     # Если expense_date без времени, добавляем текущее время
     if expense_data['expense_date'].time() == datetime.min.time():
-        now = datetime.now()
+        now = now_server()
         expense_data['expense_date'] = expense_data['expense_date'].replace(
             hour=now.hour,
             minute=now.minute,
@@ -150,16 +151,16 @@ async def get_expense_reports(
 ):
     if not start_date:
         if period == "day":
-            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            start_date = now_server().replace(hour=0, minute=0, second=0, microsecond=0)
         elif period == "week":
-            start_date = datetime.now() - timedelta(days=7)
+            start_date = now_server() - timedelta(days=7)
         elif period == "month":
-            start_date = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            start_date = now_server().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         elif period == "year":
-            start_date = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            start_date = now_server().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     
     if not end_date:
-        end_date = datetime.now()
+        end_date = now_server()
     
     # Получаем детальные расходы
     query = select(Expense, ExpenseCategory.name, Recipient.name).join(
@@ -264,7 +265,7 @@ async def update_expense(
     expense_data = expense.model_dump()
     # Применяем ту же логику с временем что и при создании
     if expense_data['expense_date'].time() == datetime.min.time():
-        now = datetime.now()
+        now = now_server()
         expense_data['expense_date'] = expense_data['expense_date'].replace(
             hour=now.hour,
             minute=now.minute,
@@ -274,7 +275,7 @@ async def update_expense(
     # Обновляем paid_at при изменении is_paid
     if 'is_paid' in expense_data:
         if expense_data['is_paid']:
-            expense_data['paid_at'] = datetime.now(timezone.utc)
+            expense_data['paid_at'] = now_server()
         else:
             expense_data['paid_at'] = None
     

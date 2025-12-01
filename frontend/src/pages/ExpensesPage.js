@@ -418,24 +418,21 @@ function ExpensesPage() {
                   <TableCell>{expense.description || '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Chip 
-                          label={expense.is_paid ? 'Оплачено' : 'К оплате'}
-                          color={expense.is_paid ? 'success' : 'warning'}
-                          size="small"
-                        />
-                        {!expense.is_paid && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="success"
-                            startIcon={<Payment />}
-                            onClick={() => handlePaymentToggle(expense.id, true)}
-                          >
-                            Оплатить
-                          </Button>
-                        )}
-                      </Box>
+                      <Chip 
+                        label={expense.is_paid ? 'Оплачено' : 'К оплате'}
+                        color={expense.is_paid ? 'success' : 'warning'}
+                        size="small"
+                        clickable
+                        onClick={() => handlePaymentToggle(expense.id, !expense.is_paid)}
+                        icon={<Payment />}
+                        sx={{ 
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: expense.is_paid ? '#2e7d32' : '#ed6c02',
+                            color: 'white'
+                          }
+                        }}
+                      />
                     </TableCell>
                   )}
                   <TableCell>

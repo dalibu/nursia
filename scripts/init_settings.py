@@ -11,7 +11,6 @@ async def init_settings():
     settings = [
 
         {"key": "app_name", "value": "Nursia", "description": "Название приложения"},
-        {"key": "timezone", "value": "Europe/Kiev", "description": "Часовой пояс"},
         {"key": "remember_me_hours", "value": "24", "description": "Время запоминания пользователя (часы)"}
     ]
     

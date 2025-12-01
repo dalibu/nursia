@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, expenses, settings as settings_router, currencies, recipients, admin, users
+from api.routers import auth, expenses, settings as settings_router, currencies, recipients, admin, users, user_status
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
@@ -47,6 +47,7 @@ app.include_router(currencies.router, prefix="/api")
 app.include_router(recipients.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(user_status.router, prefix="/api")
 
 # React статические файлы
 if os.path.exists("frontend/build"):

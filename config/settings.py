@@ -4,7 +4,7 @@ from pydantic import field_validator
 import json
 
 class Settings(BaseSettings):
-    TELEGRAM_TOKEN: str
+    TELEGRAM_TOKEN: str = "dummy_token"
     ADMIN_IDS: List[int] = []
     DB_URL: str = "sqlite+aiosqlite:///./data/nursia.db"
     
