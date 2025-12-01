@@ -26,9 +26,10 @@ function RequestsPage() {
         }
       });
       const data = await response.json();
-      setRequests(data);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load requests:', error);
+      setRequests([]);
     }
   };
 
