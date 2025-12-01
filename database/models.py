@@ -31,7 +31,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
     expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="user")
-    tokens: Mapped[list["OAuthToken"]] = relationship("OAuthToken", back_populates="user")
+
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username}, role={self.role})>"
@@ -87,22 +87,6 @@ class Expense(Base):
 
     def __repr__(self) -> str:
         return f"<Expense(id={self.id}, amount={self.amount}, category={self.category.name if self.category else None})>"
-
-
-class OAuthToken(Base):
-    __tablename__ = "oauth_tokens"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    access_token: Mapped[str] = mapped_column(String(500))
-    refresh_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    user: Mapped["User"] = relationship("User", back_populates="tokens")
-
-    def __repr__(self) -> str:
-        return f"<OAuthToken(id={self.id}, user_id={self.user_id})>"
 
 
 class SystemSetting(Base):
