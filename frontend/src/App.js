@@ -9,7 +9,7 @@ import CurrenciesPage from './pages/CurrenciesPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import AdminPage from './pages/AdminPage';
+
 import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
@@ -55,7 +55,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="admin" element={<AdminPage />} />
+
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

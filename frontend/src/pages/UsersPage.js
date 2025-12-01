@@ -3,9 +3,9 @@ import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Button, MenuItem,
-  DialogContentText, TablePagination
+  DialogContentText, TablePagination, Chip, Alert
 } from '@mui/material';
-import { Edit, Delete } from '@mui/icons-material';
+import { Edit, Delete, Check, Close } from '@mui/icons-material';
 
 function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -23,9 +23,13 @@ function UsersPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [searchFilter, setSearchFilter] = useState('');
+  const [requests, setRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     loadUsers();
+    loadRequests();
   }, []);
 
   const loadUsers = async () => {
@@ -39,6 +43,57 @@ function UsersPage() {
       setUsers(data);
     } catch (error) {
       console.error('Failed to load users:', error);
+    }
+  };
+
+  const loadRequests = async () => {
+    try {
+      const response = await fetch('/api/admin/registration-requests', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setRequests(data);
+    } catch (error) {
+      console.error('Failed to load requests:', error);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    setRequestsLoading(true);
+    try {
+      await fetch(`/api/admin/registration-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setMessage('Пользователь одобрен и создан');
+      loadRequests();
+      loadUsers();
+    } catch (error) {
+      setMessage('Ошибка при одобрении');
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    setRequestsLoading(true);
+    try {
+      await fetch(`/api/admin/registration-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setMessage('Заявка отклонена');
+      loadRequests();
+    } catch (error) {
+      setMessage('Ошибка при отклонении');
+    } finally {
+      setRequestsLoading(false);
     }
   };
 
@@ -123,6 +178,83 @@ function UsersPage() {
     <Box>
       <Typography variant="h4" mb={3}>Управление пользователями</Typography>
 
+      {message && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage('')}>
+          {message}
+        </Alert>
+      )}
+
+      {requests.length > 0 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Заявки на регистрацию ({requests.length})
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell>Логин</TableCell>
+                  <TableCell>Имя</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Дата</TableCell>
+                  <TableCell>Статус</TableCell>
+                  <TableCell>Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {requests.map((request) => (
+                  <TableRow key={request.id}>
+                    <TableCell>{request.username}</TableCell>
+                    <TableCell>{request.full_name}</TableCell>
+                    <TableCell>{request.email}</TableCell>
+                    <TableCell>
+                      {new Date(request.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={request.status} 
+                        color={request.status === 'pending' ? 'warning' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {request.status === 'pending' && (
+                        <Box display="flex" gap={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            startIcon={<Check />}
+                            disabled={requestsLoading}
+                            onClick={() => handleApprove(request.id)}
+                          >
+                            Одобрить
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<Close />}
+                            disabled={requestsLoading}
+                            onClick={() => handleReject(request.id)}
+                          >
+                            Отклонить
+                          </Button>
+                        </Box>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+
+      <Typography variant="h6" gutterBottom>
+        Пользователи ({users.length})
+      </Typography>
+      
       <Box sx={{ mb: 2 }}>
         <TextField
           fullWidth
