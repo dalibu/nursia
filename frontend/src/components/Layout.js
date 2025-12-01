@@ -9,6 +9,7 @@ function Layout({ onLogout }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState('');
   const [settingsAnchor, setSettingsAnchor] = useState(null);
+  const [accountAnchor, setAccountAnchor] = useState(null);
 
   useEffect(() => {
     checkUserRole();
@@ -83,19 +84,43 @@ function Layout({ onLogout }) {
               </Menu>
             </>
           )}
-          <Button color="inherit" component={Link} to="/profile">
-            Профиль
+          <Button 
+            color="inherit" 
+            onClick={(e) => setAccountAnchor(e.currentTarget)}
+            endIcon={<ExpandMore />}
+          >
+            Аккаунт
           </Button>
-          {isAdmin && (
-            <Button color="inherit" component={Link} to="/users">
-              Пользователи
-            </Button>
-          )}
-          {isAdmin && (
-            <Button color="inherit" component={Link} to="/admin">
-              Админ
-            </Button>
-          )}
+          <Menu
+            anchorEl={accountAnchor}
+            open={Boolean(accountAnchor)}
+            onClose={() => setAccountAnchor(null)}
+            PaperProps={{
+              sx: {
+                backgroundColor: '#1976d2',
+                '& .MuiMenuItem-root': {
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  }
+                }
+              }
+            }}
+          >
+            <MenuItem component={Link} to="/profile" onClick={() => setAccountAnchor(null)}>
+              Профиль
+            </MenuItem>
+            {isAdmin && (
+              <MenuItem component={Link} to="/users" onClick={() => setAccountAnchor(null)}>
+                Пользователи
+              </MenuItem>
+            )}
+            {isAdmin && (
+              <MenuItem component={Link} to="/admin" onClick={() => setAccountAnchor(null)}>
+                Заявки
+              </MenuItem>
+            )}
+          </Menu>
           <Button color="inherit" onClick={handleLogout}>
             Выход
           </Button>
