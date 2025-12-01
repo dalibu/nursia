@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
 import ExpensesPage from './pages/ExpensesPage';
 import CategoriesPage from './pages/CategoriesPage';
+import CurrenciesPage from './pages/CurrenciesPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -41,6 +42,7 @@ function App() {
           }>
             <Route index element={<ExpensesPage />} />
             <Route path="categories" element={<CategoriesPage />} />
+            <Route path="currencies" element={<CurrenciesPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="admin" element={<AdminPage />} />
           </Route>

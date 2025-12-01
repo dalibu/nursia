@@ -132,6 +132,20 @@ class SystemSetting(Base):
         return f"<SystemSetting(key={self.key}, value={self.value})>"
 
 
+class Currency(Base):
+    __tablename__ = "currencies"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(3), unique=True)  # UAH, EUR, USD, RUB
+    name: Mapped[str] = mapped_column(String(100))  # Ukrainian Hryvnia
+    symbol: Mapped[str] = mapped_column(String(10))  # ₴, €, $, ₽
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<Currency(id={self.id}, code={self.code}, name={self.name})>"
+
+
 class Recipient(Base):
     __tablename__ = "recipients"
 

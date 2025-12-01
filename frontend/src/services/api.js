@@ -35,6 +35,10 @@ export const recipients = {
 
 export const currencies = {
   list: () => api.get('/currencies/'),
+  getAll: () => api.get('/currencies/all'),
+  create: (data) => api.post('/currencies/', data),
+  update: (id, data) => api.put(`/currencies/${id}`, data),
+  delete: (id) => api.delete(`/currencies/${id}`)
 };
 
 export default api;

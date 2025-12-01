@@ -46,6 +46,11 @@ function Layout({ onLogout }) {
               Категории
             </Button>
           )}
+          {isAdmin && (
+            <Button color="inherit" component={Link} to="/currencies">
+              Валюты
+            </Button>
+          )}
           <Button color="inherit" component={Link} to="/reports">
             Отчеты
           </Button>

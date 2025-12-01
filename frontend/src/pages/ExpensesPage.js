@@ -44,9 +44,12 @@ function ExpensesPage() {
         expenses.getUserInfo()
       ]);
 
+      const currenciesRes = await expenses.getUserInfo();
+      const currenciesData = await fetch('/api/currencies/').then(r => r.json());
+      
       setExpenseList(expensesRes.data);
       setCategories(categoriesRes.data);
-      setCurrencies(['UAH', 'EUR', 'USD', 'RUB']);
+      setCurrencies(currenciesData.currencies || ['UAH', 'EUR', 'USD', 'RUB']);
       setIsAdmin(userRes.data.role === 'admin');
     } catch (error) {
       console.error('Failed to load expenses:', error);
