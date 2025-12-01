@@ -8,7 +8,7 @@ import { expenses, recipients, currencies } from '../services/api';
 function ExpenseForm({ open, expense, onClose }) {
   const [formData, setFormData] = useState({
     amount: '',
-    currency: 'UAH',
+    currency: '',
     category_id: '',
     recipient_id: '',
     expense_date: new Date().toISOString().split('T')[0],
@@ -31,10 +31,10 @@ function ExpenseForm({ open, expense, onClose }) {
           description: expense.description || ''
         });
       } else {
-        // Сброс формы для нового расхода
+        // Сброс формы для нового расхода - валюта будет установлена в loadData
         setFormData({
           amount: '',
-          currency: 'UAH',
+          currency: '',
           category_id: '',
           recipient_id: '',
           expense_date: new Date().toISOString().split('T')[0],
@@ -54,6 +54,12 @@ function ExpenseForm({ open, expense, onClose }) {
       setCategories(categoriesRes.data);
       setRecipientList(recipientsRes.data);
       setCurrencyList(currenciesRes.data.currencies);
+      
+      // Устанавливаем валюту по умолчанию
+      const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
+      if (defaultCurrency && !expense) {
+        setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
+      }
     } catch (error) {
       console.error('Failed to load form data:', error);
     }

@@ -25,7 +25,7 @@ class ExpenseBase(BaseModel):
     category_id: int
     recipient_id: Optional[int] = None
     amount: Decimal = Field(..., gt=0, decimal_places=2)
-    currency: str = Field(default="UAH", max_length=3)
+    currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
     expense_date: datetime
 

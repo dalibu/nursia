@@ -91,7 +91,7 @@ class Expense(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("expense_categories.id"))
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recipients.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3), default="UAH")
+    currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expense_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -140,6 +140,7 @@ class Currency(Base):
     name: Mapped[str] = mapped_column(String(100))  # Ukrainian Hryvnia
     symbol: Mapped[str] = mapped_column(String(10))  # ₴, €, $, ₽
     is_active: Mapped[bool] = mapped_column(default=True)
+    is_default: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:

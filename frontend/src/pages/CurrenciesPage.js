@@ -12,7 +12,7 @@ function CurrenciesPage() {
   const [currencyList, setCurrencyList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState(null);
-  const [formData, setFormData] = useState({ code: '', name: '', symbol: '', is_active: true });
+  const [formData, setFormData] = useState({ code: '', name: '', symbol: '', is_active: true, is_default: false });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, currencyId: null, currencyName: '' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -51,7 +51,8 @@ function CurrenciesPage() {
       code: currency.code, 
       name: currency.name, 
       symbol: currency.symbol,
-      is_active: currency.is_active
+      is_active: currency.is_active,
+      is_default: currency.is_default
     });
     setShowForm(true);
   };
@@ -77,7 +78,7 @@ function CurrenciesPage() {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingCurrency(null);
-    setFormData({ code: '', name: '', symbol: '', is_active: true });
+    setFormData({ code: '', name: '', symbol: '', is_active: true, is_default: false });
   };
 
   return (
@@ -102,6 +103,7 @@ function CurrenciesPage() {
               <TableCell>Название</TableCell>
               <TableCell>Символ</TableCell>
               <TableCell>Активна</TableCell>
+              <TableCell>По умолчанию</TableCell>
               <TableCell>Дата создания</TableCell>
               <TableCell sx={{ width: 120 }}>Действия</TableCell>
             </TableRow>
@@ -116,6 +118,7 @@ function CurrenciesPage() {
                 <TableCell>{currency.name}</TableCell>
                 <TableCell>{currency.symbol}</TableCell>
                 <TableCell>{currency.is_active ? 'Да' : 'Нет'}</TableCell>
+                <TableCell>{currency.is_default ? 'Да' : 'Нет'}</TableCell>
                 <TableCell>{new Date(currency.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <IconButton onClick={() => handleEdit(currency)}>
@@ -188,6 +191,16 @@ function CurrenciesPage() {
               }
               label="Активна"
               sx={{ mt: 2 }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.is_default}
+                  onChange={(e) => setFormData({...formData, is_default: e.target.checked})}
+                />
+              }
+              label="По умолчанию"
+              sx={{ mt: 1 }}
             />
           </DialogContent>
           <DialogActions>

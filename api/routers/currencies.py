@@ -23,6 +23,7 @@ class CurrencyUpdate(BaseModel):
     name: str
     symbol: str
     is_active: bool
+    is_default: bool = False
 
 @router.get("/")
 async def get_currencies(db: AsyncSession = Depends(get_db)):
@@ -38,7 +39,8 @@ async def get_currencies(db: AsyncSession = Depends(get_db)):
                 "code": currency.code,
                 "name": currency.name,
                 "symbol": currency.symbol,
-                "is_active": currency.is_active
+                "is_active": currency.is_active,
+                "is_default": currency.is_default
             }
             for currency in currencies
         ]
@@ -60,6 +62,7 @@ async def get_all_currencies(
             "name": currency.name,
             "symbol": currency.symbol,
             "is_active": currency.is_active,
+            "is_default": currency.is_default,
             "created_at": currency.created_at
         }
         for currency in currencies
@@ -93,7 +96,8 @@ async def create_currency(
         "code": currency.code,
         "name": currency.name,
         "symbol": currency.symbol,
-        "is_active": currency.is_active
+        "is_active": currency.is_active,
+        "is_default": currency.is_default
     }
 
 @router.put("/{currency_id}")
@@ -114,6 +118,19 @@ async def update_currency(
     currency.symbol = currency_data.symbol
     currency.is_active = currency_data.is_active
     
+    # Если устанавливаем как default, снимаем default с всех остальных
+    if currency_data.is_default:
+        await db.execute(
+            select(Currency).where(Currency.id != currency_id)
+        )
+        result = await db.execute(select(Currency).where(Currency.id != currency_id))
+        other_currencies = result.scalars().all()
+        for other_currency in other_currencies:
+            other_currency.is_default = False
+        currency.is_default = True
+    else:
+        currency.is_default = False
+    
     await db.commit()
     await db.refresh(currency)
     
@@ -122,7 +139,8 @@ async def update_currency(
         "code": currency.code,
         "name": currency.name,
         "symbol": currency.symbol,
-        "is_active": currency.is_active
+        "is_active": currency.is_active,
+        "is_default": currency.is_default
     }
 
 @router.delete("/{currency_id}")

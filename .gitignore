@@ -52,6 +52,7 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+data/nursia.db
 
 # Node.js (for frontend)
 node_modules/

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload
 from database.core import get_db
-from database.models import User, Expense, ExpenseCategory, Recipient
+from database.models import User, Expense, ExpenseCategory, Recipient, Currency
 from api.schemas.expense import (
     ExpenseCreate, Expense as ExpenseSchema,
     ExpenseCategoryCreate, ExpenseCategory as ExpenseCategorySchema,
@@ -49,6 +49,13 @@ async def create_expense(
     current_user: User = Depends(get_current_user)
 ):
     expense_data = expense.model_dump()
+    
+    # Устанавливаем валюту по умолчанию если не указана
+    if not expense_data.get('currency'):
+        result = await db.execute(select(Currency).where(Currency.is_default == True))
+        default_currency = result.scalar_one_or_none()
+        expense_data['currency'] = default_currency.code if default_currency else 'UAH'
+    
     # Если expense_date без времени, добавляем текущее время
     if expense_data['expense_date'].time() == datetime.min.time():
         now = datetime.now()
