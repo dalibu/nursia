@@ -85,8 +85,8 @@ function CategoriesPage() {
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
+        <Table size="small" stickyHeader>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
               <TableCell>ID</TableCell>

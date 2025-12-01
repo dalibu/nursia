@@ -262,8 +262,8 @@ function ExpensesPage() {
         </Box>
       </Paper>
 
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
+        <Table size="small" stickyHeader>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
               <TableCell sx={{ width: 60 }}>
