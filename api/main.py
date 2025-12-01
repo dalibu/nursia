@@ -4,20 +4,36 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, expenses, settings, currencies, recipients, admin
+from api.routers import auth, expenses, settings as settings_router, currencies, recipients, admin
+from api.middleware.security import SecurityHeadersMiddleware
+from api.middleware.logging import SecurityLoggingMiddleware
+from config.settings import settings
 import os
 
 app = FastAPI(
     title="Nursia Expense Tracker API",
     description="REST API для учета расходов времени и денег на проживание",
-    version="1.0.0"
+    version="1.0.0",
+    debug=settings.DEBUG
 )
 
+# Security middleware
+if settings.FORCE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+if settings.SECURITY_HEADERS_ENABLED:
+    app.add_middleware(SecurityHeadersMiddleware)
+
+# Security logging middleware
+app.add_middleware(SecurityLoggingMiddleware)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=settings.origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,7 +42,7 @@ app.add_middleware(
 # API роуты с префиксом /api
 app.include_router(auth.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
+app.include_router(settings_router.router, prefix="/api")
 app.include_router(currencies.router, prefix="/api")
 app.include_router(recipients.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")

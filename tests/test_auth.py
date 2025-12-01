@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
-from api.auth.oauth import create_access_token, SECRET_KEY, ALGORITHM
+from api.auth.oauth import create_access_token
+from config.settings import settings
 from jose import jwt
 
 def test_create_access_token():
@@ -12,7 +13,7 @@ def test_create_access_token():
     assert len(token) > 0
     
     # Декодируем токен для проверки
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     assert payload["sub"] == "123456789"
     assert "exp" in payload
 
@@ -22,7 +23,7 @@ def test_create_access_token_with_expiry():
     expires_delta = timedelta(minutes=5)
     token = create_access_token(data, expires_delta)
     
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     
     # Проверяем, что поле exp существует и это число
     assert "exp" in payload
@@ -42,4 +43,4 @@ def test_token_expiry():
     
     # Попытка декодировать истекший токен должна вызвать исключение
     with pytest.raises(jwt.ExpiredSignatureError):
-        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
