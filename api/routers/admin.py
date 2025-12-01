@@ -20,8 +20,7 @@ async def get_registration_requests(
     current_user: User = Depends(get_admin_user)
 ):
     result = await db.execute(
-        select(RegistrationRequest).where(RegistrationRequest.status == "pending")
-        .order_by(RegistrationRequest.created_at.desc())
+        select(RegistrationRequest).order_by(RegistrationRequest.created_at.desc())
     )
     return result.scalars().all()
 
@@ -67,14 +66,32 @@ async def reject_registration(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
+    # Получаем заявку
     result = await db.execute(
-        update(RegistrationRequest)
-        .where(RegistrationRequest.id == request_id)
-        .values(status="rejected", reviewed_by=current_user.id)
+        select(RegistrationRequest).where(RegistrationRequest.id == request_id)
     )
-    
-    if result.rowcount == 0:
+    request = result.scalar_one_or_none()
+    if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
+    # Удаляем отклоненную заявку из базы
+    await db.delete(request)
     await db.commit()
-    return {"message": "Registration request rejected"}
+    return {"message": "Registration request rejected and deleted"}
+
+@router.delete("/registration-requests/{request_id}")
+async def delete_registration_request(
+    request_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    result = await db.execute(
+        select(RegistrationRequest).where(RegistrationRequest.id == request_id)
+    )
+    request = result.scalar_one_or_none()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    await db.delete(request)
+    await db.commit()
+    return {"message": "Registration request deleted"}

@@ -13,6 +13,7 @@ import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import RequestsPage from './pages/RequestsPage';
 
 const theme = createTheme({
   palette: {
@@ -55,7 +56,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="reports" element={<ReportsPage />} />
-
+            <Route path="requests" element={<RequestsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

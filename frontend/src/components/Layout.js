@@ -1,8 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } from '@mui/material';
 import { ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
+
+const NotificationContext = createContext();
+
+export const useNotifications = () => {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error('useNotifications must be used within NotificationProvider');
+  }
+  return context;
+};
 
 function Layout({ onLogout }) {
   const navigate = useNavigate();
@@ -69,7 +79,8 @@ function Layout({ onLogout }) {
       const response = await axios.get('/api/admin/registration-requests', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setHasRequests(response.data.length > 0);
+      const pendingRequests = response.data.filter(r => r.status === 'pending');
+      setHasRequests(pendingRequests.length > 0);
     } catch (error) {
       console.error('Failed to check requests:', error);
     }
@@ -82,97 +93,103 @@ function Layout({ onLogout }) {
   };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            NURSIA | {userName}
-          </Typography>
-          <Button color="inherit" component={Link} to="/">
-            Расходы
-          </Button>
-          <Button color="inherit" component={Link} to="/reports">
-            Отчеты
-          </Button>
-          {isAdmin && (
-            <>
-              <Button 
-                color="inherit" 
-                onClick={(e) => setSettingsAnchor(e.currentTarget)}
-                endIcon={<ExpandMore />}
-              >
-                Настройки
-              </Button>
-              <Menu
-                anchorEl={settingsAnchor}
-                open={Boolean(settingsAnchor)}
-                onClose={() => setSettingsAnchor(null)}
-                PaperProps={{
-                  sx: {
-                    backgroundColor: '#1976d2',
-                    '& .MuiMenuItem-root': {
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+    <NotificationContext.Provider value={{ checkRequests }}>
+      <Box sx={{ flexGrow: 1 }}>
+        <AppBar position="static">
+          <Toolbar>
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              NURSIA | {userName}
+            </Typography>
+            <Button color="inherit" component={Link} to="/">
+              Расходы
+            </Button>
+            <Button color="inherit" component={Link} to="/reports">
+              Отчеты
+            </Button>
+            {isAdmin && (
+              <>
+                <Button 
+                  color="inherit" 
+                  onClick={(e) => setSettingsAnchor(e.currentTarget)}
+                  endIcon={<ExpandMore />}
+                >
+                  Настройки
+                </Button>
+                <Menu
+                  anchorEl={settingsAnchor}
+                  open={Boolean(settingsAnchor)}
+                  onClose={() => setSettingsAnchor(null)}
+                  PaperProps={{
+                    sx: {
+                      backgroundColor: '#1976d2',
+                      '& .MuiMenuItem-root': {
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                        }
                       }
                     }
-                  }
-                }}
-              >
-                <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
-                  Категории
-                </MenuItem>
-                <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
-                  Валюты
-                </MenuItem>
-                <MenuItem component={Link} to="/settings" onClick={() => setSettingsAnchor(null)}>
-                  Параметры
-                </MenuItem>
-              </Menu>
-            </>
-          )}
-          <Button 
-            color="inherit" 
-            onClick={(e) => setAccountAnchor(e.currentTarget)}
-            endIcon={<ExpandMore />}
-          >
-            Аккаунт {hasRequests && '⚠️'}
-          </Button>
-          <Menu
-            anchorEl={accountAnchor}
-            open={Boolean(accountAnchor)}
-            onClose={() => setAccountAnchor(null)}
-            PaperProps={{
-              sx: {
-                backgroundColor: '#1976d2',
-                '& .MuiMenuItem-root': {
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  }}
+                >
+                  <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
+                    Категории
+                  </MenuItem>
+                  <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
+                    Валюты
+                  </MenuItem>
+                  <MenuItem component={Link} to="/settings" onClick={() => setSettingsAnchor(null)}>
+                    Параметры
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+            <Button 
+              color="inherit" 
+              onClick={(e) => setAccountAnchor(e.currentTarget)}
+              endIcon={<ExpandMore />}
+            >
+              Аккаунт {hasRequests && '⚠️'}
+            </Button>
+            <Menu
+              anchorEl={accountAnchor}
+              open={Boolean(accountAnchor)}
+              onClose={() => setAccountAnchor(null)}
+              PaperProps={{
+                sx: {
+                  backgroundColor: '#1976d2',
+                  '& .MuiMenuItem-root': {
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }
                   }
                 }
-              }
-            }}
-          >
-            <MenuItem component={Link} to="/profile" onClick={() => setAccountAnchor(null)}>
-              Профиль
-            </MenuItem>
-            {isAdmin && (
-              <MenuItem component={Link} to="/users" onClick={() => setAccountAnchor(null)}>
-                Пользователи {hasRequests && '⚠️'}
+              }}
+            >
+              <MenuItem component={Link} to="/profile" onClick={() => setAccountAnchor(null)}>
+                Профиль
               </MenuItem>
-            )}
-
-          </Menu>
-          <Button color="inherit" onClick={handleLogout}>
-            Выход
-          </Button>
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Outlet />
-      </Container>
-    </Box>
+              {isAdmin && (
+                <MenuItem component={Link} to="/users" onClick={() => setAccountAnchor(null)}>
+                  Пользователи
+                </MenuItem>
+              )}
+              {isAdmin && (
+                <MenuItem component={Link} to="/requests" onClick={() => setAccountAnchor(null)}>
+                  Заявки {hasRequests && '⚠️'}
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => { setAccountAnchor(null); handleLogout(); }}>
+                Выйти
+              </MenuItem>
+            </Menu>
+          </Toolbar>
+        </AppBar>
+        <Container maxWidth="lg" sx={{ mt: 4 }}>
+          <Outlet />
+        </Container>
+      </Box>
+    </NotificationContext.Provider>
   );
 }
 
