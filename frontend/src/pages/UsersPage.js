@@ -216,7 +216,13 @@ function UsersPage() {
                 <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.role}</TableCell>
-                <TableCell>{user.status}</TableCell>
+                <TableCell>
+                  <Chip 
+                    label={user.status}
+                    color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : 'error'}
+                    size="small"
+                  />
+                </TableCell>
                 <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>{user.updated_at ? new Date(user.updated_at).toLocaleDateString() : '-'}</TableCell>
                 <TableCell>
