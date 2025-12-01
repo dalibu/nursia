@@ -16,19 +16,11 @@ function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [sortField, setSortField] = useState('number');
   const [sortDirection, setSortDirection] = useState('desc');
-  const [filters, setFilters] = useState(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    const lastDay = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
-    
-    return {
-      category: '',
-      currency: '',
-      dateFrom: firstDay,
-      dateTo: lastDay
-    };
+  const [filters, setFilters] = useState({
+    category: '',
+    currency: '',
+    dateFrom: '',
+    dateTo: ''
   });
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -198,17 +190,11 @@ function ExpensesPage() {
   };
 
   const clearFilters = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    const lastDay = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
-    
     setFilters({
       category: '',
       currency: '',
-      dateFrom: firstDay,
-      dateTo: lastDay
+      dateFrom: '',
+      dateTo: ''
     });
   };
 
