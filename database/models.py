@@ -54,22 +54,6 @@ class RegistrationRequest(Base):
         return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
-class Action(Base):
-    __tablename__ = "actions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger)
-    username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    start_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    stop_ts: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    duration_seconds: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    def __repr__(self) -> str:
-        return f"<Action(id={self.id}, telegram_id={self.telegram_id}, duration={self.duration_seconds})>"
-
-
 class ExpenseCategory(Base):
     __tablename__ = "expense_categories"
 

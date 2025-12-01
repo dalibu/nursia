@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User, UserRole
-from database.models import Action
+
 from datetime import datetime
 from sqlalchemy import select
 
@@ -51,30 +51,4 @@ async def get_all_users(session: AsyncSession) -> List[User]:
     return list(result.scalars().all())
 
 
-async def create_action(
-    session: AsyncSession,
-    telegram_id: int,
-    full_name: Optional[str],
-    username: Optional[str],
-    start_ts: datetime,
-    stop_ts: Optional[datetime],
-    duration_seconds: Optional[int],
-) -> Action:
-    action = Action(
-        telegram_id=telegram_id,
-        full_name=full_name,
-        username=username,
-        start_ts=start_ts,
-        stop_ts=stop_ts,
-        duration_seconds=duration_seconds,
-    )
-    session.add(action)
-    await session.commit()
-    await session.refresh(action)
-    return action
 
-
-async def get_actions_by_user(session: AsyncSession, telegram_id: int, limit: int = 20):
-    stmt = select(Action).where(Action.telegram_id == telegram_id).order_by(Action.id.desc()).limit(limit)
-    result = await session.execute(stmt)
-    return list(result.scalars().all())

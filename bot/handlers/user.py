@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from database.core import AsyncSessionLocal
 from database.crud import create_action
-from database.crud import get_actions_by_user
+
 
 
 # in-memory active timers: telegram_id -> dict(job, start_ts, chat_id, message_id)
@@ -201,7 +201,8 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with AsyncSessionLocal() as session:
-            rows = await get_actions_by_user(session, telegram_id, limit=20)
+            # Actions functionality removed
+            rows = []
     except Exception:
         await context.bot.send_message(chat_id=chat_id, text="Не удалось загрузить историю (ошибка БД).")
         return
