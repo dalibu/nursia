@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, DialogContentText
+  DialogContent, DialogActions, TextField, DialogContentText, TablePagination
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { expenses } from '../services/api';
@@ -13,6 +13,8 @@ function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, categoryId: null, categoryName: '' });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
     loadCategories();
@@ -97,7 +99,9 @@ function CategoriesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {categories.map((category) => (
+            {categories
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((category) => (
               <TableRow key={category.id}>
                 <TableCell>{category.id}</TableCell>
                 <TableCell>{category.name}</TableCell>
@@ -116,6 +120,21 @@ function CategoriesPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      
+      <TablePagination
+        component="div"
+        count={categories.length}
+        page={page}
+        onPageChange={(event, newPage) => setPage(newPage)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[10, 25, 50]}
+        labelRowsPerPage="Строк на странице:"
+        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+      />
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
         <DialogTitle>

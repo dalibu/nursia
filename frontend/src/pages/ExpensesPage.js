@@ -3,7 +3,7 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText
+  DialogContentText, TablePagination
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { expenses } from '../services/api';
@@ -27,6 +27,8 @@ function ExpensesPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, expenseId: null, expenseName: '' });
   const [totals, setTotals] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
     loadExpenses();
@@ -341,10 +343,12 @@ function ExpensesPage() {
                 </TableCell>
               </TableRow>
             )}
-            {filteredList.map((expense, index) => {
+            {filteredList
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((expense, index) => {
               const displayNumber = sortField === 'number' && sortDirection === 'desc' 
-                ? filteredList.length - index 
-                : index + 1;
+                ? filteredList.length - (page * rowsPerPage + index)
+                : page * rowsPerPage + index + 1;
               
               return (
                 <TableRow key={expense.id}>
@@ -384,6 +388,21 @@ function ExpensesPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      
+      <TablePagination
+        component="div"
+        count={filteredList.length}
+        page={page}
+        onPageChange={(event, newPage) => setPage(newPage)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        labelRowsPerPage="Строк на странице:"
+        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+      />
 
       <ExpenseForm
         open={showForm}

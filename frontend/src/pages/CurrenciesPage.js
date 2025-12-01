@@ -3,7 +3,7 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, DialogContentText, Switch,
-  FormControlLabel
+  FormControlLabel, TablePagination
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { currencies } from '../services/api';
@@ -14,6 +14,8 @@ function CurrenciesPage() {
   const [editingCurrency, setEditingCurrency] = useState(null);
   const [formData, setFormData] = useState({ code: '', name: '', symbol: '', is_active: true });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, currencyId: null, currencyName: '' });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
     loadCurrencies();
@@ -105,7 +107,9 @@ function CurrenciesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {currencyList.map((currency) => (
+            {currencyList
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((currency) => (
               <TableRow key={currency.id}>
                 <TableCell>{currency.id}</TableCell>
                 <TableCell>{currency.code}</TableCell>
@@ -126,6 +130,21 @@ function CurrenciesPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      
+      <TablePagination
+        component="div"
+        count={currencyList.length}
+        page={page}
+        onPageChange={(event, newPage) => setPage(newPage)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[10, 25, 50]}
+        labelRowsPerPage="Строк на странице:"
+        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+      />
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
         <DialogTitle>
