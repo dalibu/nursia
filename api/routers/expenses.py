@@ -116,6 +116,8 @@ async def get_expenses(
             "expense_date": expense.expense_date.isoformat(),
             "user_id": expense.user_id,
             "created_at": expense.created_at.isoformat(),
+            "is_paid": expense.is_paid,
+            "paid_at": expense.paid_at.isoformat() if expense.paid_at else None,
             "category": {
                 "id": expense.category.id,
                 "name": expense.category.name,
@@ -268,6 +270,13 @@ async def update_expense(
             minute=now.minute,
             second=now.second
         )
+    
+    # Обновляем paid_at при изменении is_paid
+    if 'is_paid' in expense_data:
+        if expense_data['is_paid']:
+            expense_data['paid_at'] = datetime.now(timezone.utc)
+        else:
+            expense_data['paid_at'] = None
     
     for field, value in expense_data.items():
         setattr(db_expense, field, value)

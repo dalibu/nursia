@@ -28,6 +28,7 @@ class ExpenseBase(BaseModel):
     currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
     expense_date: datetime
+    is_paid: Optional[bool] = False
 
 
 class ExpenseCreate(ExpenseBase):
@@ -56,6 +57,7 @@ class Expense(ExpenseBase):
     id: int
     user_id: int
     created_at: datetime
+    paid_at: Optional[datetime] = None
     category: Optional[ExpenseCategory] = None
     recipient: Optional[RecipientInfo] = None
     user: Optional[UserInfo] = None

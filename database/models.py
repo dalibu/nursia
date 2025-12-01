@@ -79,6 +79,8 @@ class Expense(Base):
     currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expense_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_paid: Mapped[bool] = mapped_column(default=False)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="expenses")

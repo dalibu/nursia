@@ -12,11 +12,13 @@ function ExpenseForm({ open, expense, onClose }) {
     category_id: '',
     recipient_id: '',
     expense_date: new Date().toISOString().split('T')[0],
-    description: ''
+    description: '',
+    is_paid: false
   });
   const [categories, setCategories] = useState([]);
   const [recipientList, setRecipientList] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -28,7 +30,8 @@ function ExpenseForm({ open, expense, onClose }) {
           category_id: expense.category_id,
           recipient_id: expense.recipient_id,
           expense_date: expense.expense_date.split('T')[0],
-          description: expense.description || ''
+          description: expense.description || '',
+          is_paid: expense.is_paid || false
         });
       } else {
         // Сброс формы для нового расхода - валюта будет установлена в loadData
@@ -38,7 +41,8 @@ function ExpenseForm({ open, expense, onClose }) {
           category_id: '',
           recipient_id: '',
           expense_date: new Date().toISOString().split('T')[0],
-          description: ''
+          description: '',
+          is_paid: false
         });
       }
     }
@@ -46,14 +50,16 @@ function ExpenseForm({ open, expense, onClose }) {
 
   const loadData = async () => {
     try {
-      const [categoriesRes, recipientsRes, currenciesRes] = await Promise.all([
+      const [categoriesRes, recipientsRes, currenciesRes, userRes] = await Promise.all([
         expenses.categories(),
         recipients.list(),
-        currencies.list()
+        currencies.list(),
+        expenses.getUserInfo()
       ]);
       setCategories(categoriesRes.data);
       setRecipientList(recipientsRes.data);
       setCurrencyList(currenciesRes.data.currencies);
+      setIsAdmin(userRes.data.role === 'admin');
       
       // Устанавливаем валюту по умолчанию
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
@@ -162,6 +168,19 @@ function ExpenseForm({ open, expense, onClose }) {
             inputProps={{ maxLength: 1000 }}
             helperText={`${formData.description.length}/1000 символов`}
           />
+          {isAdmin && (
+            <TextField
+              fullWidth
+              select
+              label="Статус оплаты"
+              margin="normal"
+              value={formData.is_paid}
+              onChange={(e) => setFormData({...formData, is_paid: e.target.value === 'true'})}
+            >
+              <MenuItem value={false}>Не оплачено</MenuItem>
+              <MenuItem value={true}>Оплачено</MenuItem>
+            </TextField>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Отмена</Button>

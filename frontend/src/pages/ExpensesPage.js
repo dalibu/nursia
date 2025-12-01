@@ -3,9 +3,9 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination
+  DialogContentText, TablePagination, Chip
 } from '@mui/material';
-import { Add, Edit, Delete } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment } from '@mui/icons-material';
 import { expenses } from '../services/api';
 import ExpenseForm from '../components/ExpenseForm';
 
@@ -20,7 +20,8 @@ function ExpensesPage() {
     category: '',
     currency: '',
     dateFrom: '',
-    dateTo: ''
+    dateTo: '',
+    paymentStatus: 'all'
   });
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -81,7 +82,16 @@ function ExpensesPage() {
       filtered = filtered.filter(expense => 
         new Date(expense.expense_date) <= new Date(filters.dateTo + 'T23:59:59')
       );
-
+    }
+    if (filters.paymentStatus !== 'all') {
+      filtered = filtered.filter(expense => {
+        if (filters.paymentStatus === 'paid') {
+          return expense.is_paid === true;
+        } else if (filters.paymentStatus === 'unpaid') {
+          return expense.is_paid === false || expense.is_paid === undefined;
+        }
+        return true;
+      });
     }
     
     // Применяем сортировку
@@ -135,14 +145,29 @@ function ExpensesPage() {
     
     // Вычисляем итоги по валютам
     const newTotals = {};
+    const paidTotals = {};
+    const unpaidTotals = {};
+    
     filtered.forEach(expense => {
       const currency = expense.currency;
+      const amount = parseFloat(expense.amount);
+      
       if (!newTotals[currency]) {
         newTotals[currency] = 0;
+        paidTotals[currency] = 0;
+        unpaidTotals[currency] = 0;
       }
-      newTotals[currency] += parseFloat(expense.amount);
+      
+      newTotals[currency] += amount;
+      
+      if (expense.is_paid) {
+        paidTotals[currency] += amount;
+      } else {
+        unpaidTotals[currency] += amount;
+      }
     });
-    setTotals(newTotals);
+    
+    setTotals({ all: newTotals, paid: paidTotals, unpaid: unpaidTotals });
   };
 
   const handleSort = (field) => {
@@ -193,12 +218,26 @@ function ExpensesPage() {
     loadExpenses();
   };
 
+  const handlePaymentToggle = async (expenseId, isPaid) => {
+    try {
+      const expense = expenseList.find(e => e.id === expenseId);
+      await expenses.update(expenseId, {
+        ...expense,
+        is_paid: isPaid
+      });
+      loadExpenses();
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+    }
+  };
+
   const clearFilters = () => {
     setFilters({
       category: '',
       currency: '',
       dateFrom: '',
-      dateTo: ''
+      dateTo: '',
+      paymentStatus: 'all'
     });
   };
 
@@ -246,6 +285,20 @@ function ExpensesPage() {
               </MenuItem>
             ))}
           </TextField>
+          {isAdmin && (
+            <TextField
+              select
+              label="Оплата"
+              size="small"
+              value={filters.paymentStatus}
+              onChange={(e) => handleFilterChange('paymentStatus', e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="all">Все</MenuItem>
+              <MenuItem value="paid">Оплачено</MenuItem>
+              <MenuItem value="unpaid">Не оплачено</MenuItem>
+            </TextField>
+          )}
           <TextField
             label="Дата от"
             type="date"
@@ -331,6 +384,7 @@ function ExpensesPage() {
                 </TableSortLabel>
               </TableCell>
               <TableCell>Описание</TableCell>
+              {isAdmin && <TableCell>Оплачено</TableCell>}
               <TableCell sx={{ width: 120 }}>Действия</TableCell>
             </TableRow>
           </TableHead>
@@ -338,7 +392,7 @@ function ExpensesPage() {
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 9 : 8} align="center">
+                <TableCell colSpan={isAdmin ? 10 : 8} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -362,6 +416,28 @@ function ExpensesPage() {
                   )}
                   <TableCell>{expense.recipient?.name || '-'}</TableCell>
                   <TableCell>{expense.description || '-'}</TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Chip 
+                          label={expense.is_paid ? 'Оплачено' : 'К оплате'}
+                          color={expense.is_paid ? 'success' : 'warning'}
+                          size="small"
+                        />
+                        {!expense.is_paid && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="success"
+                            startIcon={<Payment />}
+                            onClick={() => handlePaymentToggle(expense.id, true)}
+                          >
+                            Оплатить
+                          </Button>
+                        )}
+                      </Box>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <IconButton onClick={() => handleEdit(expense)}>
                       <Edit />
@@ -377,14 +453,36 @@ function ExpensesPage() {
           </TableBody>
           <TableBody>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
+              <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>Итого:</TableCell>
               <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5', whiteSpace: 'nowrap' }}>
-                {Object.entries(totals).map(([currency, amount]) => 
+                {Object.entries(totals.all || {}).map(([currency, amount]) => 
                   `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
                 ).join(' / ') || '0.00'}
               </TableCell>
-              <TableCell colSpan={isAdmin ? 5 : 4} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
+              <TableCell colSpan={isAdmin ? 6 : 4} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
             </TableRow>
+            {isAdmin && (
+              <>
+                <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
+                  <TableCell colSpan={3} sx={{ backgroundColor: '#e8f5e8', fontWeight: 'bold' }}>Оплачено:</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', whiteSpace: 'nowrap' }}>
+                    {Object.entries(totals.paid || {}).map(([currency, amount]) => 
+                      `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
+                    ).join(' / ') || '0.00'}
+                  </TableCell>
+                  <TableCell colSpan={6} sx={{ backgroundColor: '#e8f5e8' }}></TableCell>
+                </TableRow>
+                <TableRow sx={{ backgroundColor: '#ffe8e8' }}>
+                  <TableCell colSpan={3} sx={{ backgroundColor: '#ffe8e8', fontWeight: 'bold' }}>Не оплачено:</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#ffe8e8', whiteSpace: 'nowrap' }}>
+                    {Object.entries(totals.unpaid || {}).map(([currency, amount]) => 
+                      `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
+                    ).join(' / ') || '0.00'}
+                  </TableCell>
+                  <TableCell colSpan={6} sx={{ backgroundColor: '#ffe8e8' }}></TableCell>
+                </TableRow>
+              </>
+            )}
           </TableBody>
         </Table>
       </TableContainer>
