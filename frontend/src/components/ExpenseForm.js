@@ -105,7 +105,9 @@ function ExpenseForm({ open, expense, onClose }) {
             onChange={(e) => setFormData({...formData, currency: e.target.value})}
           >
             {currencyList.map((curr) => (
-              <MenuItem key={curr} value={curr}>{curr}</MenuItem>
+              <MenuItem key={curr.code || curr} value={curr.code || curr}>
+                {curr.symbol ? `${curr.symbol} ${curr.code}` : curr}
+              </MenuItem>
             ))}
           </TextField>
           <TextField

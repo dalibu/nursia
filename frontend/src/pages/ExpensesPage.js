@@ -44,12 +44,11 @@ function ExpensesPage() {
         expenses.getUserInfo()
       ]);
 
-      const currenciesRes = await expenses.getUserInfo();
       const currenciesData = await fetch('/api/currencies/').then(r => r.json());
       
       setExpenseList(expensesRes.data);
       setCategories(categoriesRes.data);
-      setCurrencies(currenciesData.currencies || ['UAH', 'EUR', 'USD', 'RUB']);
+      setCurrencies(currenciesData.details || []);
       setIsAdmin(userRes.data.role === 'admin');
     } catch (error) {
       console.error('Failed to load expenses:', error);
@@ -163,7 +162,7 @@ function ExpensesPage() {
     setDeleteDialog({
       open: true,
       expenseId: expense.id,
-      expenseName: `${expense.amount} ${expense.currency} - ${expense.category?.name || 'Нет категории'}`
+      expenseName: `${expense.amount} ${currencies.find(c => c.code === expense.currency)?.symbol || expense.currency} - ${expense.category?.name || 'Нет категории'}`
     });
   };
 
@@ -240,7 +239,9 @@ function ExpensesPage() {
           >
             <MenuItem value="">Все</MenuItem>
             {currencies.map(curr => (
-              <MenuItem key={curr} value={curr}>{curr}</MenuItem>
+              <MenuItem key={curr.code || curr} value={curr.code || curr}>
+                {curr.symbol ? `${curr.symbol} ${curr.code}` : curr}
+              </MenuItem>
             ))}
           </TextField>
           <TextField
@@ -350,7 +351,7 @@ function ExpensesPage() {
                   <TableCell>{displayNumber}</TableCell>
                   <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
                   <TableCell>{new Date(expense.expense_date).toLocaleTimeString()}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{expense.amount} {expense.currency}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{expense.amount} {currencies.find(c => c.code === expense.currency)?.symbol || expense.currency}</TableCell>
                   <TableCell>{expense.category?.name || '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>{expense.user?.full_name || '-'}</TableCell>
@@ -375,7 +376,7 @@ function ExpensesPage() {
               <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
               <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5', whiteSpace: 'nowrap' }}>
                 {Object.entries(totals).map(([currency, amount]) => 
-                  `${amount.toFixed(2)} ${currency}`
+                  `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
                 ).join(' / ') || '0.00'}
               </TableCell>
               <TableCell colSpan={isAdmin ? 5 : 4} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
