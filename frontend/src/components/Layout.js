@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Container, Box } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
 
 function Layout({ onLogout }) {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState('');
+  const [settingsAnchor, setSettingsAnchor] = useState(null);
 
   useEffect(() => {
     checkUserRole();
@@ -41,19 +43,43 @@ function Layout({ onLogout }) {
           <Button color="inherit" component={Link} to="/">
             Расходы
           </Button>
-          {isAdmin && (
-            <Button color="inherit" component={Link} to="/categories">
-              Категории
-            </Button>
-          )}
-          {isAdmin && (
-            <Button color="inherit" component={Link} to="/currencies">
-              Валюты
-            </Button>
-          )}
           <Button color="inherit" component={Link} to="/reports">
             Отчеты
           </Button>
+          {isAdmin && (
+            <>
+              <Button 
+                color="inherit" 
+                onClick={(e) => setSettingsAnchor(e.currentTarget)}
+                endIcon={<ExpandMore />}
+              >
+                Настройки
+              </Button>
+              <Menu
+                anchorEl={settingsAnchor}
+                open={Boolean(settingsAnchor)}
+                onClose={() => setSettingsAnchor(null)}
+                PaperProps={{
+                  sx: {
+                    backgroundColor: '#1976d2',
+                    '& .MuiMenuItem-root': {
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                      }
+                    }
+                  }
+                }}
+              >
+                <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
+                  Категории
+                </MenuItem>
+                <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
+                  Валюты
+                </MenuItem>
+              </Menu>
+            </>
+          )}
           <Button color="inherit" component={Link} to="/profile">
             Профиль
           </Button>
