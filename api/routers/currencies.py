@@ -7,7 +7,7 @@ from database.core import get_db
 from database.models import Currency
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from api.auth.oauth import get_admin_user
+from api.auth.oauth import get_admin_user, get_current_user
 from database.models import User
 from pydantic import BaseModel
 
@@ -26,7 +26,10 @@ class CurrencyUpdate(BaseModel):
     is_default: bool = False
 
 @router.get("/")
-async def get_currencies(db: AsyncSession = Depends(get_db)):
+async def get_currencies(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Получить список доступных валют"""
     result = await db.execute(select(Currency).where(Currency.is_active == True))
     currencies = result.scalars().all()

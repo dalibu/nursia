@@ -1,0 +1,214 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from database.core import get_db
+from database.models import User, SystemSetting
+from api.auth.oauth import get_current_user, get_admin_user
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/users", tags=["users"])
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_password: str
+
+class UserUpdate(BaseModel):
+    username: str
+    full_name: str
+    email: str = None
+    role: str = None
+    status: str = None
+
+class AdminUserUpdate(BaseModel):
+    username: str
+    full_name: str
+    email: str = None
+    role: str
+    status: str
+
+@router.get("/me")
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user)
+):
+    """Получить профиль текущего пользователя"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "status": current_user.status,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at
+    }
+
+@router.put("/me")
+async def update_current_user_profile(
+    user_data: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Обновить профиль текущего пользователя"""
+    from datetime import datetime
+    
+    # Проверяем уникальность username если он изменился
+    if user_data.username != current_user.username:
+        result = await db.execute(select(User).where(User.username == user_data.username))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Username already exists")
+        current_user.username = user_data.username
+    
+    current_user.full_name = user_data.full_name
+    if user_data.email:
+        current_user.email = user_data.email
+    
+    # Админы могут изменять свою роль и статус
+    if current_user.role == "admin":
+        if user_data.role:
+            current_user.role = user_data.role
+        if user_data.status:
+            current_user.status = user_data.status
+    
+    # Устанавливаем updated_at при редактировании
+    current_user.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {"message": "Profile updated successfully"}
+
+@router.get("/")
+async def get_all_users(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Получить всех пользователей (только для админов)"""
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    
+    return [
+        {
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "status": user.status,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at
+        }
+        for user in users
+    ]
+
+@router.put("/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: AdminUserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Обновить пользователя (только для админов)"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    from datetime import datetime
+    
+    # Проверяем уникальность username если он изменился
+    if user_data.username != user.username:
+        result = await db.execute(select(User).where(User.username == user_data.username))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Username already exists")
+        user.username = user_data.username
+    
+    user.full_name = user_data.full_name
+    if user_data.email:
+        user.email = user_data.email
+    user.role = user_data.role
+    user.status = user_data.status
+    user.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(user)
+    
+    return {"message": "User updated successfully"}
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Удалить пользователя (только для админов)"""
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    await db.delete(user)
+    await db.commit()
+    
+    return {"message": "User deleted successfully"}
+
+@router.put("/me/password")
+async def change_password(
+    password_data: PasswordChange,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Изменить свой пароль"""
+    from api.routers.auth import verify_password, hash_password
+    from datetime import datetime
+    
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match")
+    
+    if not verify_password(password_data.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid old password")
+    
+    current_user.password_hash = hash_password(password_data.new_password)
+    current_user.force_password_change = False
+    current_user.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    return {"message": "Password changed successfully"}
+
+@router.post("/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Сбросить пароль пользователя (только для админов)"""
+    from datetime import datetime
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.force_password_change = True
+    user.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    return {"message": "Password reset. User must change password on next login"}
+
+@router.get("/password-rules")
+async def get_password_rules(db: AsyncSession = Depends(get_db)):
+    """Получить правила выбора паролей"""
+    result = await db.execute(select(SystemSetting).where(SystemSetting.key == "password_rules"))
+    setting = result.scalar_one_or_none()
+    return {"rules": setting.value if setting else "Пароль должен содержать минимум 6 символов"}

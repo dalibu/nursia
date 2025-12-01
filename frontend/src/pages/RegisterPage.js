@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
 import { auth } from '../services/api';
@@ -23,6 +23,21 @@ function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [passwordRules, setPasswordRules] = useState('');
+
+  useEffect(() => {
+    loadPasswordRules();
+  }, []);
+
+  const loadPasswordRules = async () => {
+    try {
+      const response = await fetch('/api/users/password-rules');
+      const data = await response.json();
+      setPasswordRules(data.rules);
+    } catch (error) {
+      console.error('Failed to load password rules:', error);
+    }
+  };
 
   const validatePassword = (password) => {
     if (password.length < 8) {
@@ -130,7 +145,7 @@ function RegisterPage() {
             value={formData.password}
             onChange={handlePasswordChange}
             error={!!passwordError}
-            helperText={passwordError || 'Минимум 8 символов, 1 цифра, буквы (латиница/кириллица)'}
+            helperText={passwordError || passwordRules}
             required
           />
           <TextField

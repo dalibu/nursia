@@ -16,7 +16,8 @@ router = APIRouter(prefix="/recipients", tags=["recipients"])
 
 @router.get("/")
 async def get_recipients(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     # Получаем всех получателей
     recipients_result = await db.execute(select(Recipient).order_by(Recipient.name))

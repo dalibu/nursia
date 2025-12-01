@@ -10,6 +10,8 @@ import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
+import ProfilePage from './pages/ProfilePage';
+import UsersPage from './pages/UsersPage';
 
 const theme = createTheme({
   palette: {
@@ -20,11 +22,17 @@ const theme = createTheme({
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
+    setIsLoading(false);
   }, []);
+
+  if (isLoading) {
+    return null; // или компонент загрузки
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -43,6 +51,8 @@ function App() {
             <Route index element={<ExpensesPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="currencies" element={<CurrenciesPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="users" element={<UsersPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="admin" element={<AdminPage />} />
           </Route>

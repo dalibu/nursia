@@ -54,6 +54,14 @@ function Layout({ onLogout }) {
           <Button color="inherit" component={Link} to="/reports">
             Отчеты
           </Button>
+          <Button color="inherit" component={Link} to="/profile">
+            Профиль
+          </Button>
+          {isAdmin && (
+            <Button color="inherit" component={Link} to="/users">
+              Пользователи
+            </Button>
+          )}
           {isAdmin && (
             <Button color="inherit" component={Link} to="/admin">
               Админ
