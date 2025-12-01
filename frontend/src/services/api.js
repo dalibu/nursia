@@ -23,6 +23,9 @@ export const expenses = {
   delete: (id) => api.delete(`/expenses/${id}`),
   reports: (params) => api.get('/expenses/reports', { params }),
   categories: () => api.get('/expenses/categories'),
+  createCategory: (data) => api.post('/expenses/categories', data),
+  updateCategory: (id, data) => api.put(`/expenses/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/expenses/categories/${id}`),
   getUserInfo: () => api.get('/auth/me'),
 };
 

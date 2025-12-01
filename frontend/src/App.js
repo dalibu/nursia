@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
 import ExpensesPage from './pages/ExpensesPage';
+import CategoriesPage from './pages/CategoriesPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -39,6 +40,7 @@ function App() {
             isAuthenticated ? <Layout onLogout={() => setIsAuthenticated(false)} /> : <Navigate to="/login" replace />
           }>
             <Route index element={<ExpensesPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="admin" element={<AdminPage />} />
           </Route>

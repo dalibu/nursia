@@ -36,7 +36,7 @@ async def create_category(
 @router.get("/categories", response_model=List[ExpenseCategorySchema])
 async def get_categories(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     result = await db.execute(select(ExpenseCategory))
     return result.scalars().all()
@@ -194,6 +194,42 @@ async def get_expense_reports(
         "period_end": end_date.isoformat(),
         "count": len(expenses)
     }
+
+
+@router.put("/categories/{category_id}")
+async def update_category(
+    category_id: int,
+    category: ExpenseCategoryCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    result = await db.execute(select(ExpenseCategory).where(ExpenseCategory.id == category_id))
+    db_category = result.scalar_one_or_none()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    for field, value in category.model_dump().items():
+        setattr(db_category, field, value)
+    
+    await db.commit()
+    await db.refresh(db_category)
+    return db_category
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    result = await db.execute(select(ExpenseCategory).where(ExpenseCategory.id == category_id))
+    db_category = result.scalar_one_or_none()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    await db.delete(db_category)
+    await db.commit()
+    return {"message": "Category deleted"}
 
 
 @router.put("/{expense_id}")
