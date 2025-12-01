@@ -77,6 +77,9 @@ function Layout({ onLogout }) {
                 <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
                   Валюты
                 </MenuItem>
+                <MenuItem component={Link} to="/settings" onClick={() => setSettingsAnchor(null)}>
+                  Параметры
+                </MenuItem>
               </Menu>
             </>
           )}
