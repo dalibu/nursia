@@ -113,7 +113,7 @@ function Layout({ onLogout }) {
                   onClick={(e) => setSettingsAnchor(e.currentTarget)}
                   endIcon={<ExpandMore />}
                 >
-                  Настройки
+                  Настройки {hasRequests && '⚠️'}
                 </Button>
                 <Menu
                   anchorEl={settingsAnchor}
@@ -131,6 +131,12 @@ function Layout({ onLogout }) {
                     }
                   }}
                 >
+                  <MenuItem component={Link} to="/users" onClick={() => setSettingsAnchor(null)}>
+                    Пользователи
+                  </MenuItem>
+                  <MenuItem component={Link} to="/requests" onClick={() => setSettingsAnchor(null)}>
+                    Заявки {hasRequests && '⚠️'}
+                  </MenuItem>
                   <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
                     Категории
                   </MenuItem>
@@ -148,7 +154,7 @@ function Layout({ onLogout }) {
               onClick={(e) => setAccountAnchor(e.currentTarget)}
               endIcon={<ExpandMore />}
             >
-              Аккаунт {hasRequests && '⚠️'}
+              Аккаунт
             </Button>
             <Menu
               anchorEl={accountAnchor}
@@ -169,16 +175,6 @@ function Layout({ onLogout }) {
               <MenuItem component={Link} to="/profile" onClick={() => setAccountAnchor(null)}>
                 Профиль
               </MenuItem>
-              {isAdmin && (
-                <MenuItem component={Link} to="/users" onClick={() => setAccountAnchor(null)}>
-                  Пользователи
-                </MenuItem>
-              )}
-              {isAdmin && (
-                <MenuItem component={Link} to="/requests" onClick={() => setAccountAnchor(null)}>
-                  Заявки {hasRequests && '⚠️'}
-                </MenuItem>
-              )}
               <MenuItem onClick={() => { setAccountAnchor(null); handleLogout(); }}>
                 Выйти
               </MenuItem>
