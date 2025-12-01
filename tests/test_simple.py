@@ -38,14 +38,14 @@ def test_mobile_app_endpoint(client):
     response = client.get("/mobile")
     assert response.status_code == 200
 
-def test_currencies_public(client):
+def test_currencies_unauthorized(client):
     """Тест получения валют без авторизации"""
     response = client.get("/api/currencies/")
-    assert response.status_code == 200
-    assert "currencies" in response.json()
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json()["detail"]
 
-def test_recipients_public(client):
+def test_recipients_unauthorized(client):
     """Тест получения получателей без авторизации"""
     response = client.get("/api/recipients/")
-    assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json()["detail"]
