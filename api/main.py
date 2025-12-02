@@ -50,7 +50,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(user_status.router, prefix="/api")
 
 # React статические файлы
-if os.path.exists("frontend/build"):
+if os.path.exists("frontend/build/static"):
     app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 
 @app.get("/api")
