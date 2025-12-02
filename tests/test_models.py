@@ -35,7 +35,7 @@ def test_payment_category_model():
 def test_payment_model():
     """Тест модели платежа"""
     payment = Payment(
-        user_id=123456789,
+        payer_id=1,
         category_id=1,
         amount=Decimal("100.50"),
         currency="UAH",
@@ -43,7 +43,7 @@ def test_payment_model():
         payment_date=datetime.now()
     )
     
-    assert payment.user_id == 123456789
+    assert payment.payer_id == 1
     assert payment.category_id == 1
     assert payment.amount == Decimal("100.50")
     assert payment.currency == "UAH"

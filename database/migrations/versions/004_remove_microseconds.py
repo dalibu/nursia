@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision = '004'
-down_revision = '003'
+down_revision = 'add_user_registration'
 branch_labels = None
 depends_on = None
 

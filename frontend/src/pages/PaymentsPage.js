@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, Button, Table, TableBody, TableCell, TableContainer, 
+import {
+  Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
   DialogContentText, TablePagination, Chip
@@ -51,7 +51,7 @@ function PaymentsPage() {
       const currenciesData = await fetch('/api/currencies/', {
         headers: { Authorization: `Bearer ${token}` }
       }).then(r => r.json());
-      
+
       setPaymentList(paymentsRes.data);
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
@@ -63,10 +63,10 @@ function PaymentsPage() {
 
   const applyFiltersAndSort = () => {
     let filtered = [...paymentList];
-    
+
     // Применяем фильтры
     if (filters.category) {
-      filtered = filtered.filter(payment => 
+      filtered = filtered.filter(payment =>
         payment.category?.id === parseInt(filters.category)
       );
 
@@ -76,13 +76,13 @@ function PaymentsPage() {
 
     }
     if (filters.dateFrom) {
-      filtered = filtered.filter(payment => 
+      filtered = filtered.filter(payment =>
         new Date(payment.payment_date) >= new Date(filters.dateFrom)
       );
 
     }
     if (filters.dateTo) {
-      filtered = filtered.filter(payment => 
+      filtered = filtered.filter(payment =>
         new Date(payment.payment_date) <= new Date(filters.dateTo + 'T23:59:59')
       );
     }
@@ -96,11 +96,11 @@ function PaymentsPage() {
         return true;
       });
     }
-    
+
     // Применяем сортировку
     filtered.sort((a, b) => {
       let aVal, bVal;
-      
+
       switch (sortField) {
         case 'number':
           aVal = a.id;
@@ -131,45 +131,45 @@ function PaymentsPage() {
           bVal = b.recipient?.name || '';
           break;
         case 'payer':
-          aVal = a.user?.full_name || '';
-          bVal = b.user?.full_name || '';
+          aVal = a.payer?.name || '';
+          bVal = b.payer?.name || '';
           break;
         default:
           return 0;
       }
-      
+
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-    
+
 
     setFilteredList(filtered);
-    
+
     // Вычисляем итоги по валютам
     const newTotals = {};
     const paidTotals = {};
     const unpaidTotals = {};
-    
+
     filtered.forEach(payment => {
       const currency = payment.currency;
       const amount = parseFloat(payment.amount);
-      
+
       if (!newTotals[currency]) {
         newTotals[currency] = 0;
         paidTotals[currency] = 0;
         unpaidTotals[currency] = 0;
       }
-      
+
       newTotals[currency] += amount;
-      
+
       if (payment.is_paid) {
         paidTotals[currency] += amount;
       } else {
         unpaidTotals[currency] += amount;
       }
     });
-    
+
     setTotals({ all: newTotals, paid: paidTotals, unpaid: unpaidTotals });
   };
 
@@ -183,7 +183,7 @@ function PaymentsPage() {
   };
 
   const handleFilterChange = (field, value) => {
-    setFilters({...filters, [field]: value});
+    setFilters({ ...filters, [field]: value });
   };
 
 
@@ -416,72 +416,72 @@ function PaymentsPage() {
             {filteredList
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((payment, index) => {
-              const displayNumber = sortField === 'number' && sortDirection === 'desc' 
-                ? filteredList.length - (page * rowsPerPage + index)
-                : page * rowsPerPage + index + 1;
-              
-              return (
-                <TableRow key={payment.id}>
-                  <TableCell>{displayNumber}</TableCell>
-                  <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(payment.payment_date).toLocaleTimeString()}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
-                  <TableCell>
-                    {['Аванс', 'Долг'].includes(payment.category?.name)
-                      ? (
+                const displayNumber = sortField === 'number' && sortDirection === 'desc'
+                  ? filteredList.length - (page * rowsPerPage + index)
+                  : page * rowsPerPage + index + 1;
+
+                return (
+                  <TableRow key={payment.id}>
+                    <TableCell>{displayNumber}</TableCell>
+                    <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(payment.payment_date).toLocaleTimeString()}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
+                    <TableCell>
+                      {['Аванс', 'Долг'].includes(payment.category?.name)
+                        ? (
+                          <Chip
+                            label={payment.category.name}
+                            size="small"
+                            sx={{
+                              backgroundColor: '#FFEB3B',
+                              color: '#000',
+                            }}
+                          />
+                        )
+                        : (payment.category?.name || '-')}
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>{payment.payer?.name || '-'}</TableCell>
+                    )}
+                    <TableCell>{payment.recipient?.name || '-'}</TableCell>
+                    <TableCell>{payment.description || '-'}</TableCell>
+                    {isAdmin && (
+                      <TableCell>
                         <Chip
-                          label={payment.category.name}
+                          label={payment.is_paid ? 'Оплачено' : 'К оплате'}
+                          color={payment.is_paid ? 'success' : 'warning'}
                           size="small"
+                          clickable
+                          onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
+                          icon={<Payment />}
                           sx={{
-                            backgroundColor: '#FFEB3B',
-                            color: '#000',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
+                              color: 'white'
+                            }
                           }}
                         />
-                      )
-                      : (payment.category?.name || '-')}
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell>{payment.user?.full_name || '-'}</TableCell>
-                  )}
-                  <TableCell>{payment.recipient?.name || '-'}</TableCell>
-                  <TableCell>{payment.description || '-'}</TableCell>
-                  {isAdmin && (
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <Chip 
-                        label={payment.is_paid ? 'Оплачено' : 'К оплате'}
-                        color={payment.is_paid ? 'success' : 'warning'}
-                        size="small"
-                        clickable
-                        onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
-                        icon={<Payment />}
-                        sx={{ 
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
-                            color: 'white'
-                          }
-                        }}
-                      />
+                      <IconButton onClick={() => handleEdit(payment)}>
+                        <Edit />
+                      </IconButton>
+                      <IconButton onClick={() => handleDeleteClick(payment)}>
+                        <Delete />
+                      </IconButton>
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <IconButton onClick={() => handleEdit(payment)}>
-                      <Edit />
-                    </IconButton>
-                    <IconButton onClick={() => handleDeleteClick(payment)}>
-                      <Delete />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                  </TableRow>
+                );
+              })}
 
           </TableBody>
           <TableBody>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
               <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>Итого:</TableCell>
               <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5', whiteSpace: 'nowrap' }}>
-                {Object.entries(totals.all || {}).map(([currency, amount]) => 
+                {Object.entries(totals.all || {}).map(([currency, amount]) =>
                   `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
                 ).join(' / ') || '0.00'}
               </TableCell>
@@ -492,7 +492,7 @@ function PaymentsPage() {
                 <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
                   <TableCell colSpan={3} sx={{ backgroundColor: '#e8f5e8', fontWeight: 'bold' }}>Оплачено:</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', whiteSpace: 'nowrap' }}>
-                    {Object.entries(totals.paid || {}).map(([currency, amount]) => 
+                    {Object.entries(totals.paid || {}).map(([currency, amount]) =>
                       `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
                     ).join(' / ') || '0.00'}
                   </TableCell>
@@ -501,7 +501,7 @@ function PaymentsPage() {
                 <TableRow sx={{ backgroundColor: '#ffe8e8' }}>
                   <TableCell colSpan={3} sx={{ backgroundColor: '#ffe8e8', fontWeight: 'bold' }}>Не оплачено:</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#ffe8e8', whiteSpace: 'nowrap' }}>
-                    {Object.entries(totals.unpaid || {}).map(([currency, amount]) => 
+                    {Object.entries(totals.unpaid || {}).map(([currency, amount]) =>
                       `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
                     ).join(' / ') || '0.00'}
                   </TableCell>
@@ -512,7 +512,7 @@ function PaymentsPage() {
           </TableBody>
         </Table>
       </TableContainer>
-      
+
       <TablePagination
         component="div"
         count={filteredList.length}

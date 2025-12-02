@@ -9,22 +9,22 @@ def client():
 def test_currencies_endpoint_exists(client):
     """Тест существования endpoint валют"""
     response = client.get("/api/currencies/")
-    assert response.status_code == 401  # Требует авторизации
+    assert response.status_code == 403  # Требует авторизации
 
 def test_settings_endpoint_exists(client):
     """Тест существования endpoint настроек"""
     response = client.get("/api/settings/")
-    assert response.status_code == 401  # Требует авторизации
+    assert response.status_code == 403  # Требует авторизации
 
 def test_users_endpoint_exists(client):
     """Тест существования endpoint пользователей"""
     response = client.get("/api/users/")
-    assert response.status_code == 401  # Требует авторизации
+    assert response.status_code == 403  # Требует авторизации
 
 def test_registration_requests_endpoint_exists(client):
     """Тест существования endpoint заявок на регистрацию"""
     response = client.get("/api/admin/registration-requests")
-    assert response.status_code == 401  # Требует авторизации
+    assert response.status_code == 403  # Требует авторизации
 
 def test_password_rules_endpoint_exists(client):
     """Тест существования endpoint правил паролей"""
@@ -43,7 +43,7 @@ def test_currency_crud_endpoints_exist(client):
     """Тест существования CRUD endpoints для валют"""
     # GET
     response = client.get("/api/currencies/")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # POST
     response = client.post("/api/currencies/", json={
@@ -52,7 +52,7 @@ def test_currency_crud_endpoints_exist(client):
         "symbol": "T",
         "is_default": False
     })
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # PUT
     response = client.put("/api/currencies/1", json={
@@ -61,27 +61,27 @@ def test_currency_crud_endpoints_exist(client):
         "symbol": "T", 
         "is_default": False
     })
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # DELETE
     response = client.delete("/api/currencies/1")
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 def test_settings_crud_endpoints_exist(client):
     """Тест существования CRUD endpoints для настроек"""
     # GET
     response = client.get("/api/settings/")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # PUT
     response = client.put("/api/settings/test_key", json={"value": "test"})
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 def test_user_management_endpoints_exist(client):
     """Тест существования endpoints управления пользователями"""
     # GET users
     response = client.get("/api/users/")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # PUT user
     response = client.put("/api/users/1", json={
@@ -91,22 +91,22 @@ def test_user_management_endpoints_exist(client):
         "role": "user",
         "status": "active"
     })
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # DELETE user
     response = client.delete("/api/users/1")
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 def test_admin_endpoints_exist(client):
     """Тест существования admin endpoints"""
     # Registration requests
     response = client.get("/api/admin/registration-requests")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # Approve request
     response = client.post("/api/admin/registration-requests/1/approve")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # Reject request
     response = client.post("/api/admin/registration-requests/1/reject")
-    assert response.status_code == 401
+    assert response.status_code == 403

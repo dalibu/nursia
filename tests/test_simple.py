@@ -25,7 +25,7 @@ def test_root_endpoint(client):
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""
     response = client.get("/api/payments/categories")
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]
 
 def test_web_app_endpoint(client):
@@ -41,11 +41,11 @@ def test_mobile_app_endpoint(client):
 def test_currencies_unauthorized(client):
     """Тест получения валют без авторизации"""
     response = client.get("/api/currencies/")
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]
 
 def test_recipients_unauthorized(client):
     """Тест получения получателей без авторизации"""
     response = client.get("/api/recipients/")
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]

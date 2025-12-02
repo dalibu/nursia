@@ -11,7 +11,7 @@ function PaymentForm({ open, payment, onClose }) {
     currency: '',
     category_id: '',
     recipient_id: '',
-    user_id: '',
+    payer_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     description: '',
     is_paid: false
@@ -31,7 +31,7 @@ function PaymentForm({ open, payment, onClose }) {
           currency: payment.currency,
           category_id: payment.category_id,
           recipient_id: payment.recipient_id,
-          user_id: payment.user_id || '',
+          payer_id: payment.payer_id || '',
           payment_date: payment.payment_date.split('T')[0],
           description: payment.description || '',
           is_paid: payment.is_paid || false
@@ -43,7 +43,7 @@ function PaymentForm({ open, payment, onClose }) {
           currency: '',
           category_id: '',
           recipient_id: '',
-          user_id: '',
+          payer_id: '',
           payment_date: new Date().toISOString().split('T')[0],
           description: '',
           is_paid: false
@@ -85,7 +85,7 @@ function PaymentForm({ open, payment, onClose }) {
       amount: parseFloat(formData.amount),
       category_id: parseInt(formData.category_id),
       recipient_id: parseInt(formData.recipient_id),
-      user_id: formData.user_id ? parseInt(formData.user_id) : undefined,
+      payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
       payment_date: formData.payment_date + 'T00:00:00'
     };
     
@@ -168,21 +168,19 @@ function PaymentForm({ open, payment, onClose }) {
               <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
             ))}
           </TextField>
-          {isAdmin && (
-            <TextField
-              fullWidth
-              select
-              label="От кого"
-              margin="normal"
-              value={formData.user_id}
-              onChange={(e) => setFormData({...formData, user_id: e.target.value})}
-            >
-              <MenuItem value="">Текущий пользователь</MenuItem>
-              {userList.map((user) => (
-                <MenuItem key={user.id} value={user.id}>{user.full_name}</MenuItem>
-              ))}
-            </TextField>
-          )}
+          <TextField
+            fullWidth
+            select
+            label="От кого"
+            margin="normal"
+            value={formData.payer_id}
+            onChange={(e) => setFormData({...formData, payer_id: e.target.value})}
+            required
+          >
+            {recipientList.map((rec) => (
+              <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
+            ))}
+          </TextField>
           <TextField
             fullWidth
             label="Дата"

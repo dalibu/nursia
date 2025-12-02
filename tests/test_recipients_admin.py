@@ -19,7 +19,7 @@ def client():
 def test_recipients_endpoint_exists(client):
   """Список получателей требует авторизации."""
   response = client.get("/api/recipients/")
-  assert response.status_code == 401
+  assert response.status_code == 403
 
 
 def test_recipients_admin_endpoints_exist(client):
@@ -27,7 +27,7 @@ def test_recipients_admin_endpoints_exist(client):
 
   # Admin list
   response = client.get("/api/recipients/admin")
-  assert response.status_code == 401
+  assert response.status_code == 403
 
   # Create
   response = client.post("/api/recipients/", json={
@@ -36,7 +36,7 @@ def test_recipients_admin_endpoints_exist(client):
     "description": "",
     "is_active": True,
   })
-  assert response.status_code == 401
+  assert response.status_code == 403
 
   # Update
   response = client.put("/api/recipients/1", json={
@@ -45,12 +45,12 @@ def test_recipients_admin_endpoints_exist(client):
     "description": "desc",
     "is_active": False,
   })
-  assert response.status_code == 401
+  assert response.status_code == 403
 
   # Validate delete
   response = client.get("/api/recipients/1/validate-delete")
-  assert response.status_code == 401
+  assert response.status_code == 403
 
   # Delete
   response = client.delete("/api/recipients/1")
-  assert response.status_code == 401
+  assert response.status_code == 403

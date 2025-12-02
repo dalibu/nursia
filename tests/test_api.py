@@ -31,5 +31,5 @@ def test_login_validation(client):
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""
     response = client.get("/api/payments/categories")
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]

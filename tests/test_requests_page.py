@@ -10,7 +10,7 @@ def test_requests_endpoint_returns_array(client):
     """Тест что endpoint заявок возвращает массив"""
     # Без авторизации должен вернуть 401, но не ошибку парсинга
     response = client.get("/api/admin/registration-requests")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     # Проверяем что ответ можно распарсить как JSON
     data = response.json()

@@ -32,7 +32,7 @@ class PaymentBase(BaseModel):
 
 
 class PaymentCreate(PaymentBase):
-    user_id: Optional[int] = None
+    payer_id: Optional[int] = None
 
 
 class RecipientInfo(BaseModel):
@@ -55,12 +55,12 @@ class UserInfo(BaseModel):
 
 class Payment(PaymentBase):
     id: int
-    user_id: int
+    payer_id: int
     created_at: datetime
     paid_at: Optional[datetime] = None
     category: Optional[PaymentCategory] = None
     recipient: Optional[RecipientInfo] = None
-    user: Optional[UserInfo] = None
+    payer: Optional[RecipientInfo] = None
 
     class Config:
         from_attributes = True
