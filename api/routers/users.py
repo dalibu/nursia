@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database.core import get_db
-from database.models import User, SystemSetting
+from database.models import User
 from api.auth.oauth import get_current_user, get_admin_user
 from pydantic import BaseModel
 
@@ -169,7 +169,7 @@ async def change_password(
     current_user: User = Depends(get_current_user)
 ):
     """Изменить свой пароль"""
-    from api.routers.auth import verify_password, hash_password
+    from utils.password_utils import verify_password, hash_password
     from datetime import datetime
     
     if password_data.new_password != password_data.confirm_password:
@@ -207,8 +207,8 @@ async def reset_user_password(
     return {"message": "Password reset. User must change password on next login"}
 
 @router.get("/password-rules")
-async def get_password_rules(db: AsyncSession = Depends(get_db)):
+async def get_password_rules():
     """Получить правила выбора паролей"""
-    result = await db.execute(select(SystemSetting).where(SystemSetting.key == "password_rules"))
-    setting = result.scalar_one_or_none()
-    return {"rules": setting.value if setting else "Пароль должен содержать минимум 6 символов"}
+    from utils.settings_helper import get_setting
+    rules = await get_setting("password_rules", "Пароль должен содержать минимум 6 символов")
+    return {"rules": rules}

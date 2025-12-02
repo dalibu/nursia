@@ -6,23 +6,15 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import bcrypt
 from database.core import get_db
 from database.models import User, RegistrationRequest
 from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse
 from api.auth.oauth import create_access_token, get_current_user
 from config.settings import settings
 from utils.settings_helper import get_jwt_expire_minutes
+from utils.password_utils import hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-def hash_password(password: str) -> str:
-    # Пароль уже захеширован SHA-256 на клиенте, добавляем bcrypt с солью
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 
 @router.post("/register", response_model=RegistrationRequestResponse)

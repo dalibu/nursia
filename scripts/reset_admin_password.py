@@ -9,17 +9,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from database.core import AsyncSessionLocal
 from database.models import User
 from sqlalchemy import select
-import bcrypt
-
-def hash_password_double(password: str) -> str:
-    """Двойное хеширование: SHA-256 + bcrypt"""
-    # Сначала SHA-256 (как на клиенте)
-    import hashlib
-    sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-    
-    # Затем bcrypt с солью
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(sha256_hash.encode('utf-8'), salt).decode('utf-8')
+from utils.password_utils import hash_password_double
 
 async def reset_admin_password():
     """Сбросить пароль администратора"""
