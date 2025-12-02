@@ -45,7 +45,7 @@ function ContributorsPage() {
       }
       handleFormClose();
       loadContributors();
-      setMessage({ type: 'success', text: 'Контрибьютор успешно сохранён' });
+      setMessage({ type: 'success', text: 'Участник успешно сохранён' });
     } catch (error) {
       console.error('Failed to save contributor:', error);
       const msg = error.response?.data?.detail || 'Не удалось сохранить контрибьютора';
@@ -109,7 +109,7 @@ function ContributorsPage() {
       await contributors.delete(deleteDialog.id);
       setDeleteDialog({ open: false, id: null, name: '' });
       loadContributors();
-      setMessage({ type: 'success', text: 'Контрибьютор удалён' });
+      setMessage({ type: 'success', text: 'Участник удалён' });
     } catch (error) {
       const msg = error.response?.data?.detail || 'Не удалось удалить контрибьютора';
       setMessage({ type: 'error', text: msg });
@@ -180,13 +180,13 @@ function ContributorsPage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Контрибьюторы</Typography>
+        <Typography variant="h4">Участники</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => setShowForm(true)}
         >
-          Добавить контрибьютора
+          Добавить участника
         </Button>
       </Box>
 
