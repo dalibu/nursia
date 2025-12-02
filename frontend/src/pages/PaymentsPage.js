@@ -53,7 +53,13 @@ function PaymentsPage() {
         headers: { Authorization: `Bearer ${token}` }
       }).then(r => r.json());
 
-      setPaymentList(paymentsRes.data);
+      // Присваиваем постоянный номер строки каждому платежу
+      const paymentsWithRowNumbers = paymentsRes.data.map((payment, index) => ({
+        ...payment,
+        rowNumber: index + 1
+      }));
+
+      setPaymentList(paymentsWithRowNumbers);
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
       setIsAdmin(userRes.data.role === 'admin');
@@ -104,8 +110,8 @@ function PaymentsPage() {
 
       switch (sortField) {
         case 'number':
-          aVal = a.id;
-          bVal = b.id;
+          aVal = a.rowNumber;
+          bVal = b.rowNumber;
           break;
         case 'id':
           aVal = a.id;
@@ -435,14 +441,9 @@ function PaymentsPage() {
             )}
             {filteredList
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((payment, index) => {
-                const displayNumber = sortField === 'number' && sortDirection === 'desc'
-                  ? filteredList.length - (page * rowsPerPage + index)
-                  : page * rowsPerPage + index + 1;
-
-                return (
-                  <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
-                    <TableCell sx={{ width: 32, minWidth: 32, maxWidth: 32, px: 0.5, textAlign: 'center' }}>{displayNumber}</TableCell>
+              .map((payment, index) => (
+                <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
+                  <TableCell sx={{ width: 32, minWidth: 32, maxWidth: 32, px: 0.5, textAlign: 'center' }}>{payment.rowNumber}</TableCell>
                     <TableCell>
                       <div style={{ lineHeight: 1 }}>
                         <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
@@ -502,8 +503,8 @@ function PaymentsPage() {
                       </Box>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                )
+              )}
 
           </TableBody>
 
