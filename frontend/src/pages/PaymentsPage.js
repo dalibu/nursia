@@ -87,7 +87,8 @@ function PaymentsPage() {
           payment.recipient?.name,
           payment.payer?.name,
           payment.description,
-          new Date(payment.payment_date).toLocaleDateString()
+          new Date(payment.payment_date).toLocaleDateString(),
+          payment.is_paid ? 'оплачено' : 'к оплате'
         ];
 
         return searchFields.some(field =>
