@@ -88,10 +88,10 @@ Telegram Bot ─┘
 - **Persistence**: SQLite database with Alembic migrations
 
 ### Domain-Driven Organization
-- **Expenses**: Core expense tracking functionality
+- **Payments**: Core payment tracking functionality
 - **Authentication**: User management and security
 - **Recipients**: Payment recipient management
-- **Categories**: Expense categorization system
+- **Categories**: Payment categorization system
 - **Currencies**: Multi-currency support
 - **Settings**: System configuration management
 

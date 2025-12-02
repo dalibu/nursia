@@ -40,7 +40,7 @@
             cursor: pointer;
         }
         button:hover { background: #0056b3; }
-        .expense-item { 
+        .payment-item { 
             background: white;
             border-radius: 8px;
             padding: 15px;
@@ -101,10 +101,10 @@
                 <button onclick="login()">Войти</button>
             </div>
 
-            <!-- Добавление расхода -->
+            <!-- Добавление платежа -->
             <div id="add-section" class="card hidden">
                 <div id="message-area" style="display: none; padding: 10px; margin-bottom: 15px; border-radius: 8px; font-weight: 500;"></div>
-                <h2>Новый расход</h2>
+                <h2>Новый платёж</h2>
                 <div class="form-group">
                     <label>Категория:</label>
                     <select id="category-select"></select>
@@ -124,9 +124,9 @@
                 </div>
                 <div class="form-group">
                     <label>Описание:</label>
-                    <textarea id="description" placeholder="Описание расхода" rows="3"></textarea>
+                    <textarea id="description" placeholder="Описание платежа" rows="3"></textarea>
                 </div>
-                <button onclick="addExpense()">Добавить расход</button>
+                <button onclick="addPayment()">Добавить платёж</button>
             </div>
 
             <!-- Отчеты -->
@@ -143,17 +143,17 @@
                 <div id="reports-container"></div>
             </div>
 
-            <!-- Последние расходы -->
-            <div id="expenses-section" class="card hidden">
-                <h2>Последние расходы</h2>
-                <div id="expenses-container"></div>
+            <!-- Последние платежи -->
+            <div id="payments-section" class="card hidden">
+                <h2>Последние платежи</h2>
+                <div id="payments-container"></div>
             </div>
         </div>
 
         <!-- Модальное окно редактирования -->
         <div id="edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
-                <h3>Редактировать расход</h3>
+                <h3>Редактировать платёж</h3>
                 <div class="form-group">
                     <label>Категория:</label>
                     <select id="edit-category-select"></select>
@@ -176,7 +176,7 @@
                     <textarea id="edit-description" rows="3"></textarea>
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" onclick="saveExpense()" style="flex: 1; background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px;">Сохранить</button>
+                    <button type="button" onclick="savePayment()" style="flex: 1; background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px;">Сохранить</button>
                     <button type="button" onclick="closeEditModal()" style="flex: 1; background: #6c757d; color: white; padding: 12px; border: none; border-radius: 8px;">Отмена</button>
                 </div>
             </div>
@@ -185,7 +185,7 @@
         <!-- Нижняя панель навигации -->
         <div id="tab-bar" class="tab-bar hidden">
             <button class="tab active" onclick="showTab('add')">Добавить</button>
-            <button class="tab" onclick="showTab('expenses')">Расходы</button>
+            <button class="tab" onclick="showTab('payments')">Платежи</button>
             <button class="tab" onclick="showTab('reports')">Отчеты</button>
         </div>
     </div>
@@ -263,7 +263,7 @@
 
         async function loadCategories() {
             try {
-                const response = await fetch(`${API_BASE}/expenses/categories`, {
+                const response = await fetch(`${API_BASE}/payments/categories`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
@@ -338,7 +338,7 @@
             }
         }
 
-        async function addExpense() {
+        async function addPayment() {
             const categoryId = document.getElementById('category-select').value;
             const recipientId = document.getElementById('recipient-select').value;
             const amount = document.getElementById('amount').value;
@@ -350,26 +350,26 @@
                 return;
             }
             
-            const expenseData = {
+            const paymentData = {
                 category_id: parseInt(categoryId),
                 amount: parseFloat(amount),
                 currency: currency,
                 description: description,
-                expense_date: new Date().toISOString()
+                payment_date: new Date().toISOString()
             };
             
             if (recipientId) {
-                expenseData.recipient_id = parseInt(recipientId);
+                paymentData.recipient_id = parseInt(recipientId);
             }
             
             try {
-                const response = await fetch(`${API_BASE}/expenses/`, {
+                const response = await fetch(`${API_BASE}/payments/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify(expenseData)
+                    body: JSON.stringify(paymentData)
                 });
                 
                 if (response.ok) {
@@ -377,7 +377,7 @@
                     const currencySymbols = {'UAH': '₴', 'EUR': '€', 'USD': '$', 'RUB': '₽'};
                     const symbol = currencySymbols[currency] || currency;
                     
-                    showMessage(`Добавлен расход: ${categoryName} - ${amount} ${symbol}`, 'success');
+                    showMessage(`Добавлен платеж: ${categoryName} - ${amount} ${symbol}`, 'success');
                     document.getElementById('amount').value = '';
                     document.getElementById('description').value = '';
                     
@@ -386,7 +386,7 @@
                         loadReports();
                     }
                 } else {
-                    showMessage('Ошибка добавления расхода', 'error');
+                    showMessage('Ошибка добавления платежа', 'error');
                 }
             } catch (error) {
                 alert('Ошибка подключения к серверу');
@@ -397,7 +397,7 @@
             const period = document.getElementById('period-select').value;
             
             try {
-                const response = await fetch(`${API_BASE}/expenses/reports?period=${period}`, {
+                const response = await fetch(`${API_BASE}/payments/reports?period=${period}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
@@ -406,7 +406,7 @@
                     const container = document.getElementById('reports-container');
                     container.innerHTML = '';
                     
-                    if (data.expenses.length === 0) {
+                    if (data.payments.length === 0) {
                         container.innerHTML = '<p>Нет данных за выбранный период</p>';
                         return;
                     }
@@ -429,7 +429,7 @@
                     `;
                     container.appendChild(totalDiv);
                     
-                    // Таблица расходов
+                    // Таблица платежей
                     const tableDiv = document.createElement('div');
                     tableDiv.style.background = 'white';
                     tableDiv.style.borderRadius = '12px';
@@ -447,27 +447,27 @@
                         </div>
                     `;
                     
-                    data.expenses.forEach((expense, index) => {
-                        const date = new Date(expense.expense_date);
+                    data.payments.forEach((payment, index) => {
+                        const date = new Date(payment.payment_date);
                         const dateStr = date.toLocaleDateString('ru-RU');
                         const timeStr = date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
                         
                         tableHTML += `
                             <div style="display: grid; grid-template-columns: 30px 1fr 1fr 60px 60px 60px; gap: 6px; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 12px;">
-                                <div>${data.expenses.length - index}</div>
+                                <div>${data.payments.length - index}</div>
                                 <div>
-                                    <div style="font-weight: 500; font-size: 11px;">${expense.category_name}</div>
-                                    <div style="font-size: 9px; color: #666;">${expense.description || ''}</div>
+                                    <div style="font-weight: 500; font-size: 11px;">${payment.category_name}</div>
+                                    <div style="font-size: 9px; color: #666;">${payment.description || ''}</div>
                                 </div>
-                                <div style="font-size: 11px; color: #555;">${expense.recipient_name || '-'}</div>
-                                <div style="font-weight: bold; font-size: 11px;">${expense.amount} ${expense.currency}</div>
+                                <div style="font-size: 11px; color: #555;">${payment.recipient_name || '-'}</div>
+                                <div style="font-weight: bold; font-size: 11px;">${payment.amount} ${payment.currency}</div>
                                 <div>
                                     <div style="font-size: 10px;">${dateStr}</div>
                                     <div style="font-size: 9px; color: #999;">${timeStr}</div>
                                 </div>
                                 <div>
-                                    <button type="button" onclick="editExpense(${expense.id})" style="background: #007AFF; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; margin-bottom: 2px; width: 100%;">✏️</button>
-                                    <button type="button" onclick="deleteExpense(${expense.id})" style="background: #FF3B30; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; width: 100%;">🗑️</button>
+                                    <button type="button" onclick="editPayment(${payment.id})" style="background: #007AFF; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; margin-bottom: 2px; width: 100%;">✏️</button>
+                                    <button type="button" onclick="deletePayment(${payment.id})" style="background: #FF3B30; color: white; border: none; padding: 2px 4px; border-radius: 3px; font-size: 10px; width: 100%;">🗑️</button>
                                 </div>
                             </div>
                         `;
@@ -492,37 +492,37 @@
             }
         }
 
-        async function loadExpenses() {
+        async function loadPayments() {
             try {
-                const response = await fetch(`${API_BASE}/expenses/?limit=10`, {
+                const response = await fetch(`${API_BASE}/payments/?limit=10`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
                 if (response.ok) {
-                    const expenses = await response.json();
-                    const container = document.getElementById('expenses-container');
+                    const payments = await response.json();
+                    const container = document.getElementById('payments-container');
                     container.innerHTML = '';
                     
-                    if (expenses.length === 0) {
-                        container.innerHTML = '<p>Нет расходов</p>';
+                    if (payments.length === 0) {
+                        container.innerHTML = '<p>Нет платежей</p>';
                         return;
                     }
                     
-                    expenses.forEach(expense => {
+                    payments.forEach(payment => {
                         const div = document.createElement('div');
-                        div.className = 'expense-item';
-                        const date = new Date(expense.expense_date).toLocaleDateString('ru-RU');
+                        div.className = 'payment-item';
+                        const date = new Date(payment.payment_date).toLocaleDateString('ru-RU');
                         div.innerHTML = `
-                            <div class="amount">${expense.amount} ${expense.currency || 'UAH'}</div>
-                            <div class="category">${expense.category?.name || 'Без категории'}</div>
-                            <div>${expense.description || ''}</div>
+                            <div class="amount">${payment.amount} ${payment.currency || 'UAH'}</div>
+                            <div class="category">${payment.category?.name || 'Без категории'}</div>
+                            <div>${payment.description || ''}</div>
                             <div style="font-size: 12px; color: #999;">${date}</div>
                         `;
                         container.appendChild(div);
                     });
                 }
             } catch (error) {
-                console.error('Ошибка загрузки расходов:', error);
+                console.error('Ошибка загрузки платежей:', error);
             }
         }
 
@@ -544,8 +544,8 @@
             currentTab = tab;
             
             // Загружаем данные для соответствующего таба
-            if (tab === 'expenses') {
-                loadExpenses();
+            if (tab === 'payments') {
+                loadPayments();
             } else if (tab === 'reports') {
                 loadReports();
             }
@@ -564,17 +564,17 @@
             }, 5000);
         }
 
-        async function deleteExpense(expenseId) {
-            if (!confirm('Удалить этот расход?')) return;
+        async function deletePayment(paymentId) {
+            if (!confirm('Удалить этот платеж?')) return;
             
             try {
-                const response = await fetch(`${API_BASE}/expenses/${expenseId}`, {
+                const response = await fetch(`${API_BASE}/payments/${paymentId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
                 if (response.ok) {
-                    showMessage('Расход удален', 'success');
+                    showMessage('Платеж удален', 'success');
                     loadReports();
                 } else {
                     showMessage('Ошибка удаления', 'error');
@@ -584,24 +584,24 @@
             }
         }
 
-        let editingExpenseId = null;
-        let currentExpenseData = null;
+        let editingPaymentId = null;
+        let currentPaymentData = null;
 
-        async function editExpense(expenseId) {
-            editingExpenseId = expenseId;
+        async function editPayment(paymentId) {
+            editingPaymentId = paymentId;
             
-            // Находим данные расхода в текущем отчете
+            // Находим данные платежа в текущем отчете
             try {
-                const response = await fetch(`${API_BASE}/expenses/reports?period=year`, {
+                const response = await fetch(`${API_BASE}/payments/reports?period=year`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const expense = data.expenses.find(e => e.id === expenseId);
-                    if (expense) {
-                        currentExpenseData = expense;
-                        await populateEditForm(expense);
+                    const payment = data.payments.find(e => e.id === paymentId);
+                    if (payment) {
+                        currentPaymentData = payment;
+                        await populateEditForm(payment);
                         document.getElementById('edit-modal').style.display = 'block';
                     }
                 }
@@ -610,31 +610,31 @@
             }
         }
 
-        async function populateEditForm(expense) {
+        async function populateEditForm(payment) {
             // Заполняем категории
             const categorySelect = document.getElementById('edit-category-select');
             const mainCategorySelect = document.getElementById('category-select');
             categorySelect.innerHTML = mainCategorySelect.innerHTML;
-            categorySelect.value = expense.category_id || '';
+            categorySelect.value = payment.category_id || '';
             
             // Заполняем получателей
             const recipientSelect = document.getElementById('edit-recipient-select');
             const mainRecipientSelect = document.getElementById('recipient-select');
             recipientSelect.innerHTML = mainRecipientSelect.innerHTML;
-            recipientSelect.value = expense.recipient_id || '';
+            recipientSelect.value = payment.recipient_id || '';
             
             // Заполняем валюты
             const currencySelect = document.getElementById('edit-currency-select');
             const mainCurrencySelect = document.getElementById('currency-select');
             currencySelect.innerHTML = mainCurrencySelect.innerHTML;
-            currencySelect.value = expense.currency || 'UAH';
+            currencySelect.value = payment.currency || 'UAH';
             
             // Заполняем остальные поля
-            document.getElementById('edit-amount').value = expense.amount;
-            document.getElementById('edit-description').value = expense.description || '';
+            document.getElementById('edit-amount').value = payment.amount;
+            document.getElementById('edit-description').value = payment.description || '';
         }
 
-        async function saveExpense(event) {
+        async function savePayment(event) {
             if (event) event.preventDefault();
             
             const categoryId = document.getElementById('edit-category-select').value;
@@ -643,30 +643,30 @@
             const currency = document.getElementById('edit-currency-select').value;
             const description = document.getElementById('edit-description').value;
             
-            const expenseData = {
+            const paymentData = {
                 category_id: parseInt(categoryId),
                 amount: parseFloat(amount),
                 currency: currency,
                 description: description,
-                expense_date: currentExpenseData.expense_date
+                payment_date: currentPaymentData.payment_date
             };
             
             if (recipientId) {
-                expenseData.recipient_id = parseInt(recipientId);
+                paymentData.recipient_id = parseInt(recipientId);
             }
             
             try {
-                const response = await fetch(`${API_BASE}/expenses/${editingExpenseId}`, {
+                const response = await fetch(`${API_BASE}/payments/${editingPaymentId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify(expenseData)
+                    body: JSON.stringify(paymentData)
                 });
                 
                 if (response.ok) {
-                    showMessage('Расход обновлен', 'success');
+                    showMessage('Платёж обновлен', 'success');
                     closeEditModal();
                     loadReports();
                 } else {
@@ -679,8 +679,8 @@
 
         function closeEditModal() {
             document.getElementById('edit-modal').style.display = 'none';
-            editingExpenseId = null;
-            currentExpenseData = null;
+            editingPaymentId = null;
+            currentPaymentData = null;
         }
     </script>
 </body>

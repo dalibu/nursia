@@ -19,7 +19,7 @@ def run_command(command, description):
 
 def main():
     """Главная функция развертывания"""
-    print("🚀 Развертывание Nursia Expense Tracker")
+    print("🚀 Развертывание Nursia Payment Tracker")
     print("=" * 50)
     
     # Проверяем Python версию

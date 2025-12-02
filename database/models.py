@@ -36,7 +36,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
-    expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="user")
+    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
 
 
     def __repr__(self) -> str:
@@ -78,41 +78,41 @@ class RegistrationRequest(Base):
         return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
-class ExpenseCategory(Base):
-    __tablename__ = "expense_categories"
+class PaymentCategory(Base):
+    __tablename__ = "payment_categories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="category")
+    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="category")
 
     def __repr__(self) -> str:
-        return f"<ExpenseCategory(id={self.id}, name={self.name})>"
+        return f"<PaymentCategory(id={self.id}, name={self.name})>"
 
 
-class Expense(Base):
-    __tablename__ = "expenses"
+class Payment(Base):
+    __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    category_id: Mapped[int] = mapped_column(ForeignKey("expense_categories.id"))
+    category_id: Mapped[int] = mapped_column(ForeignKey("payment_categories.id"))
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recipients.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    expense_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_paid: Mapped[bool] = mapped_column(default=False)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    user: Mapped["User"] = relationship("User", back_populates="expenses")
-    category: Mapped["ExpenseCategory"] = relationship("ExpenseCategory", back_populates="expenses")
-    recipient: Mapped[Optional["Recipient"]] = relationship("Recipient", back_populates="expenses")
+    user: Mapped["User"] = relationship("User", back_populates="payments")
+    category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
+    recipient: Mapped[Optional["Recipient"]] = relationship("Recipient", back_populates="payments")
 
     def __repr__(self) -> str:
-        return f"<Expense(id={self.id}, amount={self.amount}, category={self.category.name if self.category else None})>"
+        return f"<Payment(id={self.id}, amount={self.amount}, category={self.category.name if self.category else None})>"
 
 
 class SystemSetting(Base):
@@ -151,7 +151,7 @@ class Recipient(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    expenses: Mapped[list["Expense"]] = relationship("Expense", back_populates="recipient")
+    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="recipient")
 
     def __repr__(self) -> str:
         return f"<Recipient(id={self.id}, name={self.name}, type={self.type})>"

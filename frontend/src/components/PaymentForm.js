@@ -3,16 +3,16 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, MenuItem, Box
 } from '@mui/material';
-import { expenses, recipients, currencies } from '../services/api';
+import { payments, recipients, currencies } from '../services/api';
 
-function ExpenseForm({ open, expense, onClose }) {
+function PaymentForm({ open, payment, onClose }) {
   const [formData, setFormData] = useState({
     amount: '',
     currency: '',
     category_id: '',
     recipient_id: '',
     user_id: '',
-    expense_date: new Date().toISOString().split('T')[0],
+    payment_date: new Date().toISOString().split('T')[0],
     description: '',
     is_paid: false
   });
@@ -25,40 +25,40 @@ function ExpenseForm({ open, expense, onClose }) {
   useEffect(() => {
     if (open) {
       loadData();
-      if (expense) {
+      if (payment) {
         setFormData({
-          amount: expense.amount,
-          currency: expense.currency,
-          category_id: expense.category_id,
-          recipient_id: expense.recipient_id,
-          user_id: expense.user_id || '',
-          expense_date: expense.expense_date.split('T')[0],
-          description: expense.description || '',
-          is_paid: expense.is_paid || false
+          amount: payment.amount,
+          currency: payment.currency,
+          category_id: payment.category_id,
+          recipient_id: payment.recipient_id,
+          user_id: payment.user_id || '',
+          payment_date: payment.payment_date.split('T')[0],
+          description: payment.description || '',
+          is_paid: payment.is_paid || false
         });
       } else {
-        // Сброс формы для нового расхода - валюта будет установлена в loadData
+        // Сброс формы для нового платежа - валюта будет установлена в loadData
         setFormData({
           amount: '',
           currency: '',
           category_id: '',
           recipient_id: '',
           user_id: '',
-          expense_date: new Date().toISOString().split('T')[0],
+          payment_date: new Date().toISOString().split('T')[0],
           description: '',
           is_paid: false
         });
       }
     }
-  }, [open, expense]);
+  }, [open, payment]);
 
   const loadData = async () => {
     try {
       const [categoriesRes, recipientsRes, currenciesRes, userRes, usersRes] = await Promise.all([
-        expenses.categories(),
+        payments.categories(),
         recipients.list(),
         currencies.list(),
-        expenses.getUserInfo(),
+        payments.getUserInfo(),
         fetch('/api/users/', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json())
       ]);
       setCategories(categoriesRes.data);
@@ -69,7 +69,7 @@ function ExpenseForm({ open, expense, onClose }) {
       
       // Устанавливаем валюту по умолчанию
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
-      if (defaultCurrency && !expense) {
+      if (defaultCurrency && !payment) {
         setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
       }
     } catch (error) {
@@ -86,24 +86,24 @@ function ExpenseForm({ open, expense, onClose }) {
       category_id: parseInt(formData.category_id),
       recipient_id: parseInt(formData.recipient_id),
       user_id: formData.user_id ? parseInt(formData.user_id) : undefined,
-      expense_date: formData.expense_date + 'T00:00:00'
+      payment_date: formData.payment_date + 'T00:00:00'
     };
     
     try {
-      if (expense) {
-        await expenses.update(expense.id, submitData);
+      if (payment) {
+        await payments.update(payment.id, submitData);
       } else {
-        await expenses.create(submitData);
+        await payments.create(submitData);
       }
       onClose();
     } catch (error) {
-      console.error('Failed to save expense:', error);
+      console.error('Failed to save payment:', error);
     }
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{expense ? 'Редактировать расход' : 'Новый расход'}</DialogTitle>
+      <DialogTitle>{payment ? 'Редактировать платёж' : 'Новый платёж'}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent>
           <TextField
@@ -175,8 +175,8 @@ function ExpenseForm({ open, expense, onClose }) {
             label="Дата"
             type="date"
             margin="normal"
-            value={formData.expense_date}
-            onChange={(e) => setFormData({...formData, expense_date: e.target.value})}
+            value={formData.payment_date}
+            onChange={(e) => setFormData({...formData, payment_date: e.target.value})}
             InputLabelProps={{ shrink: true }}
           />
           <TextField
@@ -213,4 +213,4 @@ function ExpenseForm({ open, expense, onClose }) {
   );
 }
 
-export default ExpenseForm;
+export default PaymentForm;

@@ -62,3 +62,6 @@ yarn-error.log*
 
 # React build
 frontend/build/
+
+# Backup files
+.bak

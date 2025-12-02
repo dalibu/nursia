@@ -7,15 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, expenses, settings as settings_router, currencies, recipients, admin, users, user_status
+from api.routers import auth, payments, settings as settings_router, currencies, recipients, admin, users, user_status
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
 import os
 
 app = FastAPI(
-    title="Nursia Expense Tracker API",
-    description="REST API для учета расходов времени и денег на проживание",
+    title="Nursia Payment Tracker API",
+    description="REST API для учета платежей",
     version="1.0.0",
     debug=settings.DEBUG
 )
@@ -41,7 +41,7 @@ app.add_middleware(
 
 # API роуты с префиксом /api
 app.include_router(auth.router, prefix="/api")
-app.include_router(expenses.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(currencies.router, prefix="/api")
 app.include_router(recipients.router, prefix="/api")
@@ -55,7 +55,7 @@ if os.path.exists("frontend/build"):
 
 @app.get("/api")
 async def api_root():
-    return {"message": "Nursia Expense Tracker API"}
+    return {"message": "Nursia Payment Tracker API"}
 
 @app.get("/health")
 async def health_check():

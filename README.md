@@ -1,18 +1,18 @@
 # Nursia
 
-Expense tracking service for household spending management with multi-currency support.
+Payment tracking service for household spending management with multi-currency support.
 
 ## Features
 
-- **REST API** with FastAPI for expense management
+- **REST API** with FastAPI for payment management
 - **OAuth Authentication** with JWT tokens
 - **Database** with migrations (Alembic + SQLite)
 - **Telegram Bot** for mobile access
 - **React Frontend** (SPA с Material-UI)
 - **Multi-currency Support** (UAH, EUR, USD, RUB)
-- **Expense Categories** and recipient management
+- **Payment Categories** and recipient management
 - **Detailed Reports** with filtering by period and currency
-- **CRUD Operations** for expenses (create, read, update, delete)
+- **CRUD Operations** for payments (create, read, update, delete)
 
 ## Quick Start with Docker
 
@@ -44,7 +44,7 @@ cd frontend && npm install
 # Apply migrations
 cd database && alembic upgrade head
 
-# Initialize expense categories
+# Initialize payment categories
 python scripts/init_categories.py
 
 # Initialize system settings
@@ -73,16 +73,16 @@ python bot/main.py
 ### Authentication
 - `POST /auth/login` - User login
 
-### Expense Categories
-- `GET /expenses/categories` - List categories
-- `POST /expenses/categories` - Create category (admin only)
+### Payment Categories
+- `GET /payments/categories` - List categories
+- `POST /payments/categories` - Create category (admin only)
 
-### Expenses
-- `GET /expenses/` - List expenses with filtering
-- `POST /expenses/` - Create expense
-- `PUT /expenses/{id}` - Update expense
-- `DELETE /expenses/{id}` - Delete expense
-- `GET /expenses/reports` - Generate reports
+### Payments
+- `GET /payments/` - List payments with filtering
+- `POST /payments/` - Create payment
+- `PUT /payments/{id}` - Update payment
+- `DELETE /payments/{id}` - Delete payment
+- `GET /payments/reports` - Generate reports
 
 ### Recipients
 - `GET /recipients/` - List recipients (users and organizations)

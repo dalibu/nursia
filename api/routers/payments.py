@@ -1,0 +1,327 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, and_
+from sqlalchemy.orm import joinedload
+from database.core import get_db
+from database.models import User, Payment, PaymentCategory, Recipient, Currency
+from api.schemas.payment import (
+    PaymentCreate, Payment as PaymentSchema,
+    PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
+    PaymentReport
+)
+from api.auth.oauth import get_current_user, get_admin_user
+from utils.timezone import now_server
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+@router.post("/categories", response_model=PaymentCategorySchema)
+async def create_category(
+    category: PaymentCategoryCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    db_category = PaymentCategory(**category.dict())
+    db.add(db_category)
+    await db.commit()
+    await db.refresh(db_category)
+    return db_category
+
+
+@router.get("/categories", response_model=List[PaymentCategorySchema])
+async def get_categories(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+) -> List[PaymentCategorySchema]:
+    result = await db.execute(select(PaymentCategory))
+    return [PaymentCategorySchema.from_orm(c) for c in result.scalars().all()]
+
+
+@router.post("/", response_model=PaymentSchema)
+async def create_payment(
+    payment: PaymentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    payment_data = payment.dict()
+    
+    # Устанавливаем валюту по умолчанию если не указана
+    if not payment_data.get('currency'):
+        result = await db.execute(select(Currency).where(Currency.is_default == True))
+        default_currency = result.scalar_one_or_none()
+        payment_data['currency'] = default_currency.code if default_currency else 'UAH'
+    
+    # Если payment_date без времени, добавляем текущее время
+    if payment_data['payment_date'].time() == datetime.min.time():
+        now = now_server()
+        payment_data['payment_date'] = payment_data['payment_date'].replace(
+            hour=now.hour,
+            minute=now.minute,
+            second=now.second
+        )
+    
+    # Админы могут указать user_id, обычные пользователи - только свои платежи
+    if current_user.role == "admin" and payment_data.get('user_id'):
+        user_id = payment_data['user_id']
+    else:
+        user_id = current_user.id
+    
+    # Удаляем user_id из payment_data перед созданием объекта
+    payment_data.pop('user_id', None)
+    db_payment = Payment(
+        **payment_data,
+        user_id=user_id,
+        is_paid=payment.is_paid if payment.is_paid is not None else False,
+        paid_at=now_server() if payment.is_paid else None
+    )
+    db.add(db_payment)
+    await db.commit()
+    await db.refresh(db_payment)
+    return PaymentSchema.from_orm(db_payment)
+
+
+@router.get("/", response_model=List[PaymentSchema])
+async def get_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    category_id: Optional[int] = Query(None),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> List[PaymentSchema]:
+    query = select(Payment).options(
+        joinedload(Payment.category),
+        joinedload(Payment.recipient),
+        joinedload(Payment.user)
+    )
+    
+    # Админ видит все платежи, пользователи только свои
+    if current_user.role != "admin":
+        query = query.where(Payment.user_id == current_user.id)
+    
+    if category_id:
+        query = query.where(Payment.category_id == category_id)
+    if start_date:
+        query = query.where(Payment.payment_date >= start_date)
+    if end_date:
+        query = query.where(Payment.payment_date <= end_date)
+    
+    query = query.offset(skip).limit(limit).order_by(Payment.payment_date.desc())
+    result = await db.execute(query)
+    payments = result.scalars().all()
+    
+    # Формируем ответ вручную
+    response = []
+    for payment in payments:
+        payment_dict = {
+            "id": payment.id,
+            "category_id": payment.category_id,
+            "recipient_id": payment.recipient_id,
+            "amount": str(payment.amount),
+            "currency": payment.currency,
+            "description": payment.description,
+            "payment_date": payment.payment_date.isoformat(),
+            "user_id": payment.user_id,
+            "created_at": payment.created_at.isoformat(),
+            "is_paid": payment.is_paid,
+            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+            "category": {
+                "id": payment.category.id,
+                "name": payment.category.name,
+                "description": payment.category.description,
+                "created_at": payment.category.created_at.isoformat()
+            } if payment.category else None,
+            "recipient": {
+                "id": payment.recipient.id,
+                "name": payment.recipient.name,
+                "type": payment.recipient.type
+            } if payment.recipient else None,
+            "user": {
+                "id": payment.user.id,
+                "full_name": payment.user.full_name,
+                "username": payment.user.username
+            } if payment.user else None
+        }
+        response.append(payment_dict)
+    
+    return response
+
+
+@router.get("/reports")
+async def get_payment_reports(
+    period: str = Query("month", regex="^(day|week|month|year)$"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not start_date:
+        if period == "day":
+            start_date = now_server().replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "week":
+            start_date = now_server() - timedelta(days=7)
+        elif period == "month":
+            start_date = now_server().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period == "year":
+            start_date = now_server().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    if not end_date:
+        end_date = now_server()
+    
+    # Получаем детальные платежи
+    query = select(Payment, PaymentCategory.name, Recipient.name).join(
+        PaymentCategory
+    ).outerjoin(
+        Recipient, Payment.recipient_id == Recipient.id
+    ).where(
+        and_(
+            Payment.user_id == current_user.id,
+            Payment.payment_date >= start_date,
+            Payment.payment_date <= end_date
+        )
+    ).order_by(Payment.payment_date.desc())
+    
+    result = await db.execute(query)
+    payments = []
+    totals_by_currency = {}
+    
+    for payment, category_name, recipient_name in result:
+        payments.append({
+            "id": payment.id,
+            "amount": float(payment.amount),
+            "currency": payment.currency,
+            "category_name": category_name,
+            "recipient_name": recipient_name,
+            "description": payment.description,
+            "payment_date": payment.payment_date.isoformat(),
+            "created_at": payment.created_at.isoformat()
+        })
+        
+        # Группируем по валютам
+        currency = payment.currency
+        if currency not in totals_by_currency:
+            totals_by_currency[currency] = 0
+        totals_by_currency[currency] += float(payment.amount)
+    
+    return {
+        "payments": payments,
+        "totals_by_currency": totals_by_currency,
+        "period_start": start_date.isoformat(),
+        "period_end": end_date.isoformat(),
+        "count": len(payments)
+    }
+
+
+@router.put("/categories/{category_id}")
+async def update_category(
+    category_id: int,
+    category: PaymentCategoryCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    result = await db.execute(select(PaymentCategory).where(PaymentCategory.id == category_id))
+    db_category = result.scalar_one_or_none()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    for field, value in category.model_dump().items():
+        setattr(db_category, field, value)
+    
+    await db.commit()
+    await db.refresh(db_category)
+    return db_category
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    result = await db.execute(select(PaymentCategory).where(PaymentCategory.id == category_id))
+    db_category = result.scalar_one_or_none()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    await db.delete(db_category)
+    await db.commit()
+    return {"message": "Category deleted"}
+
+
+@router.put("/{payment_id}")
+async def update_payment(
+    payment_id: int,
+    payment: PaymentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Админ может редактировать любые платежи, пользователи только свои
+    if current_user.role == "admin":
+        result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    else:
+        result = await db.execute(select(Payment).where(
+            Payment.id == payment_id,
+            Payment.user_id == current_user.id
+        ))
+    
+    db_payment = result.scalar_one_or_none()
+    if not db_payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    payment_data = payment.model_dump()
+    
+    # Если указан user_id и пользователь админ, обновляем user_id
+    if 'user_id' in payment_data and current_user.role != 'admin':
+        del payment_data['user_id']
+    
+    # Если указан is_paid, обновляем paid_at
+    if 'is_paid' in payment_data:
+        if payment_data['is_paid'] and not db_payment.paid_at:
+            payment_data['paid_at'] = now_server()
+        elif not payment_data['is_paid']:
+            payment_data['paid_at'] = None
+    
+    # Удаляем user_id, чтобы не перезаписать его
+    payment_data.pop('user_id', None)
+    
+    for field, value in payment_data.items():
+        setattr(db_payment, field, value)
+    
+    await db.commit()
+    await db.refresh(db_payment)
+    return {"id": db_payment.id, "message": "Payment updated successfully"}
+
+
+@router.delete("/{payment_id}")
+async def delete_payment(
+    payment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Админ может удалять любые платежи, пользователи только свои
+    if current_user.role == "admin":
+        result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    else:
+        result = await db.execute(select(Payment).where(
+            Payment.id == payment_id,
+            Payment.user_id == current_user.id
+        ))
+    
+    db_payment = result.scalar_one_or_none()
+    if not db_payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Проверяем права доступа
+    if current_user.role != 'admin' and db_payment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    await db.delete(db_payment)
+    await db.commit()
+    return {"message": "Payment deleted"}

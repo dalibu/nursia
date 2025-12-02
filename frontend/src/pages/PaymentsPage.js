@@ -6,14 +6,14 @@ import {
   DialogContentText, TablePagination, Chip
 } from '@mui/material';
 import { Add, Edit, Delete, Payment } from '@mui/icons-material';
-import { expenses } from '../services/api';
-import ExpenseForm from '../components/ExpenseForm';
+import { payments } from '../services/api';
+import PaymentForm from '../components/PaymentForm';
 
-function ExpensesPage() {
-  const [expenseList, setExpenseList] = useState([]);
+function PaymentsPage() {
+  const [paymentList, setPaymentList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [editingExpense, setEditingExpense] = useState(null);
+  const [editingPayment, setEditingPayment] = useState(null);
   const [sortField, setSortField] = useState('number');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filters, setFilters] = useState({
@@ -26,25 +26,25 @@ function ExpensesPage() {
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, expenseId: null, expenseName: '' });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, paymentId: null, paymentName: '' });
   const [totals, setTotals] = useState({});
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
-    loadExpenses();
+    loadPayments();
   }, []);
 
   useEffect(() => {
     applyFiltersAndSort();
-  }, [expenseList, filters, sortField, sortDirection]);
+  }, [paymentList, filters, sortField, sortDirection]);
 
-  const loadExpenses = async () => {
+  const loadPayments = async () => {
     try {
-      const [expensesRes, categoriesRes, userRes] = await Promise.all([
-        expenses.list(),
-        expenses.categories(),
-        expenses.getUserInfo()
+      const [paymentsRes, categoriesRes, userRes] = await Promise.all([
+        payments.list(),
+        payments.categories(),
+        payments.getUserInfo()
       ]);
 
       const token = localStorage.getItem('token');
@@ -52,46 +52,46 @@ function ExpensesPage() {
         headers: { Authorization: `Bearer ${token}` }
       }).then(r => r.json());
       
-      setExpenseList(expensesRes.data);
+      setPaymentList(paymentsRes.data);
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
       setIsAdmin(userRes.data.role === 'admin');
     } catch (error) {
-      console.error('Failed to load expenses:', error);
+      console.error('Failed to load payments:', error);
     }
   };
 
   const applyFiltersAndSort = () => {
-    let filtered = [...expenseList];
+    let filtered = [...paymentList];
     
     // Применяем фильтры
     if (filters.category) {
-      filtered = filtered.filter(expense => 
-        expense.category?.id === parseInt(filters.category)
+      filtered = filtered.filter(payment => 
+        payment.category?.id === parseInt(filters.category)
       );
 
     }
     if (filters.currency) {
-      filtered = filtered.filter(expense => expense.currency === filters.currency);
+      filtered = filtered.filter(payment => payment.currency === filters.currency);
 
     }
     if (filters.dateFrom) {
-      filtered = filtered.filter(expense => 
-        new Date(expense.expense_date) >= new Date(filters.dateFrom)
+      filtered = filtered.filter(payment => 
+        new Date(payment.payment_date) >= new Date(filters.dateFrom)
       );
 
     }
     if (filters.dateTo) {
-      filtered = filtered.filter(expense => 
-        new Date(expense.expense_date) <= new Date(filters.dateTo + 'T23:59:59')
+      filtered = filtered.filter(payment => 
+        new Date(payment.payment_date) <= new Date(filters.dateTo + 'T23:59:59')
       );
     }
     if (filters.paymentStatus !== 'all') {
-      filtered = filtered.filter(expense => {
+      filtered = filtered.filter(payment => {
         if (filters.paymentStatus === 'paid') {
-          return expense.is_paid === true;
+          return payment.is_paid === true;
         } else if (filters.paymentStatus === 'unpaid') {
-          return expense.is_paid === false || expense.is_paid === undefined;
+          return payment.is_paid === false || payment.is_paid === undefined;
         }
         return true;
       });
@@ -110,9 +110,9 @@ function ExpensesPage() {
           aVal = a.id;
           bVal = b.id;
           break;
-        case 'expense_date':
-          aVal = new Date(a.expense_date);
-          bVal = new Date(b.expense_date);
+        case 'payment_date':
+          aVal = new Date(a.payment_date);
+          bVal = new Date(b.payment_date);
           break;
         case 'amount':
           aVal = parseFloat(a.amount);
@@ -151,9 +151,9 @@ function ExpensesPage() {
     const paidTotals = {};
     const unpaidTotals = {};
     
-    filtered.forEach(expense => {
-      const currency = expense.currency;
-      const amount = parseFloat(expense.amount);
+    filtered.forEach(payment => {
+      const currency = payment.currency;
+      const amount = parseFloat(payment.amount);
       
       if (!newTotals[currency]) {
         newTotals[currency] = 0;
@@ -163,7 +163,7 @@ function ExpensesPage() {
       
       newTotals[currency] += amount;
       
-      if (expense.is_paid) {
+      if (payment.is_paid) {
         paidTotals[currency] += amount;
       } else {
         unpaidTotals[currency] += amount;
@@ -188,47 +188,47 @@ function ExpensesPage() {
 
 
 
-  const handleDeleteClick = (expense) => {
+  const handleDeleteClick = (payment) => {
     setDeleteDialog({
       open: true,
-      expenseId: expense.id,
-      expenseName: `${expense.amount} ${currencies.find(c => c.code === expense.currency)?.symbol || expense.currency} - ${expense.category?.name || 'Нет категории'}`
+      paymentId: payment.id,
+      paymentName: `${payment.amount} ${currencies.find(c => c.code === payment.currency)?.symbol || payment.currency} - ${payment.category?.name || 'Нет категории'}`
     });
   };
 
   const handleDeleteConfirm = async () => {
     try {
-      await expenses.delete(deleteDialog.expenseId);
-      loadExpenses();
-      setDeleteDialog({ open: false, expenseId: null, expenseName: '' });
+      await payments.delete(deleteDialog.paymentId);
+      loadPayments();
+      setDeleteDialog({ open: false, paymentId: null, paymentName: '' });
     } catch (error) {
-      console.error('Failed to delete expense:', error);
+      console.error('Failed to delete payment:', error);
     }
   };
 
   const handleDeleteCancel = () => {
-    setDeleteDialog({ open: false, expenseId: null, expenseName: '' });
+    setDeleteDialog({ open: false, paymentId: null, paymentName: '' });
   };
 
-  const handleEdit = (expense) => {
-    setEditingExpense(expense);
+  const handleEdit = (payment) => {
+    setEditingPayment(payment);
     setShowForm(true);
   };
 
   const handleFormClose = () => {
     setShowForm(false);
-    setEditingExpense(null);
-    loadExpenses();
+    setEditingPayment(null);
+    loadPayments();
   };
 
-  const handlePaymentToggle = async (expenseId, isPaid) => {
+  const handlePaymentToggle = async (paymentId, isPaid) => {
     try {
-      const expense = expenseList.find(e => e.id === expenseId);
-      await expenses.update(expenseId, {
-        ...expense,
+      const payment = paymentList.find(e => e.id === paymentId);
+      await payments.update(paymentId, {
+        ...payment,
         is_paid: isPaid
       });
-      loadExpenses();
+      loadPayments();
     } catch (error) {
       console.error('Failed to update payment status:', error);
     }
@@ -247,13 +247,13 @@ function ExpensesPage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Расходы</Typography>
+        <Typography variant="h4">Платежи</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => setShowForm(true)}
         >
-          Добавить расход
+          Добавить платёж
         </Button>
       </Box>
 
@@ -339,9 +339,9 @@ function ExpensesPage() {
               </TableCell>
               <TableCell>
                 <TableSortLabel
-                  active={sortField === 'expense_date'}
-                  direction={sortField === 'expense_date' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('expense_date')}
+                  active={sortField === 'payment_date'}
+                  direction={sortField === 'payment_date' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('payment_date')}
                 >
                   Дата
                 </TableSortLabel>
@@ -402,36 +402,36 @@ function ExpensesPage() {
             )}
             {filteredList
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((expense, index) => {
+              .map((payment, index) => {
               const displayNumber = sortField === 'number' && sortDirection === 'desc' 
                 ? filteredList.length - (page * rowsPerPage + index)
                 : page * rowsPerPage + index + 1;
               
               return (
-                <TableRow key={expense.id}>
+                <TableRow key={payment.id}>
                   <TableCell>{displayNumber}</TableCell>
-                  <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(expense.expense_date).toLocaleTimeString()}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{expense.amount} {currencies.find(c => c.code === expense.currency)?.symbol || expense.currency}</TableCell>
-                  <TableCell>{expense.category?.name || '-'}</TableCell>
+                  <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(payment.payment_date).toLocaleTimeString()}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
+                  <TableCell>{payment.category?.name || '-'}</TableCell>
                   {isAdmin && (
-                    <TableCell>{expense.user?.full_name || '-'}</TableCell>
+                    <TableCell>{payment.user?.full_name || '-'}</TableCell>
                   )}
-                  <TableCell>{expense.recipient?.name || '-'}</TableCell>
-                  <TableCell>{expense.description || '-'}</TableCell>
+                  <TableCell>{payment.recipient?.name || '-'}</TableCell>
+                  <TableCell>{payment.description || '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>
                       <Chip 
-                        label={expense.is_paid ? 'Оплачено' : 'К оплате'}
-                        color={expense.is_paid ? 'success' : 'warning'}
+                        label={payment.is_paid ? 'Оплачено' : 'К оплате'}
+                        color={payment.is_paid ? 'success' : 'warning'}
                         size="small"
                         clickable
-                        onClick={() => handlePaymentToggle(expense.id, !expense.is_paid)}
+                        onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
                         icon={<Payment />}
                         sx={{ 
                           cursor: 'pointer',
                           '&:hover': {
-                            backgroundColor: expense.is_paid ? '#2e7d32' : '#ed6c02',
+                            backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
                             color: 'white'
                           }
                         }}
@@ -439,10 +439,10 @@ function ExpensesPage() {
                     </TableCell>
                   )}
                   <TableCell>
-                    <IconButton onClick={() => handleEdit(expense)}>
+                    <IconButton onClick={() => handleEdit(payment)}>
                       <Edit />
                     </IconButton>
-                    <IconButton onClick={() => handleDeleteClick(expense)}>
+                    <IconButton onClick={() => handleDeleteClick(payment)}>
                       <Delete />
                     </IconButton>
                   </TableCell>
@@ -502,9 +502,9 @@ function ExpensesPage() {
         labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
       />
 
-      <ExpenseForm
+      <PaymentForm
         open={showForm}
-        expense={editingExpense}
+        payment={editingPayment}
         onClose={handleFormClose}
       />
 
@@ -512,9 +512,9 @@ function ExpensesPage() {
         <DialogTitle>Подтвердите удаление</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите удалить расход:
+            Вы уверены, что хотите удалить платёж:
             <br />
-            <strong>{deleteDialog.expenseName}</strong>
+            <strong>{deleteDialog.paymentName}</strong>
             <br /><br />
             Это действие нельзя отменить.
           </DialogContentText>
@@ -530,4 +530,4 @@ function ExpensesPage() {
   );
 }
 
-export default ExpensesPage;
+export default PaymentsPage;

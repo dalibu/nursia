@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
-import ExpensesPage from './pages/ExpensesPage';
+import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import CurrenciesPage from './pages/CurrenciesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -51,7 +51,7 @@ function App() {
           <Route path="/" element={
             isAuthenticated ? <Layout onLogout={() => setIsAuthenticated(false)} /> : <Navigate to="/login" replace />
           }>
-            <Route index element={<ExpensesPage />} />
+            <Route index element={<PaymentsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="currencies" element={<CurrenciesPage />} />
             <Route path="profile" element={<ProfilePage />} />

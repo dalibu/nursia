@@ -1,7 +1,7 @@
 import pytest
 from decimal import Decimal
 from datetime import datetime
-from database.models import User, ExpenseCategory, Expense, Recipient, UserRole
+from database.models import User, PaymentCategory, Payment, Recipient, UserRole
 
 def test_user_model():
     """Тест модели пользователя"""
@@ -22,9 +22,9 @@ def test_user_model():
     assert "testuser" in user_str
     assert "UserRole.ADMIN" in user_str
 
-def test_expense_category_model():
-    """Тест модели категории расходов"""
-    category = ExpenseCategory(
+def test_payment_category_model():
+    """Тест модели категории платежей"""
+    category = PaymentCategory(
         name="Test Category",
         description="Test description"
     )
@@ -32,22 +32,22 @@ def test_expense_category_model():
     assert category.name == "Test Category"
     assert category.description == "Test description"
 
-def test_expense_model():
-    """Тест модели расхода"""
-    expense = Expense(
+def test_payment_model():
+    """Тест модели платежа"""
+    payment = Payment(
         user_id=123456789,
         category_id=1,
         amount=Decimal("100.50"),
         currency="UAH",
-        description="Test expense",
-        expense_date=datetime.now()
+        description="Test payment",
+        payment_date=datetime.now()
     )
     
-    assert expense.user_id == 123456789
-    assert expense.category_id == 1
-    assert expense.amount == Decimal("100.50")
-    assert expense.currency == "UAH"
-    assert expense.description == "Test expense"
+    assert payment.user_id == 123456789
+    assert payment.category_id == 1
+    assert payment.amount == Decimal("100.50")
+    assert payment.currency == "UAH"
+    assert payment.description == "Test payment"
 
 def test_recipient_model():
     """Тест модели получателя"""
