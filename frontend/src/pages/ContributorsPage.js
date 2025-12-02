@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
@@ -9,6 +10,7 @@ import { Add, Edit, Delete } from '@mui/icons-material';
 import { contributors } from '../services/api';
 
 function ContributorsPage() {
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -24,6 +26,23 @@ function ContributorsPage() {
   useEffect(() => {
     loadContributors();
   }, []);
+
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && items.length > 0) {
+      const itemToEdit = items.find(item => item.id.toString() === editId);
+      if (itemToEdit) {
+        setEditingItem(itemToEdit);
+        setFormData({
+          name: itemToEdit.name,
+          type: itemToEdit.type,
+          description: itemToEdit.description || '',
+          is_active: itemToEdit.is_active !== false
+        });
+        setShowForm(true);
+      }
+    }
+  }, [searchParams, items]);
 
   const loadContributors = async () => {
     try {

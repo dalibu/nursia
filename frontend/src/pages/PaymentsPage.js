@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
@@ -8,12 +9,16 @@ import {
 import { Add, Edit, Delete, Payment, Replay, Search } from '@mui/icons-material';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
+import ContributorForm from '../components/ContributorForm';
 
 function PaymentsPage() {
+  const navigate = useNavigate();
   const [paymentList, setPaymentList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
+  const [showContributorForm, setShowContributorForm] = useState(false);
+  const [editingContributor, setEditingContributor] = useState(null);
   const [sortField, setSortField] = useState('number');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filters, setFilters] = useState({
@@ -290,6 +295,17 @@ function PaymentsPage() {
     });
   };
 
+  const handleContributorClick = (contributor) => {
+    if (contributor && isAdmin) {
+      setEditingContributor(contributor);
+      setShowContributorForm(true);
+    }
+  };
+
+  const handleContributorFormSuccess = () => {
+    loadPayments(); // Перезагружаем платежи, чтобы обновить имена участников
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -476,9 +492,39 @@ function PaymentsPage() {
                       </div>
                     </TableCell>
                     {isAdmin && (
-                      <TableCell>{payment.payer?.name || '-'}</TableCell>
+                      <TableCell
+                        sx={{
+                          cursor: payment.payer?.name ? 'pointer' : 'default'
+                        }}
+                        onClick={() => handleContributorClick(payment.payer)}
+                      >
+                        <span
+                          style={{
+                            textDecoration: payment.payer?.name ? 'underline' : 'none',
+                            textDecorationStyle: 'dotted',
+                            textDecorationColor: 'rgba(25, 118, 210, 0.5)'
+                          }}
+                        >
+                          {payment.payer?.name || '-'}
+                        </span>
+                      </TableCell>
                     )}
-                    <TableCell>{payment.recipient?.name || '-'}</TableCell>
+                    <TableCell
+                      sx={{
+                        cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                      }}
+                      onClick={() => handleContributorClick(payment.recipient)}
+                    >
+                      <span
+                        style={{
+                          textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                          textDecorationStyle: 'dotted',
+                          textDecorationColor: 'rgba(25, 118, 210, 0.5)'
+                        }}
+                      >
+                        {payment.recipient?.name || '-'}
+                      </span>
+                    </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
                     <TableCell>
                       {['Аванс', 'Долг'].includes(payment.category?.name)
@@ -598,6 +644,16 @@ function PaymentsPage() {
         payment={editingPayment}
         initialData={repeatTemplate}
         onClose={() => { setRepeatTemplate(null); handleFormClose(); }}
+      />
+
+      <ContributorForm
+        open={showContributorForm}
+        contributor={editingContributor}
+        onClose={() => {
+          setShowContributorForm(false);
+          setEditingContributor(null);
+        }}
+        onSuccess={handleContributorFormSuccess}
       />
 
       <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
