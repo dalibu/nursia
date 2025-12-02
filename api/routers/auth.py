@@ -12,6 +12,7 @@ from database.models import User, RegistrationRequest
 from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse
 from api.auth.oauth import create_access_token, get_current_user
 from config.settings import settings
+from utils.settings_helper import get_jwt_expire_minutes
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -84,15 +85,17 @@ async def login(
             detail="Account not activated"
         )
     
-    access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire_minutes = await get_jwt_expire_minutes()
+    access_token_expires = timedelta(minutes=expire_minutes)
     access_token = create_access_token(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     
+    expire_minutes = await get_jwt_expire_minutes()
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        "expires_in": expire_minutes * 60
     }
 
 

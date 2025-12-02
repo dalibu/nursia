@@ -11,7 +11,8 @@ async def init_settings():
     settings = [
 
         {"key": "app_name", "value": "Nursia", "description": "Название приложения"},
-        {"key": "remember_me_hours", "value": "24", "description": "Время запоминания пользователя (часы)"}
+        {"key": "remember_me_hours", "value": "24", "description": "Время запоминания пользователя (часы)"},
+        {"key": "jwt_access_token_expire_minutes", "value": "480", "description": "Время жизни JWT токена (минуты)"}
     ]
     
     async for session in get_db():

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 часов
 
     @field_validator('ADMIN_IDS', mode='before')
     @classmethod

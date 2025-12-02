@@ -19,6 +19,7 @@ security = HTTPBearer()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Создать JWT токен"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

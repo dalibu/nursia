@@ -13,7 +13,7 @@ class UserStatusResponse(BaseModel):
     status: UserStatusType
     force_password_change: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True

@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } from '@mui/material';
 import { ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
+import useIdleTimer from '../hooks/useIdleTimer';
 
 const NotificationContext = createContext();
 
@@ -91,6 +92,9 @@ function Layout({ onLogout }) {
     onLogout();
     navigate('/login');
   };
+
+  // Автоматический logout по бездействию (30 минут)
+  useIdleTimer(handleLogout, 30 * 60 * 1000);
 
   return (
     <NotificationContext.Provider value={{ checkRequests }}>
