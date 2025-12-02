@@ -101,7 +101,8 @@ function Layout({ onLogout }) {
       <Box sx={{ flexGrow: 1 }}>
         <AppBar position="static">
           <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <img src="/favicon.svg" alt="Nursia" style={{ width: 32, height: 32 }} />
               NURSIA | {userName}
             </Typography>
             <Button color="inherit" component={Link} to="/">
