@@ -148,6 +148,9 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
                     Категории
                   </MenuItem>
+                  <MenuItem component={Link} to="/recipients" onClick={() => setSettingsAnchor(null)}>
+                    Получатели
+                  </MenuItem>
                   <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
                     Валюты
                   </MenuItem>

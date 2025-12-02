@@ -42,6 +42,11 @@ export const payments = {
 
 export const recipients = {
   list: () => api.get('/recipients/'),
+  listAdmin: () => api.get('/recipients/admin'),
+  create: (data) => api.post('/recipients/', data),
+  update: (id, data) => api.put(`/recipients/${id}`, data),
+  delete: (id) => api.delete(`/recipients/${id}`),
+  validateDelete: (id) => api.get(`/recipients/${id}/validate-delete`),
 };
 
 export const currencies = {
