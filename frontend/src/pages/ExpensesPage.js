@@ -47,7 +47,10 @@ function ExpensesPage() {
         expenses.getUserInfo()
       ]);
 
-      const currenciesData = await fetch('/api/currencies/').then(r => r.json());
+      const token = localStorage.getItem('token');
+      const currenciesData = await fetch('/api/currencies/', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json());
       
       setExpenseList(expensesRes.data);
       setCategories(categoriesRes.data);
@@ -370,7 +373,7 @@ function ExpensesPage() {
                     direction={sortField === 'payer' ? sortDirection : 'asc'}
                     onClick={() => handleSort('payer')}
                   >
-                    Плательщик
+                    От кого
                   </TableSortLabel>
                 </TableCell>
               )}
@@ -380,10 +383,10 @@ function ExpensesPage() {
                   direction={sortField === 'recipient' ? sortDirection : 'asc'}
                   onClick={() => handleSort('recipient')}
                 >
-                  Получатель
+                  Кому
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Описание</TableCell>
+              <TableCell>Комментарий</TableCell>
               {isAdmin && <TableCell>Оплачено</TableCell>}
               <TableCell sx={{ width: 120 }}>Действия</TableCell>
             </TableRow>

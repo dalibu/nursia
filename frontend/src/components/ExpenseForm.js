@@ -138,7 +138,7 @@ function ExpenseForm({ open, expense, onClose }) {
           <TextField
             fullWidth
             select
-            label="Получатель"
+            label="Кому"
             margin="normal"
             value={formData.recipient_id}
             onChange={(e) => setFormData({...formData, recipient_id: e.target.value})}
