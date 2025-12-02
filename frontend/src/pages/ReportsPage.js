@@ -43,7 +43,7 @@ function ReportsPage() {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Отчеты
+        Обзор
       </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>

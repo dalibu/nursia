@@ -52,7 +52,8 @@ function App() {
           <Route path="/" element={
             isAuthenticated ? <Layout onLogout={() => setIsAuthenticated(false)} /> : <Navigate to="/login" replace />
           }>
-            <Route index element={<PaymentsPage />} />
+            <Route index element={<ReportsPage />} />
+            <Route path="payments" element={<PaymentsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="currencies" element={<CurrenciesPage />} />
             <Route path="contributors" element={<ContributorsPage />} />

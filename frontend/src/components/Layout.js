@@ -106,10 +106,10 @@ function Layout({ onLogout }) {
               NURSIA | {userName}
             </Typography>
             <Button color="inherit" component={Link} to="/">
-              Платежи
+              Обзор
             </Button>
-            <Button color="inherit" component={Link} to="/reports">
-              Отчеты
+            <Button color="inherit" component={Link} to="/payments">
+              Платежи
             </Button>
             {isAdmin && (
               <>
