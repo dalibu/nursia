@@ -32,7 +32,7 @@ class ExpenseBase(BaseModel):
 
 
 class ExpenseCreate(ExpenseBase):
-    pass
+    user_id: Optional[int] = None
 
 
 class RecipientInfo(BaseModel):

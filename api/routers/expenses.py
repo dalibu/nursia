@@ -66,7 +66,15 @@ async def create_expense(
             second=now.second
         )
     
-    db_expense = Expense(**expense_data, user_id=current_user.id)
+    # Админы могут указать user_id, обычные пользователи - только свои расходы
+    if current_user.role == "admin" and expense_data.get('user_id'):
+        user_id = expense_data['user_id']
+    else:
+        user_id = current_user.id
+    
+    # Удаляем user_id из expense_data перед созданием объекта
+    expense_data.pop('user_id', None)
+    db_expense = Expense(**expense_data, user_id=user_id)
     db.add(db_expense)
     await db.commit()
     await db.refresh(db_expense)
@@ -278,6 +286,13 @@ async def update_expense(
             expense_data['paid_at'] = now_server()
         else:
             expense_data['paid_at'] = None
+    
+    # Админы могут изменить user_id
+    if current_user.role == "admin" and expense_data.get('user_id'):
+        db_expense.user_id = expense_data['user_id']
+    
+    # Удаляем user_id из expense_data перед обновлением
+    expense_data.pop('user_id', None)
     
     for field, value in expense_data.items():
         setattr(db_expense, field, value)

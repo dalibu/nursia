@@ -11,6 +11,7 @@ function ExpenseForm({ open, expense, onClose }) {
     currency: '',
     category_id: '',
     recipient_id: '',
+    user_id: '',
     expense_date: new Date().toISOString().split('T')[0],
     description: '',
     is_paid: false
@@ -18,6 +19,7 @@ function ExpenseForm({ open, expense, onClose }) {
   const [categories, setCategories] = useState([]);
   const [recipientList, setRecipientList] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
+  const [userList, setUserList] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ function ExpenseForm({ open, expense, onClose }) {
           currency: expense.currency,
           category_id: expense.category_id,
           recipient_id: expense.recipient_id,
+          user_id: expense.user_id || '',
           expense_date: expense.expense_date.split('T')[0],
           description: expense.description || '',
           is_paid: expense.is_paid || false
@@ -40,6 +43,7 @@ function ExpenseForm({ open, expense, onClose }) {
           currency: '',
           category_id: '',
           recipient_id: '',
+          user_id: '',
           expense_date: new Date().toISOString().split('T')[0],
           description: '',
           is_paid: false
@@ -50,15 +54,17 @@ function ExpenseForm({ open, expense, onClose }) {
 
   const loadData = async () => {
     try {
-      const [categoriesRes, recipientsRes, currenciesRes, userRes] = await Promise.all([
+      const [categoriesRes, recipientsRes, currenciesRes, userRes, usersRes] = await Promise.all([
         expenses.categories(),
         recipients.list(),
         currencies.list(),
-        expenses.getUserInfo()
+        expenses.getUserInfo(),
+        fetch('/api/users/', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json())
       ]);
       setCategories(categoriesRes.data);
       setRecipientList(recipientsRes.data);
       setCurrencyList(currenciesRes.data.currencies);
+      setUserList(usersRes || []);
       setIsAdmin(userRes.data.role === 'admin');
       
       // Устанавливаем валюту по умолчанию
@@ -79,6 +85,7 @@ function ExpenseForm({ open, expense, onClose }) {
       amount: parseFloat(formData.amount),
       category_id: parseInt(formData.category_id),
       recipient_id: parseInt(formData.recipient_id),
+      user_id: formData.user_id ? parseInt(formData.user_id) : undefined,
       expense_date: formData.expense_date + 'T00:00:00'
     };
     
@@ -148,6 +155,21 @@ function ExpenseForm({ open, expense, onClose }) {
               <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
             ))}
           </TextField>
+          {isAdmin && (
+            <TextField
+              fullWidth
+              select
+              label="От кого"
+              margin="normal"
+              value={formData.user_id}
+              onChange={(e) => setFormData({...formData, user_id: e.target.value})}
+            >
+              <MenuItem value="">Текущий пользователь</MenuItem>
+              {userList.map((user) => (
+                <MenuItem key={user.id} value={user.id}>{user.full_name}</MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             fullWidth
             label="Дата"
