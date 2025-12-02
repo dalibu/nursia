@@ -149,7 +149,7 @@ function Layout({ onLogout }) {
                     Категории
                   </MenuItem>
                   <MenuItem component={Link} to="/contributors" onClick={() => setSettingsAnchor(null)}>
-                    Контрибьюторы
+                    Участники
                   </MenuItem>
                   <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
                     Валюты

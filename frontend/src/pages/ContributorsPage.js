@@ -31,7 +31,7 @@ function ContributorsPage() {
       setItems(response.data);
     } catch (error) {
       console.error('Failed to load contributors:', error);
-      setMessage({ type: 'error', text: 'Не удалось загрузить список контрибьюторов' });
+      setMessage({ type: 'error', text: 'Не удалось загрузить список участников' });
     }
   };
 
@@ -48,7 +48,7 @@ function ContributorsPage() {
       setMessage({ type: 'success', text: 'Участник успешно сохранён' });
     } catch (error) {
       console.error('Failed to save contributor:', error);
-      const msg = error.response?.data?.detail || 'Не удалось сохранить контрибьютора';
+      const msg = error.response?.data?.detail || 'Не удалось сохранить участника';
       setMessage({ type: 'error', text: msg });
     }
   };
@@ -81,7 +81,7 @@ function ContributorsPage() {
       loadContributors();
     } catch (error) {
       console.error('Failed to toggle contributor:', error);
-      const msg = error.response?.data?.detail || 'Не удалось изменить статус контрибьютора';
+      const msg = error.response?.data?.detail || 'Не удалось изменить статус участника';
       setMessage({ type: 'error', text: msg });
     }
   };
@@ -92,7 +92,7 @@ function ContributorsPage() {
       .then((response) => {
         const data = response.data;
         if (!data.can_delete) {
-          const msg = data.reason || 'Нельзя удалить контрибьютора.';
+          const msg = data.reason || 'Нельзя удалить участника.';
           setMessage({ type: 'error', text: msg });
           return;
         }
@@ -111,7 +111,7 @@ function ContributorsPage() {
       loadContributors();
       setMessage({ type: 'success', text: 'Участник удалён' });
     } catch (error) {
-      const msg = error.response?.data?.detail || 'Не удалось удалить контрибьютора';
+      const msg = error.response?.data?.detail || 'Не удалось удалить участника';
       setMessage({ type: 'error', text: msg });
     }
   };
@@ -332,7 +332,7 @@ function ContributorsPage() {
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingItem ? 'Редактировать контрибьютора' : 'Новый контрибьютор'}
+          {editingItem ? 'Редактировать участника' : 'Новый участник'}
         </DialogTitle>
         <Box component="form" onSubmit={handleSubmit}>
           <DialogContent>
@@ -386,7 +386,7 @@ function ContributorsPage() {
         <DialogTitle>Подтвердите удаление</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите удалить контрибьютора:
+            Вы уверены, что хотите удалить участника:
             <br />
             <strong>{deleteDialog.name}</strong>
             <br /><br />

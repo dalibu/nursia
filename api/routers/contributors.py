@@ -20,7 +20,7 @@ async def get_contributors(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    """Список активных контрибьюторов для использования в формах платежей."""
+    """Список активных участников для использования в формах платежей."""
     contributors_result = await db.execute(
         select(Contributor).where(Contributor.is_active == True).order_by(Contributor.name)
     )
@@ -42,7 +42,7 @@ async def get_contributors_admin(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_admin_user)
 ):
-    """Полный список контрибьюторов для админки."""
+    """Полный список участников для админки."""
     result = await db.execute(select(Contributor).order_by(Contributor.name))
     return result.scalars().all()
 
@@ -66,15 +66,15 @@ async def validate_delete_contributor(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_admin_user)
 ):
-    """Проверка возможности удаления контрибьютора.
+    """Проверка возможности удаления участника.
 
-    Возвращает can_delete=false и причину, если у контрибьютора есть связанные платежи
+    Возвращает can_delete=false и причину, если у участника есть связанные платежи
     или если он не найден.
     """
     result = await db.execute(select(Contributor).where(Contributor.id == contributor_id))
     db_contributor = result.scalar_one_or_none()
     if not db_contributor:
-        return {"can_delete": False, "reason": "Контрибьютор не найден."}
+        return {"can_delete": False, "reason": "Участник не найден."}
 
     payments_count_result = await db.execute(
         select(func.count(Payment.id)).where(
@@ -86,7 +86,7 @@ async def validate_delete_contributor(
     if payments_count > 0:
         return {
             "can_delete": False,
-            "reason": "Нельзя удалить контрибьютора: с ним связаны платежи.",
+            "reason": "Нельзя удалить участника: с ним связаны платежи.",
             "payments_count": payments_count,
         }
 
@@ -114,7 +114,7 @@ async def delete_contributor(
     if payments_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="Нельзя удалить контрибьютора: с ним связаны платежи."
+            detail="Нельзя удалить участника: с ним связаны платежи."
         )
 
     await db.delete(db_contributor)
