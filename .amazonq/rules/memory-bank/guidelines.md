@@ -154,6 +154,7 @@ except SQLAlchemyError as e:
 - **Linting**: Follow PEP 8 standards for Python code
 - **Documentation**: Document complex business logic and API endpoints
 - **Version Control**: Use meaningful commit messages and branch naming
+- **Git Commits**: Keep commit messages under 100 characters for readability
 
 ## Configuration Management
 
