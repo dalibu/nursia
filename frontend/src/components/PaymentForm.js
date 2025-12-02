@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, MenuItem, Box
+  TextField, Button, MenuItem, Box, Chip
 } from '@mui/material';
 import { payments, recipients, currencies } from '../services/api';
 
@@ -139,7 +139,20 @@ function PaymentForm({ open, payment, onClose }) {
             required
           >
             {categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+              <MenuItem key={cat.id} value={cat.id}>
+                {['Аванс', 'Долг'].includes(cat.name)
+                  ? (
+                    <Chip
+                      label={cat.name}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#FFEB3B',
+                        color: '#000',
+                      }}
+                    />
+                  )
+                  : cat.name}
+              </MenuItem>
             ))}
           </TextField>
           <TextField

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, DialogContentText, TablePagination
+  DialogContent, DialogActions, TextField, DialogContentText, TablePagination, Chip
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { payments } from '../services/api';
@@ -104,7 +104,20 @@ function CategoriesPage() {
               .map((category) => (
               <TableRow key={category.id}>
                 <TableCell>{category.id}</TableCell>
-                <TableCell>{category.name}</TableCell>
+                <TableCell>
+                  {['Аванс', 'Долг'].includes(category.name)
+                    ? (
+                      <Chip
+                        label={category.name}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#FFEB3B',
+                          color: '#000',
+                        }}
+                      />
+                    )
+                    : category.name}
+                </TableCell>
                 <TableCell>{category.description || '-'}</TableCell>
                 <TableCell>{new Date(category.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>

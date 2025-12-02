@@ -8,16 +8,18 @@ from database.models import PaymentCategory
 
 async def init_categories():
     categories = [
-        {"name": "Продукты", "description": "Платежи за продукты питания"},
+        {"name": "Аванс", "description": "Авансовые платежи"},
+        {"name": "Долг", "description": "Погашение долгов"},
+        {"name": "Зарплата", "description": "Заработная плата"},
         {"name": "Коммунальные", "description": "Коммунальные платежи"},
-        {"name": "Транспорт", "description": "Платежи за транспорт"},
         {"name": "Медицина", "description": "Медицинские платежи"},
-        {"name": "Развлечения", "description": "Платежи за развлечения и досуг"},
         {"name": "Одежда", "description": "Платежи за одежду и обувь"},
         {"name": "Подарки", "description": "Платежи за подарки и сувениры"},
-        {"name": "Зарплата помощникам", "description": "Оплата труда домохозяек и сиделок"},
         {"name": "Премии", "description": "Премии и бонусы"},
-        {"name": "Прочее", "description": "Прочие платежи"}
+        {"name": "Продукты", "description": "Платежи за продукты питания"},
+        {"name": "Прочее", "description": "Прочие платежи"},
+        {"name": "Развлечения", "description": "Платежи за развлечения и досуг"},
+        {"name": "Транспорт", "description": "Платежи за транспорт"}
     ]
     
     async for session in get_db():

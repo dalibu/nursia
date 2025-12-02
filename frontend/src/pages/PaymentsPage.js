@@ -270,7 +270,20 @@ function PaymentsPage() {
           >
             <MenuItem value="">Все</MenuItem>
             {categories.map(cat => (
-              <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+              <MenuItem key={cat.id} value={cat.id}>
+                {['Аванс', 'Долг'].includes(cat.name)
+                  ? (
+                    <Chip
+                      label={cat.name}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#FFEB3B',
+                        color: '#000',
+                      }}
+                    />
+                  )
+                  : cat.name}
+              </MenuItem>
             ))}
           </TextField>
           <TextField
@@ -413,7 +426,20 @@ function PaymentsPage() {
                   <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                   <TableCell>{new Date(payment.payment_date).toLocaleTimeString()}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
-                  <TableCell>{payment.category?.name || '-'}</TableCell>
+                  <TableCell>
+                    {['Аванс', 'Долг'].includes(payment.category?.name)
+                      ? (
+                        <Chip
+                          label={payment.category.name}
+                          size="small"
+                          sx={{
+                            backgroundColor: '#FFEB3B',
+                            color: '#000',
+                          }}
+                        />
+                      )
+                      : (payment.category?.name || '-')}
+                  </TableCell>
                   {isAdmin && (
                     <TableCell>{payment.user?.full_name || '-'}</TableCell>
                   )}
