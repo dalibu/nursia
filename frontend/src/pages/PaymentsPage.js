@@ -141,6 +141,10 @@ function PaymentsPage() {
           aVal = a.payer?.name || '';
           bVal = b.payer?.name || '';
           break;
+        case 'is_paid':
+          aVal = a.is_paid ? 1 : 0;
+          bVal = b.is_paid ? 1 : 0;
+          break;
         default:
           return 0;
       }
@@ -426,7 +430,17 @@ function PaymentsPage() {
                 </TableSortLabel>
               </TableCell>
               <TableCell>Комментарий</TableCell>
-              {isAdmin && <TableCell>Оплачено</TableCell>}
+              {isAdmin && (
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'is_paid'}
+                    direction={sortField === 'is_paid' ? sortDirection : 'asc'}
+                    onClick={() => handleSort('is_paid')}
+                  >
+                    Оплачено
+                  </TableSortLabel>
+                </TableCell>
+              )}
               <TableCell sx={{ width: 130, minWidth: 130 }}>Действия</TableCell>
             </TableRow>
           </TableHead>
