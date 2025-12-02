@@ -18,7 +18,6 @@ function PaymentsPage() {
   const [sortDirection, setSortDirection] = useState('desc');
   const [filters, setFilters] = useState({
     category: '',
-    currency: '',
     dateFrom: '',
     dateTo: '',
     paymentStatus: 'all'
@@ -76,10 +75,6 @@ function PaymentsPage() {
       filtered = filtered.filter(payment =>
         payment.category?.id === parseInt(filters.category)
       );
-
-    }
-    if (filters.currency) {
-      filtered = filtered.filter(payment => payment.currency === filters.currency);
 
     }
     if (filters.dateFrom) {
@@ -268,7 +263,6 @@ function PaymentsPage() {
   const clearFilters = () => {
     setFilters({
       category: '',
-      currency: '',
       dateFrom: '',
       dateTo: '',
       paymentStatus: 'all'
@@ -314,21 +308,6 @@ function PaymentsPage() {
                     />
                   )
                   : cat.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label="Валюта"
-            size="small"
-            value={filters.currency}
-            onChange={(e) => handleFilterChange('currency', e.target.value)}
-            sx={{ minWidth: 100 }}
-          >
-            <MenuItem value="">Все</MenuItem>
-            {currencies.map(curr => (
-              <MenuItem key={curr.code || curr} value={curr.code || curr}>
-                {curr.symbol ? `${curr.symbol} ${curr.code}` : curr}
               </MenuItem>
             ))}
           </TextField>
