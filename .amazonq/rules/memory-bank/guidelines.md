@@ -29,15 +29,15 @@
 ## Structural Conventions
 
 ### File Organization
-- **Router Structure**: Organize API endpoints by domain (expenses, auth, users) in separate router files
+- **Router Structure**: Organize API endpoints by domain (payments, auth, users) in separate router files
 - **Schema Separation**: Keep Pydantic schemas in dedicated `schemas/` directory
 - **Middleware Layering**: Separate security, logging, and CORS middleware in `middleware/` directory
 - **Component Hierarchy**: React components in `components/` for reusable elements, `pages/` for route components
 
 ### Naming Conventions
-- **Database Tables**: Use snake_case for table names (e.g., `expense_categories`, `user_status`)
-- **API Endpoints**: RESTful naming with plural nouns (e.g., `/expenses/`, `/categories`)
-- **React Components**: PascalCase for component names (e.g., `ExpensesPage`, `ExpenseForm`)
+- **Database Tables**: Use snake_case for table names (e.g., `payment_categories`, `user_status`)
+- **API Endpoints**: RESTful naming with plural nouns (e.g., `/payments/`, `/categories`)
+- **React Components**: PascalCase for component names (e.g., `PaymentsPage`, `PaymentForm`)
 - **Variables**: camelCase in JavaScript, snake_case in Python
 - **Constants**: UPPER_SNAKE_CASE for configuration values
 
@@ -54,7 +54,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local imports last
 from database.core import get_db
-from api.schemas.expense import ExpenseCreate
+from api.schemas.payment import PaymentCreate
 ```
 
 ## API Design Patterns

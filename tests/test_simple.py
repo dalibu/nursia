@@ -20,11 +20,11 @@ def test_root_endpoint(client):
     """Тест корневого endpoint"""
     response = client.get("/api")
     assert response.status_code == 200
-    assert "Nursia Expense Tracker API" in response.json()["message"]
+    assert "Nursia Payment Tracker API" in response.json()["message"]
 
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""
-    response = client.get("/api/expenses/categories")
+    response = client.get("/api/payments/categories")
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
 

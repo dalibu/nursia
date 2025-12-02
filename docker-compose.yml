@@ -20,6 +20,7 @@ services:
       - .:/app
     environment:
       - DB_URL=sqlite+aiosqlite:///./data/nursia.db
+      - PYTHONPATH=/app
     command: >
       sh -c "mkdir -p data &&
              python -c 'import os; os.path.exists(\"data/nursia.db\") or __import__(\"subprocess\").run([\"python\", \"scripts/create_db.py\"])' &&

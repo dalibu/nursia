@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, TextField, DialogContentText, TablePagination
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
-import { expenses } from '../services/api';
+import { payments } from '../services/api';
 
 function CategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -22,7 +22,7 @@ function CategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await expenses.categories();
+      const response = await payments.categories();
       setCategories(response.data);
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -33,9 +33,9 @@ function CategoriesPage() {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await expenses.updateCategory(editingCategory.id, formData);
+        await payments.updateCategory(editingCategory.id, formData);
       } else {
-        await expenses.createCategory(formData);
+        await payments.createCategory(formData);
       }
       handleFormClose();
       loadCategories();
@@ -60,7 +60,7 @@ function CategoriesPage() {
 
   const handleDeleteConfirm = async () => {
     try {
-      await expenses.deleteCategory(deleteDialog.categoryId);
+      await payments.deleteCategory(deleteDialog.categoryId);
       loadCategories();
       setDeleteDialog({ open: false, categoryId: null, categoryName: '' });
     } catch (error) {
@@ -77,7 +77,7 @@ function CategoriesPage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Категории расходов</Typography>
+        <Typography variant="h4">Категории платежей</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}

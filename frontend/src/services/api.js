@@ -27,16 +27,16 @@ export const auth = {
   register: (userData) => api.post('/auth/register', userData),
 };
 
-export const expenses = {
-  list: (params) => api.get('/expenses/', { params }),
-  create: (data) => api.post('/expenses/', data),
-  update: (id, data) => api.put(`/expenses/${id}`, data),
-  delete: (id) => api.delete(`/expenses/${id}`),
-  reports: (params) => api.get('/expenses/reports', { params }),
-  categories: () => api.get('/expenses/categories'),
-  createCategory: (data) => api.post('/expenses/categories', data),
-  updateCategory: (id, data) => api.put(`/expenses/categories/${id}`, data),
-  deleteCategory: (id) => api.delete(`/expenses/categories/${id}`),
+export const payments = {
+  list: (params) => api.get('/payments/', { params }),
+  create: (data) => api.post('/payments/', data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
+  delete: (id) => api.delete(`/payments/${id}`),
+  reports: (params) => api.get('/payments/reports', { params }),
+  categories: () => api.get('/payments/categories'),
+  createCategory: (data) => api.post('/payments/categories', data),
+  updateCategory: (id, data) => api.put(`/payments/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/payments/categories/${id}`),
   getUserInfo: () => api.get('/auth/me'),
 };
 

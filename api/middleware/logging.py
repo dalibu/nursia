@@ -31,7 +31,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
         
         # Log admin actions
         if (request.url.path.startswith("/api/admin/") or 
-            request.url.path.startswith("/api/expenses/categories") and request.method in ["POST", "PUT", "DELETE"]):
+            request.url.path.startswith("/api/payments/categories") and request.method in ["POST", "PUT", "DELETE"]):
             if response.status_code < 400:
                 client_ip = request.client.host if request.client else "unknown"
                 logger.info(f"Admin action: {request.method} {request.url.path} from {client_ip}")

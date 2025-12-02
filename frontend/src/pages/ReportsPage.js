@@ -3,7 +3,7 @@ import {
   Typography, Paper, Box, TextField, MenuItem, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
-import { expenses, currencies } from '../services/api';
+import { payments, currencies } from '../services/api';
 
 function ReportsPage() {
   const [reports, setReports] = useState([]);
@@ -29,7 +29,7 @@ function ReportsPage() {
 
   const loadReports = async () => {
     try {
-      const response = await expenses.reports(filters);
+      const response = await payments.reports(filters);
       setReports(response.data);
     } catch (error) {
       console.error('Failed to load reports:', error);
