@@ -5,7 +5,7 @@ import {
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
   DialogContentText, TablePagination, Chip, TableFooter
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay, Search } from '@mui/icons-material';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
 
@@ -17,6 +17,7 @@ function PaymentsPage() {
   const [sortField, setSortField] = useState('number');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filters, setFilters] = useState({
+    search: '',
     category: '',
     dateFrom: '',
     dateTo: '',
@@ -71,6 +72,25 @@ function PaymentsPage() {
     let filtered = [...paymentList];
 
     // Применяем фильтры
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(payment => {
+        const searchFields = [
+          payment.amount?.toString(),
+          payment.currency,
+          payment.category?.name,
+          payment.recipient?.name,
+          payment.payer?.name,
+          payment.description,
+          new Date(payment.payment_date).toLocaleDateString()
+        ];
+
+        return searchFields.some(field =>
+          field && field.toString().toLowerCase().includes(searchTerm)
+        );
+      });
+    }
+
     if (filters.category) {
       filtered = filtered.filter(payment =>
         payment.category?.id === parseInt(filters.category)
@@ -262,6 +282,7 @@ function PaymentsPage() {
 
   const clearFilters = () => {
     setFilters({
+      search: '',
       category: '',
       dateFrom: '',
       dateTo: '',
@@ -285,6 +306,17 @@ function PaymentsPage() {
       <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
         <Typography variant="h6" gutterBottom>Фильтры</Typography>
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+          <TextField
+            label="Поиск"
+            size="small"
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            placeholder="Поиск по платежам..."
+            InputProps={{
+              startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+            }}
+            sx={{ minWidth: 200 }}
+          />
           <TextField
             select
             label="Категория"
