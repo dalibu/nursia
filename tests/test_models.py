@@ -1,7 +1,7 @@
 import pytest
 from decimal import Decimal
 from datetime import datetime
-from database.models import User, PaymentCategory, Payment, Recipient, UserRole
+from database.models import User, PaymentCategory, Payment, Contributor, UserRole
 
 def test_user_model():
     """Тест модели пользователя"""
@@ -49,17 +49,17 @@ def test_payment_model():
     assert payment.currency == "UAH"
     assert payment.description == "Test payment"
 
-def test_recipient_model():
+def test_contributor_model():
     """Тест модели получателя"""
-    recipient = Recipient(
-        name="Test Recipient",
+    contributor = Contributor(
+        name="Test Contributor",
         type="organization",
         description="Test organization"
     )
-    
-    assert recipient.name == "Test Recipient"
-    assert recipient.type == "organization"
-    assert recipient.description == "Test organization"
+
+    assert contributor.name == "Test Contributor"
+    assert contributor.type == "organization"
+    assert contributor.description == "Test organization"
 
 def test_user_roles():
     """Тест ролей пользователей"""

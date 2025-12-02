@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, MenuItem, Box, Chip, Switch, FormControlLabel
 } from '@mui/material';
-import { payments, recipients, currencies } from '../services/api';
+import { payments, contributors, currencies } from '../services/api';
 
 function PaymentForm({ open, payment, initialData, onClose }) {
   const [formData, setFormData] = useState({
@@ -17,7 +17,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
     is_paid: false
   });
   const [categories, setCategories] = useState([]);
-  const [recipientList, setRecipientList] = useState([]);
+  const [contributorList, setContributorList] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
   const [userList, setUserList] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -66,19 +66,19 @@ function PaymentForm({ open, payment, initialData, onClose }) {
 
   const loadData = async () => {
     try {
-      const [categoriesRes, recipientsRes, currenciesRes, userRes, usersRes] = await Promise.all([
+      const [categoriesRes, contributorsRes, currenciesRes, userRes, usersRes] = await Promise.all([
         payments.categories(),
-        recipients.list(),
+        contributors.list(),
         currencies.list(),
         payments.getUserInfo(),
         fetch('/api/users/', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json())
       ]);
       setCategories(categoriesRes.data);
-      setRecipientList(recipientsRes.data);
+      setContributorList(contributorsRes.data);
       setCurrencyList(currenciesRes.data.currencies);
       setUserList(usersRes || []);
       setIsAdmin(userRes.data.role === 'admin');
-      
+
       // Устанавливаем валюту по умолчанию
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
       if (defaultCurrency && !payment && !initialData) {
@@ -91,7 +91,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const submitData = {
       ...formData,
       amount: parseFloat(formData.amount),
@@ -100,7 +100,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
       payment_date: formData.payment_date + 'T00:00:00'
     };
-    
+
     try {
       if (payment) {
         await payments.update(payment.id, submitData);
@@ -124,7 +124,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               type="number"
               margin="normal"
               value={formData.amount}
-              onChange={(e) => setFormData({...formData, amount: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               required
               sx={{ flex: 1, minWidth: 160 }}
             />
@@ -133,7 +133,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               label="Валюта"
               margin="normal"
               value={formData.currency}
-              onChange={(e) => setFormData({...formData, currency: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
               sx={{ width: 140 }}
             >
               {currencyList.map((curr) => (
@@ -143,18 +143,18 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               ))}
             </TextField>
           </Box>
-          
+
           <Box display="flex" gap={2} flexWrap="wrap">
             <TextField
               select
               label="От кого"
               margin="normal"
               value={formData.payer_id}
-              onChange={(e) => setFormData({...formData, payer_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
               required
               sx={{ flex: 1, minWidth: 160 }}
             >
-              {recipientList.map((rec) => (
+              {contributorList.map((rec) => (
                 <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
               ))}
             </TextField>
@@ -163,11 +163,11 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               label="Кому"
               margin="normal"
               value={formData.recipient_id}
-              onChange={(e) => setFormData({...formData, recipient_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, recipient_id: e.target.value })}
               required
               sx={{ flex: 1, minWidth: 160 }}
             >
-              {recipientList.map((rec) => (
+              {contributorList.map((rec) => (
                 <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
               ))}
             </TextField>
@@ -178,7 +178,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               label="Категория"
               margin="normal"
               value={formData.category_id}
-              onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
               sx={{ flex: 1, minWidth: 160 }}
             >
               <MenuItem value="">—</MenuItem>
@@ -204,7 +204,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               type="date"
               margin="normal"
               value={formData.payment_date}
-              onChange={(e) => setFormData({...formData, payment_date: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
               InputLabelProps={{ shrink: true }}
               sx={{ width: 180 }}
             />
@@ -216,7 +216,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             multiline
             rows={3}
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             inputProps={{ maxLength: 1000 }}
             helperText={`${formData.description.length}/1000 символов`}
           />

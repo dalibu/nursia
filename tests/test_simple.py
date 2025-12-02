@@ -44,8 +44,8 @@ def test_currencies_unauthorized(client):
     assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]
 
-def test_recipients_unauthorized(client):
-    """Тест получения получателей без авторизации"""
-    response = client.get("/api/recipients/")
+def test_contributors_unauthorized(client):
+    """Тест получения контрибьюторов без авторизации"""
+    response = client.get("/api/contributors/")
     assert response.status_code == 403
     assert "Not authenticated" in response.json()["detail"]

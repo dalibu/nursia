@@ -10,7 +10,7 @@ Payment tracking service for household spending management with multi-currency s
 - **Telegram Bot** for mobile access
 - **React Frontend** (SPA с Material-UI)
 - **Multi-currency Support** (UAH, EUR, USD, RUB)
-- **Payment Categories** and recipient management
+- **Payment Categories** and contributors management
 - **Detailed Reports** with filtering by period and currency
 - **CRUD Operations** for payments (create, read, update, delete)
 

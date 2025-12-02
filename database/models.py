@@ -96,9 +96,9 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    payer_id: Mapped[int] = mapped_column(ForeignKey("recipients.id"))
+    payer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("payment_categories.id"))
-    recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recipients.id"), nullable=True)
+    recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contributors.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -107,9 +107,9 @@ class Payment(Base):
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    payer: Mapped["Recipient"] = relationship("Recipient", foreign_keys=[payer_id])
+    payer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[payer_id])
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
-    recipient: Mapped[Optional["Recipient"]] = relationship("Recipient", foreign_keys=[recipient_id], back_populates="payments")
+    recipient: Mapped[Optional["Contributor"]] = relationship("Contributor", foreign_keys=[recipient_id], back_populates="payments")
 
     def __repr__(self) -> str:
         return f"<Payment(id={self.id}, amount={self.amount}, category={self.category.name if self.category else None})>"
@@ -142,8 +142,8 @@ class Currency(Base):
         return f"<Currency(id={self.id}, code={self.code}, name={self.name})>"
 
 
-class Recipient(Base):
-    __tablename__ = "recipients"
+class Contributor(Base):
+    __tablename__ = "contributors"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
@@ -157,4 +157,4 @@ class Recipient(Base):
     payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="[Payment.payer_id]", back_populates="payer")
 
     def __repr__(self) -> str:
-        return f"<Recipient(id={self.id}, name={self.name}, type={self.type})>"
+        return f"<Contributor(id={self.id}, name={self.name}, type={self.type})>"

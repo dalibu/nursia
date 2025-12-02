@@ -52,7 +52,7 @@ function Layout({ onLogout }) {
       const isAdminUser = response.data.role === 'admin';
       setIsAdmin(isAdminUser);
       setUserName(response.data.full_name || response.data.username);
-      
+
       // Проверяем заявки при логине админа
       if (isAdminUser) {
         checkRequests();
@@ -113,8 +113,8 @@ function Layout({ onLogout }) {
             </Button>
             {isAdmin && (
               <>
-                <Button 
-                  color="inherit" 
+                <Button
+                  color="inherit"
                   onClick={(e) => setSettingsAnchor(e.currentTarget)}
                   endIcon={<ExpandMore />}
                 >
@@ -148,8 +148,8 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
                     Категории
                   </MenuItem>
-                  <MenuItem component={Link} to="/recipients" onClick={() => setSettingsAnchor(null)}>
-                    Получатели
+                  <MenuItem component={Link} to="/contributors" onClick={() => setSettingsAnchor(null)}>
+                    Контрибьюторы
                   </MenuItem>
                   <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
                     Валюты
@@ -160,8 +160,8 @@ function Layout({ onLogout }) {
                 </Menu>
               </>
             )}
-            <Button 
-              color="inherit" 
+            <Button
+              color="inherit"
               onClick={(e) => setAccountAnchor(e.currentTarget)}
               endIcon={<ExpandMore />}
             >

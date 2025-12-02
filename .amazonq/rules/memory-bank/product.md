@@ -9,7 +9,7 @@ Nursia is a comprehensive household payment tracking service designed for multi-
 - **Multi-currency Support**: Track payments in UAH, EUR, USD, and RUB
 - **Payment Management**: Full CRUD operations for payment tracking
 - **Category System**: Organized payment categorization with admin controls
-- **Recipient Management**: Track payments to users and organizations
+- **Contributor Management**: Track payments to contributors
 - **Detailed Reporting**: Generate filtered reports by period and currency
 
 ### User Interfaces
@@ -41,8 +41,8 @@ Nursia is a comprehensive household payment tracking service designed for multi-
 - **Daily Payment Tracking**: Quick entry via Telegram bot or web interface
 - **Budget Analysis**: Detailed reports and spending pattern analysis
 - **Multi-currency Management**: International families or frequent travelers
-- **Payment Categorization**: Organized spending by categories and recipients
+- **Payment Categorization**: Organized spending by categories and contributors
 - **Financial Reporting**: Period-based analysis and export capabilities
 
 ## Value Proposition
-Nursia eliminates the complexity of multi-currency payment tracking by providing a unified platform that works across web, mobile (Telegram), and API interfaces. It's designed for users who need more than simple payment tracking - offering detailed categorization, recipient management, and comprehensive reporting in a self-hosted solution.
+Nursia eliminates the complexity of multi-currency payment tracking by providing a unified platform that works across web, mobile (Telegram), and API interfaces. It's designed for users who need more than simple payment tracking - offering detailed categorization, contributor management, and comprehensive reporting in a self-hosted solution.

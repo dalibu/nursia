@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, payments, settings as settings_router, currencies, recipients, admin, users, user_status
+from api.routers import auth, payments, settings as settings_router, currencies, contributors, admin, users, user_status
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
@@ -44,7 +44,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(currencies.router, prefix="/api")
-app.include_router(recipients.router, prefix="/api")
+app.include_router(contributors.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(user_status.router, prefix="/api")

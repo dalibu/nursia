@@ -36,6 +36,6 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=None)
 
 settings = Settings()

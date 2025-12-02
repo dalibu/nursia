@@ -90,7 +90,7 @@ Telegram Bot ─┘
 ### Domain-Driven Organization
 - **Payments**: Core payment tracking functionality
 - **Authentication**: User management and security
-- **Recipients**: Payment recipient management
+- **Contributors**: Payment contributors management
 - **Categories**: Payment categorization system
 - **Currencies**: Multi-currency support
 - **Settings**: System configuration management

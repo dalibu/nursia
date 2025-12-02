@@ -40,13 +40,13 @@ export const payments = {
   getUserInfo: () => api.get('/auth/me'),
 };
 
-export const recipients = {
-  list: () => api.get('/recipients/'),
-  listAdmin: () => api.get('/recipients/admin'),
-  create: (data) => api.post('/recipients/', data),
-  update: (id, data) => api.put(`/recipients/${id}`, data),
-  delete: (id) => api.delete(`/recipients/${id}`),
-  validateDelete: (id) => api.get(`/recipients/${id}/validate-delete`),
+export const contributors = {
+  list: () => api.get('/contributors/'),
+  listAdmin: () => api.get('/contributors/admin'),
+  create: (data) => api.post('/contributors/', data),
+  update: (id, data) => api.put(`/contributors/${id}`, data),
+  delete: (id) => api.delete(`/contributors/${id}`),
+  validateDelete: (id) => api.get(`/contributors/${id}/validate-delete`),
 };
 
 export const currencies = {

@@ -6,9 +6,9 @@ import {
   Chip, Switch, FormControlLabel, TableSortLabel, MenuItem, Alert
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
-import { recipients } from '../services/api';
+import { contributors } from '../services/api';
 
-function RecipientsPage() {
+function ContributorsPage() {
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -22,16 +22,16 @@ function RecipientsPage() {
   const [message, setMessage] = useState(null); // { type: 'error' | 'success', text: string }
 
   useEffect(() => {
-    loadRecipients();
+    loadContributors();
   }, []);
 
-  const loadRecipients = async () => {
+  const loadContributors = async () => {
     try {
-      const response = await recipients.listAdmin();
+      const response = await contributors.listAdmin();
       setItems(response.data);
     } catch (error) {
-      console.error('Failed to load recipients:', error);
-      setMessage({ type: 'error', text: 'Не удалось загрузить список получателей' });
+      console.error('Failed to load contributors:', error);
+      setMessage({ type: 'error', text: 'Не удалось загрузить список контрибьюторов' });
     }
   };
 
@@ -39,16 +39,16 @@ function RecipientsPage() {
     e.preventDefault();
     try {
       if (editingItem) {
-        await recipients.update(editingItem.id, formData);
+        await contributors.update(editingItem.id, formData);
       } else {
-        await recipients.create(formData);
+        await contributors.create(formData);
       }
       handleFormClose();
-      loadRecipients();
-      setMessage({ type: 'success', text: 'Получатель успешно сохранён' });
+      loadContributors();
+      setMessage({ type: 'success', text: 'Контрибьютор успешно сохранён' });
     } catch (error) {
-      console.error('Failed to save recipient:', error);
-      const msg = error.response?.data?.detail || 'Не удалось сохранить получателя';
+      console.error('Failed to save contributor:', error);
+      const msg = error.response?.data?.detail || 'Не удалось сохранить контрибьютора';
       setMessage({ type: 'error', text: msg });
     }
   };
@@ -72,27 +72,27 @@ function RecipientsPage() {
 
   const handleToggleActive = async (item) => {
     try {
-      await recipients.update(item.id, {
+      await contributors.update(item.id, {
         name: item.name,
         type: item.type,
         description: item.description,
         is_active: !item.is_active,
       });
-      loadRecipients();
+      loadContributors();
     } catch (error) {
-      console.error('Failed to toggle recipient:', error);
-      const msg = error.response?.data?.detail || 'Не удалось изменить статус получателя';
+      console.error('Failed to toggle contributor:', error);
+      const msg = error.response?.data?.detail || 'Не удалось изменить статус контрибьютора';
       setMessage({ type: 'error', text: msg });
     }
   };
 
   const handleDeleteClick = (item) => {
     // Сначала валидируем возможность удаления
-    recipients.validateDelete(item.id)
+    contributors.validateDelete(item.id)
       .then((response) => {
         const data = response.data;
         if (!data.can_delete) {
-          const msg = data.reason || 'Нельзя удалить получателя.';
+          const msg = data.reason || 'Нельзя удалить контрибьютора.';
           setMessage({ type: 'error', text: msg });
           return;
         }
@@ -106,12 +106,12 @@ function RecipientsPage() {
 
   const handleDeleteConfirm = async () => {
     try {
-      await recipients.delete(deleteDialog.id);
+      await contributors.delete(deleteDialog.id);
       setDeleteDialog({ open: false, id: null, name: '' });
-      loadRecipients();
-      setMessage({ type: 'success', text: 'Получатель удалён' });
+      loadContributors();
+      setMessage({ type: 'success', text: 'Контрибьютор удалён' });
     } catch (error) {
-      const msg = error.response?.data?.detail || 'Не удалось удалить получателя';
+      const msg = error.response?.data?.detail || 'Не удалось удалить контрибьютора';
       setMessage({ type: 'error', text: msg });
     }
   };
@@ -180,13 +180,13 @@ function RecipientsPage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Получатели платежей</Typography>
+        <Typography variant="h4">Контрибьюторы</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => setShowForm(true)}
         >
-          Добавить получателя
+          Добавить контрибьютора
         </Button>
       </Box>
 
@@ -285,32 +285,32 @@ function RecipientsPage() {
             {getFilteredAndSortedItems()
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.id}</TableCell>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.type}</TableCell>
-                <TableCell>{item.description || '-'}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={item.is_active ? 'Активен' : 'Неактивен'}
-                    color={item.is_active ? 'success' : 'default'}
-                    size="small"
-                    onClick={() => handleToggleActive(item)}
-                    sx={{ cursor: 'pointer' }}
-                  />
-                </TableCell>
-                <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
-                <TableCell>{item.changed_at ? new Date(item.changed_at).toLocaleString() : '-'}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => handleEdit(item)}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton onClick={() => handleDeleteClick(item)}>
-                    <Delete />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
+                <TableRow key={item.id}>
+                  <TableCell>{item.id}</TableCell>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell>{item.type}</TableCell>
+                  <TableCell>{item.description || '-'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={item.is_active ? 'Активен' : 'Неактивен'}
+                      color={item.is_active ? 'success' : 'default'}
+                      size="small"
+                      onClick={() => handleToggleActive(item)}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  </TableCell>
+                  <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{item.changed_at ? new Date(item.changed_at).toLocaleString() : '-'}</TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleEdit(item)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton onClick={() => handleDeleteClick(item)}>
+                      <Delete />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -332,7 +332,7 @@ function RecipientsPage() {
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingItem ? 'Редактировать получателя' : 'Новый получатель'}
+          {editingItem ? 'Редактировать контрибьютора' : 'Новый контрибьютор'}
         </DialogTitle>
         <Box component="form" onSubmit={handleSubmit}>
           <DialogContent>
@@ -386,7 +386,7 @@ function RecipientsPage() {
         <DialogTitle>Подтвердите удаление</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите удалить получателя:
+            Вы уверены, что хотите удалить контрибьютора:
             <br />
             <strong>{deleteDialog.name}</strong>
             <br /><br />
@@ -404,4 +404,4 @@ function RecipientsPage() {
   );
 }
 
-export default RecipientsPage;
+export default ContributorsPage;

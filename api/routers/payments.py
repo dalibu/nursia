@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, Recipient, Currency
+from database.models import User, Payment, PaymentCategory, Contributor, Currency
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -187,10 +187,10 @@ async def get_payment_reports(
         end_date = now_server()
     
     # Получаем детальные платежи
-    query = select(Payment, PaymentCategory.name, Recipient.name).join(
-        PaymentCategory
+    query = select(Payment, PaymentCategory.name, Contributor.name).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
     ).outerjoin(
-        Recipient, Payment.recipient_id == Recipient.id
+        Contributor, Payment.recipient_id == Contributor.id
     ).where(
         and_(
             Payment.payment_date >= start_date,
