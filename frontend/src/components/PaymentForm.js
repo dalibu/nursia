@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { payments, recipients, currencies } from '../services/api';
 
-function PaymentForm({ open, payment, onClose }) {
+function PaymentForm({ open, payment, initialData, onClose }) {
   const [formData, setFormData] = useState({
     amount: '',
     currency: '',
@@ -36,6 +36,18 @@ function PaymentForm({ open, payment, onClose }) {
           description: payment.description || '',
           is_paid: payment.is_paid || false
         });
+      } else if (initialData) {
+        // Предзаполнение формы из шаблона (повторить платёж)
+        setFormData({
+          amount: initialData.amount || '',
+          currency: initialData.currency || '',
+          category_id: initialData.category_id || '',
+          recipient_id: initialData.recipient_id || '',
+          payer_id: initialData.payer_id || '',
+          payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
+          description: initialData.description || '',
+          is_paid: initialData.is_paid || false
+        });
       } else {
         // Сброс формы для нового платежа - валюта будет установлена в loadData
         setFormData({
@@ -50,7 +62,7 @@ function PaymentForm({ open, payment, onClose }) {
         });
       }
     }
-  }, [open, payment]);
+  }, [open, payment, initialData]);
 
   const loadData = async () => {
     try {
@@ -69,7 +81,7 @@ function PaymentForm({ open, payment, onClose }) {
       
       // Устанавливаем валюту по умолчанию
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
-      if (defaultCurrency && !payment) {
+      if (defaultCurrency && !payment && !initialData) {
         setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
       }
     } catch (error) {

@@ -3,9 +3,9 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination, Chip
+  DialogContentText, TablePagination, Chip, TableFooter
 } from '@mui/material';
-import { Add, Edit, Delete, Payment } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay } from '@mui/icons-material';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
 
@@ -27,6 +27,7 @@ function PaymentsPage() {
   const [currencies, setCurrencies] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, paymentId: null, paymentName: '' });
+  const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -211,7 +212,27 @@ function PaymentsPage() {
   };
 
   const handleEdit = (payment) => {
+    setRepeatTemplate(null);
     setEditingPayment(payment);
+    setShowForm(true);
+  };
+
+  const handleRepeat = (payment) => {
+    // Подготовить шаблон для повторного платежа: текущая дата и не оплачено
+    const today = new Date().toISOString().split('T')[0];
+    const template = {
+      amount: payment.amount,
+      currency: payment.currency,
+      category_id: payment.category_id || '',
+      recipient_id: payment.recipient_id,
+      payer_id: payment.payer_id || '',
+      payment_date: today,
+      description: payment.description || '',
+      is_paid: false
+    };
+
+    setEditingPayment(null);
+    setRepeatTemplate(template);
     setShowForm(true);
   };
 
@@ -251,7 +272,7 @@ function PaymentsPage() {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => setShowForm(true)}
+          onClick={() => { setRepeatTemplate(null); setEditingPayment(null); setShowForm(true); }}
         >
           Добавить платёж
         </Button>
@@ -338,10 +359,10 @@ function PaymentsPage() {
       </Paper>
 
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
-        <Table size="small" stickyHeader>
+        <Table size="small" stickyHeader sx={{ tableLayout: 'fixed' }}>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
-              <TableCell sx={{ width: 60 }}>
+              <TableCell sx={{ width: 36, minWidth: 36, maxWidth: 36, px: 0.5 }}>
                 <TableSortLabel
                   active={sortField === 'number'}
                   direction={sortField === 'number' ? sortDirection : 'asc'}
@@ -356,27 +377,7 @@ function PaymentsPage() {
                   direction={sortField === 'payment_date' ? sortDirection : 'asc'}
                   onClick={() => handleSort('payment_date')}
                 >
-                  Дата
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>Время</TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'amount'}
-                  direction={sortField === 'amount' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('amount')}
-                >
-                  Сумма
-                </TableSortLabel>
-              </TableCell>
-
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'category'}
-                  direction={sortField === 'category' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('category')}
-                >
-                  Категория
+                  Когда
                 </TableSortLabel>
               </TableCell>
               {isAdmin && (
@@ -399,16 +400,35 @@ function PaymentsPage() {
                   Кому
                 </TableSortLabel>
               </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'amount'}
+                  direction={sortField === 'amount' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('amount')}
+                >
+                  Сумма
+                </TableSortLabel>
+              </TableCell>
+
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'category'}
+                  direction={sortField === 'category' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('category')}
+                >
+                  Категория
+                </TableSortLabel>
+              </TableCell>
               <TableCell>Комментарий</TableCell>
               {isAdmin && <TableCell>Оплачено</TableCell>}
-              <TableCell sx={{ width: 120 }}>Действия</TableCell>
+              <TableCell sx={{ width: 130, minWidth: 130 }}>Действия</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 10 : 8} align="center">
+                <TableCell colSpan={isAdmin ? 9 : 7} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -421,10 +441,18 @@ function PaymentsPage() {
                   : page * rowsPerPage + index + 1;
 
                 return (
-                  <TableRow key={payment.id}>
-                    <TableCell>{displayNumber}</TableCell>
-                    <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(payment.payment_date).toLocaleTimeString()}</TableCell>
+                  <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
+                    <TableCell sx={{ width: 32, minWidth: 32, maxWidth: 32, px: 0.5, textAlign: 'center' }}>{displayNumber}</TableCell>
+                    <TableCell>
+                      <div style={{ lineHeight: 1 }}>
+                        <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
+                        <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
+                      </div>
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>{payment.payer?.name || '-'}</TableCell>
+                    )}
+                    <TableCell>{payment.recipient?.name || '-'}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
                     <TableCell>
                       {['Аванс', 'Долг'].includes(payment.category?.name)
@@ -440,10 +468,6 @@ function PaymentsPage() {
                         )
                         : (payment.category?.name || '-')}
                     </TableCell>
-                    {isAdmin && (
-                      <TableCell>{payment.payer?.name || '-'}</TableCell>
-                    )}
-                    <TableCell>{payment.recipient?.name || '-'}</TableCell>
                     <TableCell>{payment.description || '-'}</TableCell>
                     {isAdmin && (
                       <TableCell>
@@ -465,73 +489,89 @@ function PaymentsPage() {
                       </TableCell>
                     )}
                     <TableCell>
-                      <IconButton onClick={() => handleEdit(payment)}>
-                        <Edit />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteClick(payment)}>
-                        <Delete />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
+                        <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
+                          <Replay fontSize="small" />
+                        </IconButton>
+                        <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
+                          <Edit fontSize="small" />
+                        </IconButton>
+                        <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
               })}
 
           </TableBody>
-          <TableBody>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell colSpan={3} sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>Итого:</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5', whiteSpace: 'nowrap' }}>
-                {Object.entries(totals.all || {}).map(([currency, amount]) =>
-                  `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-                ).join(' / ') || '0.00'}
-              </TableCell>
-              <TableCell colSpan={isAdmin ? 6 : 4} sx={{ backgroundColor: '#f5f5f5' }}></TableCell>
-            </TableRow>
-            {isAdmin && (
-              <>
-                <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
-                  <TableCell colSpan={3} sx={{ backgroundColor: '#e8f5e8', fontWeight: 'bold' }}>Оплачено:</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', whiteSpace: 'nowrap' }}>
-                    {Object.entries(totals.paid || {}).map(([currency, amount]) =>
-                      `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-                    ).join(' / ') || '0.00'}
-                  </TableCell>
-                  <TableCell colSpan={6} sx={{ backgroundColor: '#e8f5e8' }}></TableCell>
-                </TableRow>
-                <TableRow sx={{ backgroundColor: '#ffe8e8' }}>
-                  <TableCell colSpan={3} sx={{ backgroundColor: '#ffe8e8', fontWeight: 'bold' }}>Не оплачено:</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#ffe8e8', whiteSpace: 'nowrap' }}>
-                    {Object.entries(totals.unpaid || {}).map(([currency, amount]) =>
-                      `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-                    ).join(' / ') || '0.00'}
-                  </TableCell>
-                  <TableCell colSpan={6} sx={{ backgroundColor: '#ffe8e8' }}></TableCell>
-                </TableRow>
-              </>
-            )}
-          </TableBody>
+
         </Table>
       </TableContainer>
 
-      <TablePagination
-        component="div"
-        count={filteredList.length}
-        page={page}
-        onPageChange={(event, newPage) => setPage(newPage)}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(event) => {
-          setRowsPerPage(parseInt(event.target.value, 10));
-          setPage(0);
-        }}
-        rowsPerPageOptions={[10, 25, 50, 100]}
-        labelRowsPerPage="Строк на странице:"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
-      />
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <Box>
+            <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>
+              Итого: 
+            </Typography>
+            <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+              {Object.entries(totals.all || {}).map(([currency, amount]) =>
+                `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
+              ).join(', ') || '0.00'}
+            </Typography>
+          </Box>
+          
+          {isAdmin && (
+            <>
+              <Box>
+                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                  Оплачено: 
+                </Typography>
+                <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+                  {Object.entries(totals.paid || {}).map(([currency, amount]) =>
+                    `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
+                  ).join(', ') || '0.00'}
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                  Не оплачено: 
+                </Typography>
+                <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+                  {Object.entries(totals.unpaid || {}).map(([currency, amount]) =>
+                    `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
+                  ).join(', ') || '0.00'}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </Box>
+
+        <TablePagination
+          component="div"
+          count={filteredList.length}
+          page={page}
+          onPageChange={(event, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          labelRowsPerPage="Строк на странице:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+          sx={{ border: 'none' }}
+        />
+      </Box>
 
       <PaymentForm
         open={showForm}
         payment={editingPayment}
-        onClose={handleFormClose}
+        initialData={repeatTemplate}
+        onClose={() => { setRepeatTemplate(null); handleFormClose(); }}
       />
 
       <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
