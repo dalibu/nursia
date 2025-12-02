@@ -171,7 +171,7 @@ function PaymentForm({ open, payment, onClose }) {
           <TextField
             fullWidth
             select
-            label="От кого"
+            label="Кто"
             margin="normal"
             value={formData.payer_id}
             onChange={(e) => setFormData({...formData, payer_id: e.target.value})}

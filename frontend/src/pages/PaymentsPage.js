@@ -386,7 +386,7 @@ function PaymentsPage() {
                     direction={sortField === 'payer' ? sortDirection : 'asc'}
                     onClick={() => handleSort('payer')}
                   >
-                    От кого
+                    Кто
                   </TableSortLabel>
                 </TableCell>
               )}
