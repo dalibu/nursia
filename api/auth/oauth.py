@@ -13,7 +13,7 @@ from database.models import User
 from sqlalchemy import select
 from config.settings import settings
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -32,33 +32,60 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    # For this API we treat missing/invalid credentials as Forbidden (403)
-    # to match expected behavior in tests.
-    credentials_exception = HTTPException(
+    # For general endpoints, missing or invalid credentials are Unauthorized (401)
+    unauthorized_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    if credentials is None:
+        raise unauthorized_exception
+
     try:
         payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         user_id: int = payload.get("sub")
         if user_id is None:
-            raise credentials_exception
+            raise unauthorized_exception
     except JWTError:
-        raise credentials_exception
-    
+        raise unauthorized_exception
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise credentials_exception
+        raise unauthorized_exception
     return user
 
 
-async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
+async def get_admin_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    # Admin-only endpoints should return Forbidden (403) for missing/invalid creds
+    forbidden_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authenticated",
+    )
+
+    if credentials is None:
+        raise forbidden_exception
+
+    try:
+        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            raise forbidden_exception
+    except JWTError:
+        raise forbidden_exception
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise forbidden_exception
+
+    if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
         )
-    return current_user
+    return user

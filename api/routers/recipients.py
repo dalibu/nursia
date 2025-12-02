@@ -18,7 +18,7 @@ router = APIRouter(prefix="/recipients", tags=["recipients"])
 @router.get("/")
 async def get_recipients(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """Список активных получателей для использования в формах платежей."""
     recipients_result = await db.execute(
