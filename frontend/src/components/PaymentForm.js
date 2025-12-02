@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, MenuItem, Box, Chip
+  TextField, Button, MenuItem, Box, Chip, Switch, FormControlLabel
 } from '@mui/material';
 import { payments, recipients, currencies } from '../services/api';
 
@@ -83,7 +83,7 @@ function PaymentForm({ open, payment, onClose }) {
     const submitData = {
       ...formData,
       amount: parseFloat(formData.amount),
-      category_id: parseInt(formData.category_id),
+      category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
       recipient_id: parseInt(formData.recipient_id),
       payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
       payment_date: formData.payment_date + 'T00:00:00'
@@ -106,90 +106,97 @@ function PaymentForm({ open, payment, onClose }) {
       <DialogTitle>{payment ? 'Редактировать платёж' : 'Новый платёж'}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent>
-          <TextField
-            fullWidth
-            label="Сумма"
-            type="number"
-            margin="normal"
-            value={formData.amount}
-            onChange={(e) => setFormData({...formData, amount: e.target.value})}
-            required
-          />
-          <TextField
-            fullWidth
-            select
-            label="Валюта"
-            margin="normal"
-            value={formData.currency}
-            onChange={(e) => setFormData({...formData, currency: e.target.value})}
-          >
-            {currencyList.map((curr) => (
-              <MenuItem key={curr.code || curr} value={curr.code || curr}>
-                {curr.symbol ? `${curr.symbol} ${curr.code}` : curr}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Категория"
-            margin="normal"
-            value={formData.category_id}
-            onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-            required
-          >
-            {categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.id}>
-                {['Аванс', 'Долг'].includes(cat.name)
-                  ? (
-                    <Chip
-                      label={cat.name}
-                      size="small"
-                      sx={{
-                        backgroundColor: '#FFEB3B',
-                        color: '#000',
-                      }}
-                    />
-                  )
-                  : cat.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Кому"
-            margin="normal"
-            value={formData.recipient_id}
-            onChange={(e) => setFormData({...formData, recipient_id: e.target.value})}
-            required
-          >
-            {recipientList.map((rec) => (
-              <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Кто"
-            margin="normal"
-            value={formData.payer_id}
-            onChange={(e) => setFormData({...formData, payer_id: e.target.value})}
-            required
-          >
-            {recipientList.map((rec) => (
-              <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Дата"
-            type="date"
-            margin="normal"
-            value={formData.payment_date}
-            onChange={(e) => setFormData({...formData, payment_date: e.target.value})}
-            InputLabelProps={{ shrink: true }}
-          />
+          <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+            <TextField
+              label="Сумма"
+              type="number"
+              margin="normal"
+              value={formData.amount}
+              onChange={(e) => setFormData({...formData, amount: e.target.value})}
+              required
+              sx={{ flex: 1, minWidth: 160 }}
+            />
+            <TextField
+              select
+              label="Валюта"
+              margin="normal"
+              value={formData.currency}
+              onChange={(e) => setFormData({...formData, currency: e.target.value})}
+              sx={{ width: 140 }}
+            >
+              {currencyList.map((curr) => (
+                <MenuItem key={curr.code || curr} value={curr.code || curr}>
+                  {curr.symbol ? `${curr.symbol} ${curr.code}` : curr}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <TextField
+              select
+              label="От кого"
+              margin="normal"
+              value={formData.payer_id}
+              onChange={(e) => setFormData({...formData, payer_id: e.target.value})}
+              required
+              sx={{ flex: 1, minWidth: 160 }}
+            >
+              {recipientList.map((rec) => (
+                <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Кому"
+              margin="normal"
+              value={formData.recipient_id}
+              onChange={(e) => setFormData({...formData, recipient_id: e.target.value})}
+              required
+              sx={{ flex: 1, minWidth: 160 }}
+            >
+              {recipientList.map((rec) => (
+                <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+            <TextField
+              select
+              label="Категория"
+              margin="normal"
+              value={formData.category_id}
+              onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+              sx={{ flex: 1, minWidth: 160 }}
+            >
+              <MenuItem value="">—</MenuItem>
+              {categories.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id}>
+                  {['Аванс', 'Долг'].includes(cat.name)
+                    ? (
+                      <Chip
+                        label={cat.name}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#FFEB3B',
+                          color: '#000',
+                        }}
+                      />
+                    )
+                    : cat.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Дата"
+              type="date"
+              margin="normal"
+              value={formData.payment_date}
+              onChange={(e) => setFormData({...formData, payment_date: e.target.value})}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 180 }}
+            />
+          </Box>
           <TextField
             fullWidth
             label="Описание"
@@ -202,17 +209,18 @@ function PaymentForm({ open, payment, onClose }) {
             helperText={`${formData.description.length}/1000 символов`}
           />
           {isAdmin && (
-            <TextField
-              fullWidth
-              select
-              label="Статус оплаты"
-              margin="normal"
-              value={formData.is_paid}
-              onChange={(e) => setFormData({...formData, is_paid: e.target.value === 'true'})}
-            >
-              <MenuItem value={false}>Не оплачено</MenuItem>
-              <MenuItem value={true}>Оплачено</MenuItem>
-            </TextField>
+            <Box mt={2}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={Boolean(formData.is_paid)}
+                    onChange={(e) => setFormData({ ...formData, is_paid: e.target.checked })}
+                    color="primary"
+                  />
+                }
+                label={formData.is_paid ? 'Оплачено' : 'Не оплачено'}
+              />
+            </Box>
           )}
         </DialogContent>
         <DialogActions>
