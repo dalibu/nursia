@@ -46,8 +46,17 @@ function LoginPage({ onLogin }) {
       }
     } catch (error) {
       console.error('Login failed:', error);
+      const detail = error.response?.data?.detail || '';
+      const [msg, delay] = detail.split('|');
+
       if (error.response?.status === 401) {
-        setError('Неверный логин или пароль');
+        let errorMsg = 'Неверный логин или пароль.';
+        if (delay && parseFloat(delay) > 1) {
+          errorMsg += `\nВключена защита от перебора: задержка составила ${parseFloat(delay).toFixed(1)} сек.`;
+        }
+        setError(errorMsg);
+      } else if (error.response?.status === 403) {
+        setError('Ваш аккаунт еще не активирован администратором.');
       } else {
         setError('Ошибка подключения к серверу');
       }

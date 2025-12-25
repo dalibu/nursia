@@ -33,6 +33,8 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(String, default=UserRole.PENDING)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     force_password_change: Mapped[bool] = mapped_column(default=False)
+    failed_login_attempts: Mapped[int] = mapped_column(default=0)
+    last_failed_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 

@@ -54,28 +54,72 @@ async def login(
     user_data: UserLogin,
     db: AsyncSession = Depends(get_db)
 ):
+    import asyncio
+    from datetime import datetime
+    from utils.settings_helper import get_setting
+    
+    # Получаем настройки безопасности
+    delay_enabled = await get_setting("security_login_delay_enabled", "true")
+    base_delay = float(await get_setting("security_login_delay_seconds", "1.0"))
+
     result = await db.execute(select(User).where(User.username == user_data.username))
     user = result.scalar_one_or_none()
     
+    # Расчет задержки на основе попыток
+    current_delay = 0
+    if user:
+        # Если последняя неудачная попытка была давно (например, больше часа назад), сбрасываем счетчик
+        if user.last_failed_login:
+            # Сравниваем naive UTC datetimes
+            if datetime.utcnow() - user.last_failed_login > timedelta(hours=1):
+                user.failed_login_attempts = 0
+                await db.commit()
+        
+        current_delay = user.failed_login_attempts * 2.0  # +2 секунды за каждую попытку
+    
+    # Общая задержка (базовая + накопительная)
+    total_delay = base_delay + current_delay if delay_enabled.lower() == "true" else 0
+
+    # Если пользователь не найден
     if not user:
+        if total_delay > 0:
+            await asyncio.sleep(total_delay)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+            detail=f"User not found|{total_delay}"
         )
     
-    # Временно: если пароль не установлен, принимаем любой
+    # Проверка пароля
+    is_password_correct = False
     if user.password_hash and user.password_hash != 'temp_hash':
-        if not verify_password(user_data.password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password"
-            )
+        is_password_correct = verify_password(user_data.password, user.password_hash)
     
+    if not is_password_correct:
+        # Увеличиваем счетчик неудачных попыток
+        user.failed_login_attempts += 1
+        user.last_failed_login = datetime.utcnow()
+        await db.commit()
+        
+        if total_delay > 0:
+            await asyncio.sleep(total_delay)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Incorrect password|{total_delay}"
+        )
+    
+    # Проверка статуса
     if user.status != "active":
+        if total_delay > 0:
+            await asyncio.sleep(total_delay)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not activated"
+            detail=f"Account not activated|{total_delay}"
         )
+    
+    # Успешный вход: сбрасываем счетчик
+    user.failed_login_attempts = 0
+    user.last_failed_login = None
+    await db.commit()
     
     expire_minutes = await get_jwt_expire_minutes()
     access_token_expires = timedelta(minutes=expire_minutes)
