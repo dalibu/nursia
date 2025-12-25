@@ -12,6 +12,8 @@ from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
 import os
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
 
 app = FastAPI(
     title="Nursia Payment Tracker API",
@@ -66,10 +68,24 @@ async def api_health_check():
     return {"status": "healthy"}
 
 # React SPA - все остальные маршруты
+@app.get("/openapi.json", include_in_schema=False)
+async def get_open_api_endpoint():
+    return get_openapi(title=app.title, version=app.version, routes=app.routes)
+
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui_html():
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title + " - Swagger UI")
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_ui_html():
+    return get_redoc_html(openapi_url="/openapi.json", title=app.title + " - ReDoc")
+
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
     if os.path.exists("frontend/build/index.html"):
         return FileResponse("frontend/build/index.html")
+    
+    # Если это не API и не статика, и приложения нет - возвращаем сообщение
     return {"message": "React app not built. Run 'npm run build' in frontend directory."}
 
 if __name__ == "__main__":
