@@ -25,6 +25,8 @@ api.interceptors.response.use(
 export const auth = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
+  changePassword: (data) => api.post('/auth/change-password', data),
+  me: () => api.get('/auth/me'),
 };
 
 export const payments = {

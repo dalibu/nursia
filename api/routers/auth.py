@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database.core import get_db
 from database.models import User, RegistrationRequest
-from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse
+from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse, ChangePassword
 from api.auth.oauth import create_access_token, get_current_user
 from config.settings import settings
 from utils.settings_helper import get_jwt_expire_minutes
@@ -87,8 +87,37 @@ async def login(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "expires_in": expire_minutes * 60
+        "expires_in": expire_minutes * 60,
+        "force_password_change": user.force_password_change
     }
+
+
+@router.post("/change-password")
+async def change_password(
+    data: ChangePassword,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Проверяем старый пароль
+    if not verify_password(data.old_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password"
+        )
+    
+    # Проверяем, что новый пароль отличается от старого
+    if data.old_password == data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password"
+        )
+    
+    # Обновляем пароль
+    current_user.password_hash = hash_password(data.new_password)
+    current_user.force_password_change = False
+    await db.commit()
+    
+    return {"message": "Password changed successfully"}
 
 
 @router.get("/me")
@@ -99,5 +128,6 @@ async def get_current_user_info(
         "id": current_user.id,
         "username": current_user.username,
         "full_name": current_user.full_name,
-        "role": current_user.role
+        "role": current_user.role,
+        "force_password_change": current_user.force_password_change
     }

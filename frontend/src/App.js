@@ -10,6 +10,7 @@ import ContributorsPage from './pages/ContributorsPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
@@ -63,6 +64,7 @@ function App() {
             <Route path="requests" element={<RequestsPage />} />
             <Route path="user-status" element={<UserStatusPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="change-password" element={<ChangePasswordPage />} />
           </Route>
         </Routes>
       </Router>

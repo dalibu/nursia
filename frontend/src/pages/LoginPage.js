@@ -22,7 +22,7 @@ function LoginPage({ onLogin }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
+
     try {
       // Хешируем пароль на клиенте
       const hashedPassword = await hashPassword(credentials.password);
@@ -30,11 +30,20 @@ function LoginPage({ onLogin }) {
         ...credentials,
         password: hashedPassword
       };
-      
+
       const response = await auth.login(loginData);
       localStorage.setItem('token', response.data.access_token);
-      onLogin();
-      navigate('/');
+
+      // Проверяем, нужно ли сменить пароль
+      if (response.data.force_password_change) {
+        localStorage.setItem('force_password_change', 'true');
+        onLogin();
+        navigate('/change-password');
+      } else {
+        localStorage.removeItem('force_password_change');
+        onLogin();
+        navigate('/');
+      }
     } catch (error) {
       console.error('Login failed:', error);
       if (error.response?.status === 401) {
@@ -64,7 +73,7 @@ function LoginPage({ onLogin }) {
             label="Логин"
             margin="normal"
             value={credentials.username}
-            onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+            onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
             required
           />
           <TextField
@@ -73,7 +82,7 @@ function LoginPage({ onLogin }) {
             type="password"
             margin="normal"
             value={credentials.password}
-            onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+            onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
             required
           />
           <Button

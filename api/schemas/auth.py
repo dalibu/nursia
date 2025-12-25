@@ -7,6 +7,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    force_password_change: bool = False
 
 
 class TokenData(BaseModel):
@@ -48,3 +49,8 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
