@@ -22,11 +22,6 @@ services:
     environment:
       - DB_URL=sqlite+aiosqlite:///./data/nursia.db
       - PYTHONPATH=/app
-    command: >
-      sh -c "mkdir -p data &&
-             alembic -c database/alembic.ini upgrade head &&
-             python scripts/init_categories.py &&
-             python scripts/init_settings.py &&
-             uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: ./scripts/startup.sh
     depends_on:
       - frontend

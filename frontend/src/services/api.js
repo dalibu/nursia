@@ -12,6 +12,7 @@ api.interceptors.request.use(config => {
 });
 
 api.interceptors.response.use(
+  response => response,  // Успешные ответы просто пропускаем
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
