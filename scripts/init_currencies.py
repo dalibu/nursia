@@ -9,7 +9,7 @@ from pathlib import Path
 # Добавляем корневую директорию в путь
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.core import AsyncSessionLocal
+from database.core import AsyncSessionLocal, engine
 from database.models import Currency
 from sqlalchemy import text
 
@@ -51,5 +51,12 @@ async def init_currencies():
             print("ℹ️ Валюты уже существуют в базе данных")
 
 
+async def main():
+    try:
+        await init_currencies()
+    finally:
+        await engine.dispose()
+
+
 if __name__ == "__main__":
-    asyncio.run(init_currencies())
+    asyncio.run(main())

@@ -8,7 +8,7 @@ import argparse
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.core import get_db
+from database.core import get_db, engine
 from database.models import User, UserRole
 from sqlalchemy import select
 
@@ -104,11 +104,19 @@ async def create_admin(username: str = None, password: str = None, full_name: st
         break
 
 
-if __name__ == "__main__":
+async def main():
     parser = argparse.ArgumentParser(description='Create admin user')
     parser.add_argument('--username', '-u', help='Admin username')
     parser.add_argument('--password', '-p', help='Initial password (user will be forced to change it)')
     parser.add_argument('--name', '-n', help='Full name')
     args = parser.parse_args()
     
-    asyncio.run(create_admin(args.username, args.password, args.name))
+    try:
+        await create_admin(args.username, args.password, args.name)
+    finally:
+        # Важно закрыть пул соединений SQLAlchemy, чтобы процесс завершился чисто
+        await engine.dispose()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -12,5 +12,11 @@ async def create_database():
         await conn.run_sync(Base.metadata.create_all)
     print("База данных создана")
 
+async def main():
+    try:
+        await create_database()
+    finally:
+        await engine.dispose()
+
 if __name__ == "__main__":
-    asyncio.run(create_database())
+    asyncio.run(main())

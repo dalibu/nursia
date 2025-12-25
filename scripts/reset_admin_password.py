@@ -6,7 +6,7 @@ from pathlib import Path
 # Добавляем корневую директорию в путь
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.core import AsyncSessionLocal
+from database.core import AsyncSessionLocal, engine
 from database.models import User
 from sqlalchemy import select
 from utils.password_utils import hash_password_double
@@ -33,5 +33,11 @@ async def reset_admin_password():
         
         print("Теперь вы можете войти в систему с паролем: admin123")
 
+async def main():
+    try:
+        await reset_admin_password()
+    finally:
+        await engine.dispose()
+
 if __name__ == "__main__":
-    asyncio.run(reset_admin_password())
+    asyncio.run(main())
