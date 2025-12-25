@@ -3,8 +3,9 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.core import get_db
+from database.core import AsyncSessionLocal, engine
 from database.models import PaymentCategory
+from sqlalchemy import select
 
 async def init_categories():
     categories = [
@@ -22,8 +23,7 @@ async def init_categories():
         {"name": "Транспорт", "description": "Платежи за транспорт"}
     ]
     
-    async for session in get_db():
-        from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
         created = 0
         for cat_data in categories:
             result = await session.execute(select(PaymentCategory).where(PaymentCategory.name == cat_data["name"]))
@@ -34,10 +34,12 @@ async def init_categories():
         
         if created > 0:
             await session.commit()
-            print(f"Создано {created} новых категорий")
+            print(f"Создано {created} новых категорий", flush=True)
         else:
-            print("Все категории уже существуют")
-        break
+            print("Все категории уже существуют", flush=True)
+    
+    # Explicitly dispose engine to release all connections
+    await engine.dispose()
 
 if __name__ == "__main__":
     asyncio.run(init_categories())

@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -18,9 +19,19 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def get_column_names(table_name):
+    """Get list of column names for a table."""
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    return [col['name'] for col in inspector.get_columns(table_name)]
+
+
 def upgrade() -> None:
     """Upgrade schema."""
-    # SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+    # Get current columns in payments table
+    existing_columns = get_column_names('payments')
+    has_recipient_id = 'recipient_id' in existing_columns
+    
     # Step 1: Create new payments table with payer_id
     op.execute("""
         CREATE TABLE payments_new (
@@ -42,13 +53,19 @@ def upgrade() -> None:
     """)
     
     # Step 2: Copy data from old table, mapping user_id to payer_id
-    # Note: This assumes that user_id values correspond to recipient IDs
-    # You may need to adjust this based on your data
-    op.execute("""
-        INSERT INTO payments_new (id, payer_id, category_id, recipient_id, amount, currency, description, payment_date, is_paid, paid_at, created_at)
-        SELECT id, user_id, category_id, recipient_id, amount, currency, description, payment_date, is_paid, paid_at, created_at
-        FROM payments
-    """)
+    if has_recipient_id:
+        op.execute("""
+            INSERT INTO payments_new (id, payer_id, category_id, recipient_id, amount, currency, description, payment_date, is_paid, paid_at, created_at)
+            SELECT id, user_id, category_id, recipient_id, amount, currency, description, payment_date, is_paid, paid_at, created_at
+            FROM payments
+        """)
+    else:
+        # recipient_id doesn't exist in old table, use NULL
+        op.execute("""
+            INSERT INTO payments_new (id, payer_id, category_id, recipient_id, amount, currency, description, payment_date, is_paid, paid_at, created_at)
+            SELECT id, user_id, category_id, NULL, amount, currency, description, payment_date, is_paid, paid_at, created_at
+            FROM payments
+        """)
     
     # Step 3: Drop old table
     op.execute("DROP TABLE payments")
@@ -87,3 +104,4 @@ def downgrade() -> None:
     
     op.execute("DROP TABLE payments")
     op.execute("ALTER TABLE payments_old RENAME TO payments")
+
