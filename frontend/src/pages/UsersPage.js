@@ -3,9 +3,9 @@ import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Button, MenuItem,
-  DialogContentText, TablePagination, Chip, Alert
+  DialogContentText, TablePagination, Chip, Alert, Tooltip
 } from '@mui/material';
-import { Edit, Delete, Check, Close } from '@mui/icons-material';
+import { Edit, Delete, Check, Close, PersonAdd, ContentCopy } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
 
 function UsersPage() {
@@ -28,6 +28,18 @@ function UsersPage() {
 
   const [message, setMessage] = useState('');
 
+  // Состояния для создания нового пользователя
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    username: '',
+    full_name: '',
+    email: '',
+    role: 'user'
+  });
+  const [createdUserInfo, setCreatedUserInfo] = useState(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+
   useEffect(() => {
     loadUsers();
   }, []);
@@ -46,6 +58,54 @@ function UsersPage() {
     }
   };
 
+  // Создание нового пользователя
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/users/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(createFormData)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        setMessage(`Ошибка: ${error.detail}`);
+        return;
+      }
+
+      const result = await response.json();
+      setCreatedUserInfo({
+        username: result.user.username,
+        password: result.generated_password,
+        full_name: result.user.full_name
+      });
+      setShowCreateDialog(false);
+      setShowPasswordDialog(true);
+      setCreateFormData({ username: '', full_name: '', email: '', role: 'user' });
+      loadUsers();
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      setMessage('Ошибка при создании пользователя');
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (createdUserInfo?.password) {
+      navigator.clipboard.writeText(createdUserInfo.password);
+      setPasswordCopied(true);
+      setTimeout(() => setPasswordCopied(false), 2000);
+    }
+  };
+
+  const handleClosePasswordDialog = () => {
+    setShowPasswordDialog(false);
+    setCreatedUserInfo(null);
+    setPasswordCopied(false);
+  };
 
 
   const handleApprove = async (requestId) => {
@@ -172,11 +232,19 @@ function UsersPage() {
       )}
 
 
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">
+          Пользователи ({users.length})
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<PersonAdd />}
+          onClick={() => setShowCreateDialog(true)}
+        >
+          Добавить пользователя
+        </Button>
+      </Box>
 
-      <Typography variant="h6" gutterBottom>
-        Пользователи ({users.length})
-      </Typography>
-      
       <Box sx={{ mb: 2 }}>
         <TextField
           fullWidth
@@ -210,31 +278,31 @@ function UsersPage() {
             {filteredUsers
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.id}</TableCell>
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.full_name}</TableCell>
-                <TableCell>{user.email || '-'}</TableCell>
-                <TableCell>{user.role}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={user.status}
-                    color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : 'error'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                <TableCell>{user.updated_at ? new Date(user.updated_at).toLocaleDateString() : '-'}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => handleEdit(user)}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton onClick={() => handleDeleteClick(user)}>
-                    <Delete />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
+                <TableRow key={user.id}>
+                  <TableCell>{user.id}</TableCell>
+                  <TableCell>{user.username}</TableCell>
+                  <TableCell>{user.full_name}</TableCell>
+                  <TableCell>{user.email || '-'}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.status}
+                      color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : 'error'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{user.updated_at ? new Date(user.updated_at).toLocaleDateString() : '-'}</TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleEdit(user)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton onClick={() => handleDeleteClick(user)}>
+                      <Delete />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -263,7 +331,7 @@ function UsersPage() {
               label="Логин"
               margin="normal"
               value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               required
             />
             <TextField
@@ -271,7 +339,7 @@ function UsersPage() {
               label="Полное имя"
               margin="normal"
               value={formData.full_name}
-              onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               required
             />
             <TextField
@@ -280,7 +348,7 @@ function UsersPage() {
               type="email"
               margin="normal"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
             <TextField
               fullWidth
@@ -288,7 +356,7 @@ function UsersPage() {
               label="Роль"
               margin="normal"
               value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
               <MenuItem value="user">Пользователь</MenuItem>
               <MenuItem value="admin">Администратор</MenuItem>
@@ -299,7 +367,7 @@ function UsersPage() {
               label="Статус"
               margin="normal"
               value={formData.status}
-              onChange={(e) => setFormData({...formData, status: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             >
               <MenuItem value="active">Активный</MenuItem>
               <MenuItem value="pending">Ожидает</MenuItem>
@@ -342,6 +410,96 @@ function UsersPage() {
         <DialogActions>
           <Button onClick={() => setConfirmDialog(false)}>Отмена</Button>
           <Button onClick={handleConfirmSave} variant="contained">Сохранить</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог создания нового пользователя */}
+      <Dialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Добавить нового пользователя</DialogTitle>
+        <Box component="form" onSubmit={handleCreateUser}>
+          <DialogContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Пароль будет сгенерирован автоматически. При первом входе пользователь должен будет его сменить.
+            </Alert>
+            <TextField
+              fullWidth
+              label="Логин"
+              margin="normal"
+              value={createFormData.username}
+              onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
+              required
+              autoFocus
+            />
+            <TextField
+              fullWidth
+              label="Полное имя"
+              margin="normal"
+              value={createFormData.full_name}
+              onChange={(e) => setCreateFormData({ ...createFormData, full_name: e.target.value })}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Email"
+              type="email"
+              margin="normal"
+              value={createFormData.email}
+              onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              select
+              label="Роль"
+              margin="normal"
+              value={createFormData.role}
+              onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value })}
+            >
+              <MenuItem value="user">Пользователь</MenuItem>
+              <MenuItem value="admin">Администратор</MenuItem>
+            </TextField>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowCreateDialog(false)}>Отмена</Button>
+            <Button type="submit" variant="contained">Создать</Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Диалог показа сгенерированного пароля */}
+      <Dialog open={showPasswordDialog} onClose={handleClosePasswordDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: 'success.main' }}>✓ Пользователь создан</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Скопируйте и передайте пароль пользователю. После закрытия этого окна пароль нельзя будет посмотреть!
+          </Alert>
+          <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1, mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Пользователь:
+            </Typography>
+            <Typography variant="body1" fontWeight="bold">
+              {createdUserInfo?.full_name} ({createdUserInfo?.username})
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '2px dashed', borderColor: 'primary.main' }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Временный пароль:
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" fontFamily="monospace" sx={{ letterSpacing: 1 }}>
+                {createdUserInfo?.password}
+              </Typography>
+              <Tooltip title={passwordCopied ? "Скопировано!" : "Копировать"}>
+                <IconButton onClick={handleCopyPassword} color={passwordCopied ? "success" : "primary"}>
+                  <ContentCopy />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePasswordDialog} variant="contained">
+            Закрыть
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

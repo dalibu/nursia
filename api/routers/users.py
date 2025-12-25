@@ -32,6 +32,27 @@ class AdminUserUpdate(BaseModel):
     role: str
     status: str
 
+class AdminUserCreate(BaseModel):
+    username: str
+    full_name: str
+    email: str = None
+    role: str = "user"
+
+def generate_password(length: int = 12) -> str:
+    """Генерирует безопасный пароль"""
+    import secrets
+    import string
+    # Гарантируем наличие цифр, букв и спецсимволов
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    while True:
+        password = ''.join(secrets.choice(alphabet) for _ in range(length))
+        # Проверяем требования: минимум 1 заглавная, 1 строчная, 1 цифра, 1 спецсимвол
+        if (any(c.isupper() for c in password)
+            and any(c.islower() for c in password)
+            and any(c.isdigit() for c in password)
+            and any(c in "!@#$%" for c in password)):
+            return password
+
 @router.get("/me")
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user)
@@ -105,6 +126,60 @@ async def get_all_users(
         }
         for user in users
     ]
+
+@router.post("/")
+async def create_user(
+    user_data: AdminUserCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Создать нового пользователя (только для админов).
+    
+    Пароль генерируется автоматически и возвращается в ответе.
+    Пользователь должен сменить пароль при первом входе.
+    """
+    import hashlib
+    from utils.password_utils import hash_password
+    
+    # Проверяем уникальность username
+    result = await db.execute(select(User).where(User.username == user_data.username))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Генерируем пароль
+    plain_password = generate_password()
+    
+    # Хешируем пароль (SHA-256 + bcrypt, как ожидает клиент)
+    sha256_hash = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+    password_hash = hash_password(sha256_hash)
+    
+    # Создаём пользователя
+    new_user = User(
+        username=user_data.username,
+        full_name=user_data.full_name,
+        email=user_data.email,
+        password_hash=password_hash,
+        role=user_data.role,
+        status="active",
+        force_password_change=True  # Требуем смену пароля при первом входе
+    )
+    
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    return {
+        "message": "User created successfully",
+        "user": {
+            "id": new_user.id,
+            "username": new_user.username,
+            "full_name": new_user.full_name,
+            "email": new_user.email,
+            "role": new_user.role,
+            "status": new_user.status
+        },
+        "generated_password": plain_password  # Показываем пароль администратору
+    }
 
 @router.put("/{user_id}")
 async def update_user(
