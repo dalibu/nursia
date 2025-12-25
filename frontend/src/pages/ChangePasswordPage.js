@@ -28,8 +28,13 @@ function ChangePasswordPage() {
         e.preventDefault();
         setError('');
 
-        if (formData.newPassword.length < 4) {
-            setError('Новый пароль должен быть минимум 4 символа');
+        if (formData.newPassword.length < 6) {
+            setError('Новый пароль должен быть минимум 6 символов');
+            return;
+        }
+
+        if (!/[0-9]/.test(formData.newPassword)) {
+            setError('Новый пароль должен содержать минимум 1 цифру');
             return;
         }
 
@@ -108,7 +113,7 @@ function ChangePasswordPage() {
                         value={formData.newPassword}
                         onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                         required
-                        helperText="Минимум 4 символа"
+                        helperText="Минимум 6 символов и 1 цифра"
                     />
                     <TextField
                         fullWidth

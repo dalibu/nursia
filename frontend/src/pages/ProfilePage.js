@@ -119,24 +119,24 @@ function ProfilePage() {
     if (password.length < 6) {
       return 'Пароль должен содержать минимум 6 символов';
     }
-    if (!/[a-zA-Z]/.test(password)) {
-      return 'Пароль должен содержать буквы';
-    }
     if (!/[0-9]/.test(password)) {
-      return 'Пароль должен содержать цифры';
+      return 'Пароль должен содержать минимум 1 цифру';
+    }
+    if (!/[a-zA-Zа-яА-Я]/.test(password)) {
+      return 'Пароль должен содержать буквы';
     }
     return '';
   };
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    
+
     const validationError = validatePassword(passwordData.newPassword);
     if (validationError) {
       setPasswordErrorMsg(validationError);
       return;
     }
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordErrorMsg('Новые пароли не совпадают');
       return;
@@ -188,7 +188,7 @@ function ProfilePage() {
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>Редактировать профиль</Typography>
-        
+
         {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -198,7 +198,7 @@ function ProfilePage() {
             label="Логин"
             margin="normal"
             value={formData.username}
-            onChange={(e) => setFormData({...formData, username: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             required
           />
           <TextField
@@ -206,7 +206,7 @@ function ProfilePage() {
             label="Полное имя"
             margin="normal"
             value={formData.full_name}
-            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             required
           />
           <TextField
@@ -215,7 +215,7 @@ function ProfilePage() {
             type="email"
             margin="normal"
             value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />
           {profile.role === 'admin' && (
             <>
@@ -225,7 +225,7 @@ function ProfilePage() {
                 label="Роль"
                 margin="normal"
                 value={formData.role}
-                onChange={(e) => setFormData({...formData, role: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               >
                 <MenuItem value="user">Пользователь</MenuItem>
                 <MenuItem value="admin">Администратор</MenuItem>
@@ -236,7 +236,7 @@ function ProfilePage() {
                 label="Статус"
                 margin="normal"
                 value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               >
                 <MenuItem value="active">Активный</MenuItem>
                 <MenuItem value="pending">Ожидает</MenuItem>
@@ -252,7 +252,7 @@ function ProfilePage() {
           >
             {loading ? 'Сохранение...' : 'Сохранить'}
           </Button>
-          
+
           <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #e0e0e0' }}>
             <Typography variant="body2" color="text.secondary">
               Зарегистрирован: {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : ''}
@@ -268,10 +268,10 @@ function ProfilePage() {
 
       <Paper sx={{ p: 3, mt: 3 }}>
         <Typography variant="h6" gutterBottom>Изменить пароль</Typography>
-        
+
         {passwordMessage && <Alert severity="success" sx={{ mb: 2 }}>{passwordMessage}</Alert>}
         {passwordErrorMsg && <Alert severity="error" sx={{ mb: 2 }}>{passwordErrorMsg}</Alert>}
-        
+
         <Box component="form" onSubmit={handlePasswordSubmit}>
           <PasswordField
             fullWidth
@@ -279,7 +279,7 @@ function ProfilePage() {
             margin="normal"
             value={passwordData.oldPassword}
             onChange={(e) => {
-              setPasswordData({...passwordData, oldPassword: e.target.value});
+              setPasswordData({ ...passwordData, oldPassword: e.target.value });
               setPasswordMessage('');
               setPasswordErrorMsg('');
             }}
@@ -292,7 +292,7 @@ function ProfilePage() {
             value={passwordData.newPassword}
             onChange={(e) => {
               const value = e.target.value;
-              setPasswordData({...passwordData, newPassword: value});
+              setPasswordData({ ...passwordData, newPassword: value });
               setPasswordError(validatePassword(value));
               setPasswordMessage('');
               setPasswordErrorMsg('');
@@ -312,7 +312,7 @@ function ProfilePage() {
             margin="normal"
             value={passwordData.confirmPassword}
             onChange={(e) => {
-              setPasswordData({...passwordData, confirmPassword: e.target.value});
+              setPasswordData({ ...passwordData, confirmPassword: e.target.value });
               setPasswordMessage('');
               setPasswordErrorMsg('');
             }}

@@ -12,7 +12,8 @@ async def init_settings():
     settings = [
         {"key": "app_name", "value": "Nursia", "description": "Название приложения"},
         {"key": "remember_me_hours", "value": "24", "description": "Время запоминания пользователя (часы)"},
-        {"key": "jwt_access_token_expire_minutes", "value": "480", "description": "Время жизни JWT токена (минуты)"}
+        {"key": "jwt_access_token_expire_minutes", "value": "480", "description": "Время жизни JWT токена (минуты)"},
+        {"key": "password_rules", "value": "Пароль должен содержать минимум 6 символов и 1 цифру", "description": "Требования к паролю"}
     ]
     
     async with AsyncSessionLocal() as session:

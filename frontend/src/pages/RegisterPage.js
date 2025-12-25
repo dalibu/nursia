@@ -40,8 +40,8 @@ function RegisterPage() {
   };
 
   const validatePassword = (password) => {
-    if (password.length < 8) {
-      return 'Пароль должен содержать минимум 8 символов';
+    if (password.length < 6) {
+      return 'Пароль должен содержать минимум 6 символов';
     }
     if (!/[0-9]/.test(password)) {
       return 'Пароль должен содержать минимум 1 цифру';
@@ -54,22 +54,22 @@ function RegisterPage() {
 
   const handlePasswordChange = (e) => {
     const password = e.target.value;
-    setFormData({...formData, password});
+    setFormData({ ...formData, password });
     setPasswordError(validatePassword(password));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     const passwordValidation = validatePassword(formData.password);
     if (passwordValidation) {
       setPasswordError(passwordValidation);
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       // Хешируем пароль на клиенте
       const hashedPassword = await hashPassword(formData.password);
@@ -77,7 +77,7 @@ function RegisterPage() {
         ...formData,
         password: hashedPassword
       };
-      
+
       await auth.register(submitData);
       setSuccess(true);
     } catch (error) {
@@ -100,7 +100,7 @@ function RegisterPage() {
             Заявка отправлена
           </Typography>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Ваша заявка на регистрацию отправлена администратору. 
+            Ваша заявка на регистрацию отправлена администратору.
             Ожидайте подтверждения.
           </Alert>
           <Button
@@ -134,7 +134,7 @@ function RegisterPage() {
             label="Логин"
             margin="normal"
             value={formData.username}
-            onChange={(e) => setFormData({...formData, username: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             required
           />
           <TextField
@@ -145,7 +145,7 @@ function RegisterPage() {
             value={formData.password}
             onChange={handlePasswordChange}
             error={!!passwordError}
-            helperText={passwordError || passwordRules}
+            helperText={passwordError || (formData.password ? '' : passwordRules)}
             required
           />
           <TextField
@@ -154,14 +154,14 @@ function RegisterPage() {
             type="email"
             margin="normal"
             value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />
           <TextField
             fullWidth
             label="Полное имя"
             margin="normal"
             value={formData.full_name}
-            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             required
           />
           <Button

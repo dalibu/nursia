@@ -210,5 +210,5 @@ async def reset_user_password(
 async def get_password_rules():
     """Получить правила выбора паролей"""
     from utils.settings_helper import get_setting
-    rules = await get_setting("password_rules", "Пароль должен содержать минимум 6 символов")
+    rules = await get_setting("password_rules", "Пароль должен содержать минимум 6 символов и 1 цифру")
     return {"rules": rules}
