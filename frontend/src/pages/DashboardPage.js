@@ -44,9 +44,10 @@ function DashboardPage() {
         }
     };
 
-    const formatCurrency = (amount, currency = 'UAH', showAbsolute = false) => {
-        const symbol = currencySymbols[currency] || currency;
+    const formatCurrency = (amount, currency = 'UAH', showAbsolute = false, hideZero = false) => {
         const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
+        if (hideZero && value === 0) return '';
+        const symbol = currencySymbols[currency] || currency;
         return `${symbol}${value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
 
@@ -253,15 +254,15 @@ function DashboardPage() {
                                     <TableCell>
                                         <strong>{row.period}</strong>
                                     </TableCell>
-                                    <TableCell align="center">{row.visits}</TableCell>
-                                    <TableCell align="right">{row.hours.toFixed(1)}</TableCell>
-                                    <TableCell align="right">{formatCurrency(row.salary, row.currency)}</TableCell>
-                                    <TableCell align="right">{formatCurrency(row.expenses, row.currency)}</TableCell>
+                                    <TableCell align="center">{row.visits || ''}</TableCell>
+                                    <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
+                                    <TableCell align="right">{formatCurrency(row.salary, row.currency, false, true)}</TableCell>
+                                    <TableCell align="right">{formatCurrency(row.expenses, row.currency, false, true)}</TableCell>
                                     <TableCell align="right" sx={{ color: 'success.main' }}>
-                                        {formatCurrency(row.paid, row.currency)}
+                                        {formatCurrency(row.paid, row.currency, false, true)}
                                     </TableCell>
                                     <TableCell align="right" sx={{ color: 'error.main', fontWeight: row.to_pay !== 0 ? 700 : 'inherit' }}>
-                                        {formatCurrency(Math.abs(row.to_pay), row.currency)}
+                                        {formatCurrency(row.to_pay, row.currency, true, true)}
                                     </TableCell>
                                     <TableCell align="right">
                                         {row.bonus > 0 && (
@@ -274,7 +275,7 @@ function DashboardPage() {
                                         )}
                                     </TableCell>
                                     <TableCell align="right">
-                                        <strong>{formatCurrency(row.total, row.currency)}</strong>
+                                        <strong>{formatCurrency(row.total, row.currency, false, true)}</strong>
                                     </TableCell>
                                 </TableRow>
                             ))}
