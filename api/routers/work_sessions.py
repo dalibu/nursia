@@ -55,6 +55,15 @@ class WorkSessionSummary(BaseModel):
     currency: str
 
 
+class WorkSessionUpdate(BaseModel):
+    """Обновление рабочей сессии"""
+    session_date: Optional[date] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    duration_hours: Optional[float] = None
+    description: Optional[str] = None
+
+
 @router.post("/start", response_model=WorkSessionResponse)
 async def start_work_session(
     session_data: WorkSessionStart,
@@ -213,6 +222,121 @@ async def stop_work_session(
         worker_name=session.worker.name if session.worker else None,
         employer_name=session.employer.name if session.employer else None
     )
+
+
+@router.put("/{session_id}", response_model=WorkSessionResponse)
+async def update_work_session(
+    session_id: int,
+    update_data: WorkSessionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Редактировать рабочую сессию"""
+    
+    # Получаем сессию
+    result = await db.execute(
+        select(WorkSession)
+        .options(joinedload(WorkSession.worker), joinedload(WorkSession.employer))
+        .where(WorkSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    # Проверка прав: пользователь может редактировать только свои сессии
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or session.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на редактирование этой сессии")
+    
+    # Обновляем поля
+    if update_data.session_date is not None:
+        session.session_date = update_data.session_date
+    if update_data.start_time is not None:
+        session.start_time = update_data.start_time
+    if update_data.end_time is not None:
+        session.end_time = update_data.end_time
+        session.is_active = False  # Если указано время окончания — сессия завершена
+    if update_data.description is not None:
+        session.description = update_data.description
+    
+    # Пересчитываем duration и amount
+    if update_data.duration_hours is not None:
+        session.duration_hours = update_data.duration_hours
+    elif session.start_time and session.end_time:
+        # Автоматический расчёт длительности
+        start_dt = datetime.combine(session.session_date, session.start_time)
+        end_dt = datetime.combine(session.session_date, session.end_time)
+        if end_dt < start_dt:
+            end_dt += timedelta(days=1)  # Ночная смена
+        duration = (end_dt - start_dt).total_seconds() / 3600
+        session.duration_hours = round(duration, 2)
+    
+    # Пересчитываем сумму
+    if session.duration_hours and session.hourly_rate:
+        session.amount = round(float(session.duration_hours) * float(session.hourly_rate), 2)
+    
+    await db.commit()
+    await db.refresh(session)
+    
+    return WorkSessionResponse(
+        id=session.id,
+        worker_id=session.worker_id,
+        employer_id=session.employer_id,
+        session_date=session.session_date,
+        start_time=session.start_time,
+        end_time=session.end_time,
+        duration_hours=float(session.duration_hours) if session.duration_hours else None,
+        hourly_rate=float(session.hourly_rate),
+        currency=session.currency,
+        amount=float(session.amount) if session.amount else None,
+        is_active=session.is_active,
+        description=session.description,
+        worker_name=session.worker.name if session.worker else None,
+        employer_name=session.employer.name if session.employer else None
+    )
+
+
+@router.delete("/{session_id}")
+async def delete_work_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удалить рабочую сессию"""
+    
+    # Получаем сессию с платежом
+    result = await db.execute(
+        select(WorkSession)
+        .options(joinedload(WorkSession.payment))
+        .where(WorkSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    # Проверка прав: пользователь может удалять только свои сессии
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or session.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на удаление этой сессии")
+    
+    # Проверяем связанный платёж
+    if session.payment:
+        if session.payment.is_paid:
+            raise HTTPException(
+                status_code=400, 
+                detail="Невозможно удалить сессию: платёж уже оплачен"
+            )
+        # Удаляем неоплаченный платёж вместе с сессией
+        await db.delete(session.payment)
+    
+    await db.delete(session)
+    await db.commit()
+    
+    return {"message": "Сессия удалена"}
 
 
 @router.get("/", response_model=List[WorkSessionResponse])

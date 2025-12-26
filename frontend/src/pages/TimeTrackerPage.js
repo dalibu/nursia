@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
-    Refresh, Timer
+    Refresh, Timer, Edit, Delete
 } from '@mui/icons-material';
 import { workSessions, employment, contributors } from '../services/api';
 
@@ -31,6 +31,16 @@ function TimeTrackerPage() {
     // Start session dialog
     const [startDialogOpen, setStartDialogOpen] = useState(false);
     const [selectedEmployment, setSelectedEmployment] = useState('');
+
+    // Edit session dialog
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [editSession, setEditSession] = useState(null);
+    const [editForm, setEditForm] = useState({
+        session_date: '',
+        start_time: '',
+        end_time: '',
+        description: ''
+    });
 
     // Timer for active sessions
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -100,6 +110,66 @@ function TimeTrackerPage() {
         } catch (error) {
             console.error('Failed to stop session:', error);
             alert(error.response?.data?.detail || 'Ошибка при остановке сессии');
+        }
+    };
+
+    const handleEditClick = (session) => {
+        setEditSession(session);
+        setEditForm({
+            session_date: session.session_date,
+            start_time: session.start_time?.substring(0, 5) || '',
+            end_time: session.end_time?.substring(0, 5) || '',
+            description: session.description || ''
+        });
+        setEditDialogOpen(true);
+    };
+
+    const handleEditSave = async () => {
+        if (!editSession) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`/api/work-sessions/${editSession.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    session_date: editForm.session_date,
+                    start_time: editForm.start_time ? editForm.start_time + ':00' : null,
+                    end_time: editForm.end_time ? editForm.end_time + ':00' : null,
+                    description: editForm.description || null
+                })
+            });
+            setEditDialogOpen(false);
+            setEditSession(null);
+            loadData();
+            loadSummary();
+        } catch (error) {
+            console.error('Failed to update session:', error);
+            alert('Ошибка при сохранении');
+        }
+    };
+
+    const handleDeleteSession = async (sessionId) => {
+        if (!window.confirm('Удалить эту сессию?')) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/work-sessions/${sessionId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Ошибка');
+            }
+            loadData();
+            loadSummary();
+        } catch (error) {
+            console.error('Failed to delete session:', error);
+            alert(error.message || 'Ошибка при удалении');
         }
     };
 
@@ -269,6 +339,7 @@ function TimeTrackerPage() {
                                 <TableCell align="right"><strong>Ставка</strong></TableCell>
                                 <TableCell align="right"><strong>Сумма</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
+                                <TableCell align="center"><strong></strong></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -298,6 +369,23 @@ function TimeTrackerPage() {
                                         ) : (
                                             <Chip label="Завершено" color="success" size="small" />
                                         )}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleEditClick(session)}
+                                            title="Редактировать"
+                                        >
+                                            <Edit fontSize="small" />
+                                        </IconButton>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleDeleteSession(session.id)}
+                                            title="Удалить"
+                                            color="error"
+                                        >
+                                            <Delete fontSize="small" />
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -339,6 +427,55 @@ function TimeTrackerPage() {
                         disabled={!selectedEmployment}
                     >
                         Начать
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Session Dialog */}
+            <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
+                <DialogTitle>Редактировать сессию</DialogTitle>
+                <DialogContent sx={{ minWidth: 400 }}>
+                    <TextField
+                        fullWidth
+                        type="date"
+                        label="Дата"
+                        value={editForm.session_date}
+                        onChange={(e) => setEditForm({ ...editForm, session_date: e.target.value })}
+                        sx={{ mt: 2 }}
+                        InputLabelProps={{ shrink: true }}
+                    />
+                    <Box display="flex" gap={2} mt={2}>
+                        <TextField
+                            type="time"
+                            label="Начало"
+                            value={editForm.start_time}
+                            onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ flex: 1 }}
+                        />
+                        <TextField
+                            type="time"
+                            label="Конец"
+                            value={editForm.end_time}
+                            onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ flex: 1 }}
+                        />
+                    </Box>
+                    <TextField
+                        fullWidth
+                        label="Описание"
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        sx={{ mt: 2 }}
+                        multiline
+                        rows={2}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEditDialogOpen(false)}>Отмена</Button>
+                    <Button variant="contained" onClick={handleEditSave}>
+                        Сохранить
                     </Button>
                 </DialogActions>
             </Dialog>
