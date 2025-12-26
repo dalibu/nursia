@@ -106,7 +106,10 @@ function Layout({ onLogout }) {
               NURSIA | {userName}
             </Typography>
             <Button color="inherit" component={Link} to="/">
-              Обзор
+              Dashboard
+            </Button>
+            <Button color="inherit" component={Link} to="/time-tracker">
+              ⏱️ Время
             </Button>
             <Button color="inherit" component={Link} to="/payments">
               Платежи
@@ -150,6 +153,9 @@ function Layout({ onLogout }) {
                   </MenuItem>
                   <MenuItem component={Link} to="/contributors" onClick={() => setSettingsAnchor(null)}>
                     Участники
+                  </MenuItem>
+                  <MenuItem component={Link} to="/employment" onClick={() => setSettingsAnchor(null)}>
+                    👔 Трудовые отношения
                   </MenuItem>
                   <MenuItem component={Link} to="/currencies" onClick={() => setSettingsAnchor(null)}>
                     Валюты

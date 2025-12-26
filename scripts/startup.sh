@@ -7,5 +7,8 @@ mkdir -p data
 echo "Running system setup (database, settings, categories, currencies, admin)..."
 python scripts/setup_system.py
 
+echo "Running database migrations..."
+cd database && python -m alembic upgrade head && cd ..
+
 echo "Starting application with reload enabled..."
 exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload

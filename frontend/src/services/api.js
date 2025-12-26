@@ -62,4 +62,24 @@ export const currencies = {
   delete: (id) => api.delete(`/currencies/${id}`)
 };
 
+export const workSessions = {
+  start: (data) => api.post('/work-sessions/start', data),
+  stop: (id) => api.post(`/work-sessions/${id}/stop`),
+  list: (params) => api.get('/work-sessions/', { params }),
+  getActive: () => api.get('/work-sessions/active'),
+  getSummary: (params) => api.get('/work-sessions/summary', { params })
+};
+
+export const employment = {
+  list: (params) => api.get('/employment/', { params }),
+  create: (data) => api.post('/employment/', data),
+  update: (id, data) => api.put(`/employment/${id}`, data),
+  delete: (id) => api.delete(`/employment/${id}`)
+};
+
+export const balances = {
+  getSummary: (params) => api.get('/balances/summary', { params }),
+  getMonthly: (params) => api.get('/balances/monthly', { params })
+};
+
 export default api;

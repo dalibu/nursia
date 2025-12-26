@@ -33,7 +33,17 @@ target_metadata = Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-config.set_main_option("sqlalchemy.url", settings.DB_URL)
+
+# Исправляем относительный путь к SQLite БД
+db_url = settings.DB_URL
+if db_url.startswith("sqlite") and "./" in db_url:
+    # Преобразуем относительный путь в абсолютный от корня проекта
+    import os
+    project_root = Path(__file__).parent.parent.parent
+    # Заменяем ./ на абсолютный путь
+    db_url = db_url.replace("./", str(project_root) + "/")
+
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:

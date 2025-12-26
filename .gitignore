@@ -69,3 +69,6 @@ frontend/build/
 # SQLite database files
 data/nursia.db-shm
 data/nursia.db-wal
+
+# Temporary files
+tmp/

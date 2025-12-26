@@ -11,6 +11,9 @@ import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import DashboardPage from './pages/DashboardPage';
+import TimeTrackerPage from './pages/TimeTrackerPage';
+import EmploymentPage from './pages/EmploymentPage';
 
 import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
@@ -53,7 +56,10 @@ function App() {
           <Route path="/" element={
             isAuthenticated ? <Layout onLogout={() => setIsAuthenticated(false)} /> : <Navigate to="/login" replace />
           }>
-            <Route index element={<ReportsPage />} />
+            <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="time-tracker" element={<TimeTrackerPage />} />
+            <Route path="employment" element={<EmploymentPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="currencies" element={<CurrenciesPage />} />

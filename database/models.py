@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, date, time
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import BigInteger, String, DateTime, func, Numeric, ForeignKey, Text
+from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
@@ -20,6 +20,13 @@ class UserStatusType(str, Enum):
     ACTIVE = "active"
     BLOCKED = "blocked"
     RESETED = "reseted"
+
+class PaymentType(str, Enum):
+    EXPENSE = "expense"       # Обычные расходы (покупки)
+    WORK = "work"             # Оплата за работу
+    ADVANCE = "advance"       # Аванс / долг
+    GIFT = "gift"             # Подарок
+    BONUS = "bonus"           # Премия
 
 class User(Base):
     __tablename__ = "users"
@@ -103,18 +110,21 @@ class Payment(Base):
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contributors.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
+    payment_type: Mapped[str] = mapped_column(String(20), default="expense")  # expense, work, advance, gift, bonus
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_paid: Mapped[bool] = mapped_column(default=False)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    work_session_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_sessions.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     payer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[payer_id])
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
     recipient: Mapped[Optional["Contributor"]] = relationship("Contributor", foreign_keys=[recipient_id], back_populates="payments")
+    work_session: Mapped[Optional["WorkSession"]] = relationship("WorkSession", back_populates="payment")
 
     def __repr__(self) -> str:
-        return f"<Payment(id={self.id}, amount={self.amount}, category={self.category.name if self.category else None})>"
+        return f"<Payment(id={self.id}, amount={self.amount}, type={self.payment_type})>"
 
 
 class SystemSetting(Base):
@@ -148,6 +158,7 @@ class Contributor(Base):
     __tablename__ = "contributors"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)  # Связь с User
     name: Mapped[str] = mapped_column(String(200))
     type: Mapped[str] = mapped_column(String(50))  # 'user' или 'organization'
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -155,8 +166,55 @@ class Contributor(Base):
     changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
 
+    user: Mapped[Optional["User"]] = relationship("User")
     payments: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="[Payment.recipient_id]", back_populates="recipient")
     payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="[Payment.payer_id]", back_populates="payer")
 
     def __repr__(self) -> str:
         return f"<Contributor(id={self.id}, name={self.name}, type={self.type})>"
+
+
+class EmploymentRelation(Base):
+    """Трудовые отношения: работодатель нанимает работника с почасовой ставкой"""
+    __tablename__ = "employment_relations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанимает (А)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает (Е)
+    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 100 ₴/час
+    currency: Mapped[str] = mapped_column(String(3), default="UAH")
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    employer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employer_id])
+    employee: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employee_id])
+
+    def __repr__(self) -> str:
+        return f"<EmploymentRelation(employer={self.employer_id}, employee={self.employee_id}, rate={self.hourly_rate})>"
+
+
+class WorkSession(Base):
+    """Рабочая сессия: начало и конец работы"""
+    __tablename__ = "work_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    worker_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает (Е)
+    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанял (А)
+    session_date: Mapped[date] = mapped_column(Date)  # Дата работы
+    start_time: Mapped[time] = mapped_column(Time)  # Время начала
+    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)  # Время окончания
+    duration_hours: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)  # Длительность в часах
+    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # Ставка за час
+    currency: Mapped[str] = mapped_column(String(3), default="UAH")
+    amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)  # duration × rate
+    is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    worker: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[worker_id])
+    employer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employer_id])
+    payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="work_session", uselist=False)
+
+    def __repr__(self) -> str:
+        return f"<WorkSession(id={self.id}, date={self.session_date}, worker={self.worker_id})>"
