@@ -35,14 +35,14 @@ class MonthlySummary(BaseModel):
     period: str  # "2025-09"
     visits: int  # Количество посещений (сессий)
     hours: float  # Часы работы
-    netto: float  # Заработано
+    salary: float  # Зарплата (из work_sessions)
     paid: float  # Выплачено
-    to_pay: float  # К выплате
+    to_pay: float  # Задолженность (неоплаченные платежи за период)
     expenses: float  # Потрачено (расходы)
     expenses_paid: float  # Возмещено расходов
     bonus: float  # Премии
     remaining: float  # Остаток
-    total: float  # Итого (netto + expenses + bonus)
+    total: float  # Итого (salary + expenses + bonus)
     currency: str
 
 
@@ -253,33 +253,8 @@ async def get_monthly_summary(
         
         visits = session_row.visits if session_row else 0
         hours = float(session_row.hours) if session_row and session_row.hours else 0
-        work_netto = float(session_row.netto) if session_row and session_row.netto else 0
+        salary = float(session_row.netto) if session_row and session_row.netto else 0  # Зарплата только из work_sessions
         currency = session_row.currency if session_row else "UAH"
-        
-        # Общий доход за месяц (все платежи, где пользователь — получатель, кроме расходов)
-        # Фильтруем по группам: Зарплата, Премии (исключаем Расходы)
-        income_query = select(
-            func.sum(Payment.amount).label("total")
-        ).join(
-            PaymentCategory, Payment.category_id == PaymentCategory.id
-        ).join(
-            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-        ).where(
-            and_(
-                Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                PaymentCategoryGroup.name != "Расходы"
-            )
-        )
-        
-        if worker_id:
-            income_query = income_query.where(Payment.recipient_id == worker_id)
-        elif employer_id:
-            income_query = income_query.where(Payment.payer_id == employer_id)
-        
-        result = await db.execute(income_query)
-        income_row = result.one()
-        netto = float(income_row.total or 0) or work_netto  # Fallback to work sessions if no payments
         
         # Выплаты за месяц (все оплаченные платежи, где пользователь — получатель)
         paid_query = select(
@@ -370,44 +345,31 @@ async def get_monthly_summary(
         bonus_row = result.one()
         bonus = float(bonus_row.total or 0)
         
-        # Задолженность: для получателя = полученные платежи (долг), для плательщика = 0
+        # Задолженность: неоплаченные платежи за период
+        unpaid_query = select(func.sum(Payment.amount).label("total")).where(
+            and_(
+                Payment.payment_date >= start_date,
+                Payment.payment_date <= end_date,
+                Payment.is_paid == False
+            )
+        )
+        
         if worker_id:
-            # Работник: задолженность = все полученные платежи минус то что он вернул
-            debt_query = select(func.sum(Payment.amount).label("total")).where(
-                and_(
-                    Payment.payment_date >= start_date,
-                    Payment.payment_date <= end_date,
-                    Payment.recipient_id == worker_id
-                )
-            )
-            result = await db.execute(debt_query)
-            debt_received = float(result.one().total or 0)
-            
-            # Сколько он вернул (платежи где он плательщик)
-            returned_query = select(func.sum(Payment.amount).label("total")).where(
-                and_(
-                    Payment.payment_date >= start_date,
-                    Payment.payment_date <= end_date,
-                    Payment.payer_id == worker_id,
-                    Payment.is_paid == True
-                )
-            )
-            result = await db.execute(returned_query)
-            debt_returned = float(result.one().total or 0)
-            
-            to_pay = debt_received - debt_returned
-        else:
-            # Для плательщика/работодателя: его задолженность = 0 (он дал в долг, не должен)
-            to_pay = 0
+            unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
+        elif employer_id:
+            unpaid_query = unpaid_query.where(Payment.payer_id == employer_id)
+        
+        result = await db.execute(unpaid_query)
+        to_pay = float(result.one().total or 0)
         
         remaining = expenses - expenses_paid
-        total = netto + expenses + bonus
+        total = salary + expenses + bonus
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
             visits=visits,
             hours=round(hours, 2),
-            netto=round(netto, 2),
+            salary=round(salary, 2),
             paid=round(paid, 2),
             to_pay=round(to_pay, 2),
             expenses=round(expenses, 2),

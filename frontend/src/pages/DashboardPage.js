@@ -199,7 +199,7 @@ function DashboardPage() {
                                 <TableCell><strong>Период</strong></TableCell>
                                 <TableCell align="center"><strong>Посещ.</strong></TableCell>
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
-                                <TableCell align="right"><strong>Netto</strong></TableCell>
+                                <TableCell align="right"><strong>Зарплата</strong></TableCell>
                                 <TableCell align="right"><strong>Выплачено</strong></TableCell>
                                 <TableCell align="right"><strong>Задолженность</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
@@ -218,7 +218,7 @@ function DashboardPage() {
                                     </TableCell>
                                     <TableCell align="center">{row.visits}</TableCell>
                                     <TableCell align="right">{row.hours.toFixed(1)}</TableCell>
-                                    <TableCell align="right">{formatCurrency(row.netto, row.currency)}</TableCell>
+                                    <TableCell align="right">{formatCurrency(row.salary, row.currency)}</TableCell>
                                     <TableCell align="right" sx={{ color: 'success.main' }}>
                                         {formatCurrency(row.paid, row.currency)}
                                     </TableCell>
