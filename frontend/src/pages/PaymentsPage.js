@@ -58,8 +58,12 @@ function PaymentsPage() {
         headers: { Authorization: `Bearer ${token}` }
       }).then(r => r.json());
 
-      // Присваиваем постоянный номер строки каждому платежу
-      const paymentsWithRowNumbers = paymentsRes.data.map((payment, index) => ({
+      // Сортируем по дате ASC и присваиваем номер строки (самый новый = наибольший номер)
+      const sortedPayments = [...paymentsRes.data].sort((a, b) =>
+        new Date(a.payment_date) - new Date(b.payment_date)
+      );
+
+      const paymentsWithRowNumbers = sortedPayments.map((payment, index) => ({
         ...payment,
         rowNumber: index + 1
       }));
@@ -486,96 +490,96 @@ function PaymentsPage() {
               .map((payment, index) => (
                 <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
                   <TableCell sx={{ width: 32, minWidth: 32, maxWidth: 32, px: 0.5, textAlign: 'center' }}>{payment.rowNumber}</TableCell>
-                    <TableCell>
-                      <div style={{ lineHeight: 1 }}>
-                        <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
-                        <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
-                      </div>
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell
-                        sx={{
-                          cursor: payment.payer?.name ? 'pointer' : 'default'
-                        }}
-                        onClick={() => handleContributorClick(payment.payer)}
-                      >
-                        <span
-                          style={{
-                            textDecoration: payment.payer?.name ? 'underline' : 'none',
-                            textDecorationStyle: 'dotted',
-                            textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                          }}
-                        >
-                          {payment.payer?.name || '-'}
-                        </span>
-                      </TableCell>
-                    )}
+                  <TableCell>
+                    <div style={{ lineHeight: 1 }}>
+                      <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
+                      <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
+                    </div>
+                  </TableCell>
+                  {isAdmin && (
                     <TableCell
                       sx={{
-                        cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                        cursor: payment.payer?.name ? 'pointer' : 'default'
                       }}
-                      onClick={() => handleContributorClick(payment.recipient)}
+                      onClick={() => handleContributorClick(payment.payer)}
                     >
                       <span
                         style={{
-                          textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                          textDecoration: payment.payer?.name ? 'underline' : 'none',
                           textDecorationStyle: 'dotted',
                           textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                         }}
                       >
-                        {payment.recipient?.name || '-'}
+                        {payment.payer?.name || '-'}
                       </span>
                     </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
-                    <TableCell>
-                      {['Аванс', 'Долг'].includes(payment.category?.name)
-                        ? (
-                          <Chip
-                            label={payment.category.name}
-                            size="small"
-                            sx={{
-                              backgroundColor: '#FFEB3B',
-                              color: '#000',
-                            }}
-                          />
-                        )
-                        : (payment.category?.name || '-')}
-                    </TableCell>
-                    <TableCell>{payment.description || '-'}</TableCell>
-                    {isAdmin && (
-                      <TableCell>
+                  )}
+                  <TableCell
+                    sx={{
+                      cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                    }}
+                    onClick={() => handleContributorClick(payment.recipient)}
+                  >
+                    <span
+                      style={{
+                        textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                        textDecorationStyle: 'dotted',
+                        textDecorationColor: 'rgba(25, 118, 210, 0.5)'
+                      }}
+                    >
+                      {payment.recipient?.name || '-'}
+                    </span>
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
+                  <TableCell>
+                    {['Аванс', 'Долг'].includes(payment.category?.name)
+                      ? (
                         <Chip
-                          label={payment.is_paid ? 'Оплачено' : 'К оплате'}
-                          color={payment.is_paid ? 'success' : 'warning'}
+                          label={payment.category.name}
                           size="small"
-                          clickable
-                          onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
-                          icon={<Payment />}
                           sx={{
-                            cursor: 'pointer',
-                            '&:hover': {
-                              backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
-                              color: 'white'
-                            }
+                            backgroundColor: '#FFEB3B',
+                            color: '#000',
                           }}
                         />
-                      </TableCell>
-                    )}
+                      )
+                      : (payment.category?.name || '-')}
+                  </TableCell>
+                  <TableCell>{payment.description || '-'}</TableCell>
+                  {isAdmin && (
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
-                        <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
-                          <Replay fontSize="small" />
-                        </IconButton>
-                        <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
-                          <Edit fontSize="small" />
-                        </IconButton>
-                        <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Box>
+                      <Chip
+                        label={payment.is_paid ? 'Оплачено' : 'К оплате'}
+                        color={payment.is_paid ? 'success' : 'warning'}
+                        size="small"
+                        clickable
+                        onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
+                        icon={<Payment />}
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
+                            color: 'white'
+                          }
+                        }}
+                      />
                     </TableCell>
-                  </TableRow>
-                )
+                  )}
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
+                      <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
+                        <Replay fontSize="small" />
+                      </IconButton>
+                      <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
+                        <Edit fontSize="small" />
+                      </IconButton>
+                      <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              )
               )}
 
           </TableBody>
@@ -587,7 +591,7 @@ function PaymentsPage() {
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box>
             <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>
-              Итого: 
+              Итого:
             </Typography>
             <Typography variant="body2" component="span" sx={{ ml: 1 }}>
               {Object.entries(totals.all || {}).map(([currency, amount]) =>
@@ -595,12 +599,12 @@ function PaymentsPage() {
               ).join(', ') || '0.00'}
             </Typography>
           </Box>
-          
+
           {isAdmin && (
             <>
               <Box>
                 <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                  Оплачено: 
+                  Оплачено:
                 </Typography>
                 <Typography variant="body2" component="span" sx={{ ml: 1 }}>
                   {Object.entries(totals.paid || {}).map(([currency, amount]) =>
@@ -608,10 +612,10 @@ function PaymentsPage() {
                   ).join(', ') || '0.00'}
                 </Typography>
               </Box>
-              
+
               <Box>
                 <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                  Не оплачено: 
+                  Не оплачено:
                 </Typography>
                 <Typography variant="body2" component="span" sx={{ ml: 1 }}>
                   {Object.entries(totals.unpaid || {}).map(([currency, amount]) =>
