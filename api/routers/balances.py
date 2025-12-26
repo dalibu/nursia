@@ -256,14 +256,19 @@ async def get_monthly_summary(
         work_netto = float(session_row.netto) if session_row and session_row.netto else 0
         currency = session_row.currency if session_row else "UAH"
         
-        # Общий доход за месяц (все платежи, где пользователь — получатель)
+        # Общий доход за месяц (все платежи, где пользователь — получатель, кроме расходов)
+        # Фильтруем по группам: Зарплата, Премии (исключаем Расходы)
         income_query = select(
             func.sum(Payment.amount).label("total")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date <= end_date,
-                Payment.payment_type != "expense"  # Исключаем расходы
+                PaymentCategoryGroup.name != "Расходы"
             )
         )
         
@@ -341,14 +346,18 @@ async def get_monthly_summary(
         expenses_paid_row = result.one()
         expenses_paid = float(expenses_paid_row.total or 0)
         
-        # Премии и бонусы
+        # Премии и бонусы (группа "Премии")
         bonus_query = select(
             func.sum(Payment.amount).label("total")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date <= end_date,
-                Payment.payment_type.in_(["gift", "bonus"])
+                PaymentCategoryGroup.name == "Премии"
             )
         )
         

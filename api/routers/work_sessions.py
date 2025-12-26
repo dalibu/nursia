@@ -187,7 +187,6 @@ async def stop_work_session(
         category_id=work_category.id,
         amount=session.amount,
         currency=session.currency,
-        payment_type="work",
         description=f"Оплата за работу {session.session_date}",
         payment_date=now,
         is_paid=False,

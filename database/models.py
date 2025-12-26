@@ -135,7 +135,7 @@ class Payment(Base):
     work_session: Mapped[Optional["WorkSession"]] = relationship("WorkSession", back_populates="payment")
 
     def __repr__(self) -> str:
-        return f"<Payment(id={self.id}, amount={self.amount}, type={self.payment_type})>"
+        return f"<Payment(id={self.id}, amount={self.amount}, category_id={self.category_id})>"
 
 
 class SystemSetting(Base):

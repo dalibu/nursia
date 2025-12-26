@@ -10,5 +10,9 @@ cd database && python -m alembic upgrade head && cd ..
 echo "Running system setup (database, settings, categories, currencies, admin)..."
 python scripts/setup_system.py
 
+echo "🧪 Running smoke tests..."
+python -m pytest tests/test_smoke.py -v --tb=short || { echo "❌ Smoke tests failed!"; exit 1; }
+echo "✅ Smoke tests passed!"
+
 echo "Starting application with reload enabled..."
 exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
