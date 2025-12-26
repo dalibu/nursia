@@ -52,10 +52,21 @@ async def get_employment_relations(
     current_user: User = Depends(get_current_user)
 ):
     """Получить список трудовых отношений"""
+    from database.models import UserRole
+    from api.auth.oauth import get_user_contributor
+    
     query = select(EmploymentRelation).options(
         joinedload(EmploymentRelation.employer),
         joinedload(EmploymentRelation.employee)
     )
+    
+    # Для обычного пользователя — только его трудовые отношения
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if user_contributor:
+            query = query.where(EmploymentRelation.employee_id == user_contributor.id)
+        else:
+            return []  # Нет contributor — нет трудовых отношений
     
     if employer_id:
         query = query.where(EmploymentRelation.employer_id == employer_id)

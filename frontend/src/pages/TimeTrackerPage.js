@@ -9,7 +9,7 @@ import {
     PlayArrow, Stop, AccessTime, Person, Work,
     Refresh, Timer, Edit, Delete
 } from '@mui/icons-material';
-import { workSessions, employment, contributors } from '../services/api';
+import { workSessions, employment, contributors, payments } from '../services/api';
 
 // Символы валют
 const currencySymbols = {
@@ -27,6 +27,7 @@ function TimeTrackerPage() {
     const [contributorsList, setContributorsList] = useState([]);
     const [summary, setSummary] = useState([]);
     const [period, setPeriod] = useState('month');
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Start session dialog
     const [startDialogOpen, setStartDialogOpen] = useState(false);
@@ -58,16 +59,18 @@ function TimeTrackerPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [sessionsRes, activeRes, empRes, contribRes] = await Promise.all([
+            const [sessionsRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
                 workSessions.list({ limit: 50 }),
                 workSessions.getActive(),
                 employment.list({ is_active: true }),
-                contributors.list()
+                contributors.list(),
+                payments.getUserInfo()
             ]);
             setSessions(sessionsRes.data);
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setContributorsList(contribRes.data);
+            setIsAdmin(userRes.data.role === 'admin');
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
@@ -81,6 +84,26 @@ function TimeTrackerPage() {
             setSummary(res.data);
         } catch (error) {
             console.error('Failed to load summary:', error);
+        }
+    };
+
+    const handleStartClick = async () => {
+        // Для обычного пользователя с одним трудовым отношением — сразу старт
+        if (!isAdmin && employmentList.length === 1) {
+            const emp = employmentList[0];
+            try {
+                await workSessions.start({
+                    worker_id: emp.employee_id,
+                    employer_id: emp.employer_id
+                });
+                loadData();
+            } catch (error) {
+                console.error('Failed to start session:', error);
+                alert(error.response?.data?.detail || 'Ошибка при запуске сессии');
+            }
+        } else {
+            // Для админа или при нескольких отношениях — показываем диалог
+            setStartDialogOpen(true);
         }
     };
 
@@ -217,7 +240,7 @@ function TimeTrackerPage() {
                         variant="contained"
                         color="success"
                         startIcon={<PlayArrow />}
-                        onClick={() => setStartDialogOpen(true)}
+                        onClick={handleStartClick}
                         disabled={employmentList.length === 0}
                     >
                         Начать работу
@@ -406,14 +429,17 @@ function TimeTrackerPage() {
                         <TextField
                             select
                             fullWidth
-                            label="Выберите работника"
+                            label={isAdmin ? "Выберите работника" : "Выберите работодателя"}
                             value={selectedEmployment}
                             onChange={(e) => setSelectedEmployment(e.target.value)}
                             sx={{ mt: 2 }}
                         >
                             {employmentList.map((emp) => (
                                 <MenuItem key={emp.id} value={emp.id}>
-                                    {emp.employee_name} → {emp.employer_name} ({formatCurrency(emp.hourly_rate, emp.currency)}/ч)
+                                    {isAdmin
+                                        ? `${emp.employee_name} → ${emp.employer_name} (${formatCurrency(emp.hourly_rate, emp.currency)}/ч)`
+                                        : `${emp.employer_name} (${formatCurrency(emp.hourly_rate, emp.currency)}/ч)`
+                                    }
                                 </MenuItem>
                             ))}
                         </TextField>
