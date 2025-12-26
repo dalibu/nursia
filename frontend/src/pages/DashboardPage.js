@@ -252,7 +252,7 @@ function DashboardPage() {
                                     sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
                                 >
                                     <TableCell>
-                                        <strong>{row.period}</strong>
+                                        <strong>{row.period.split('-').reverse().join('.')}</strong>
                                     </TableCell>
                                     <TableCell align="center">{row.visits || ''}</TableCell>
                                     <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
