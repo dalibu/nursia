@@ -178,22 +178,11 @@ async def stop_work_session(
     session.duration_hours = Decimal(str(round(duration, 2)))
     session.amount = session.duration_hours * session.hourly_rate
     
-    # Создаём платёж типа "work"
-    # Находим или создаём категорию "Работа"
-    result = await db.execute(
-        select(PaymentCategory).where(PaymentCategory.name == "Работа")
-    )
-    work_category = result.scalar_one_or_none()
-    
-    if not work_category:
-        work_category = PaymentCategory(name="Работа", description="Оплата за работу")
-        db.add(work_category)
-        await db.flush()
-    
+    # Создаём платёж с категорией "Зарплата" (id=3)
     payment = Payment(
         payer_id=session.employer_id,
         recipient_id=session.worker_id,
-        category_id=work_category.id,
+        category_id=3,  # Зарплата
         amount=session.amount,
         currency=session.currency,
         description=f"Оплата за работу {session.session_date}",

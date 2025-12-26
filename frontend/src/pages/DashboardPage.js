@@ -200,9 +200,9 @@ function DashboardPage() {
                                 <TableCell align="center"><strong>Посещ.</strong></TableCell>
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
                                 <TableCell align="right"><strong>Зарплата</strong></TableCell>
-                                <TableCell align="right"><strong>Выплачено</strong></TableCell>
-                                <TableCell align="right"><strong>Задолженность</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
+                                <TableCell align="right"><strong>Кредит</strong></TableCell>
+                                <TableCell align="right"><strong>Не выплачено</strong></TableCell>
                                 <TableCell align="right"><strong>Премия</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
                             </TableRow>
@@ -219,13 +219,13 @@ function DashboardPage() {
                                     <TableCell align="center">{row.visits}</TableCell>
                                     <TableCell align="right">{row.hours.toFixed(1)}</TableCell>
                                     <TableCell align="right">{formatCurrency(row.salary, row.currency)}</TableCell>
+                                    <TableCell align="right">{formatCurrency(row.expenses, row.currency)}</TableCell>
                                     <TableCell align="right" sx={{ color: 'success.main' }}>
                                         {formatCurrency(row.paid, row.currency)}
                                     </TableCell>
                                     <TableCell align="right" sx={{ color: 'error.main', fontWeight: row.to_pay !== 0 ? 700 : 'inherit' }}>
                                         {formatCurrency(Math.abs(row.to_pay), row.currency)}
                                     </TableCell>
-                                    <TableCell align="right">{formatCurrency(row.expenses, row.currency)}</TableCell>
                                     <TableCell align="right">
                                         {row.bonus > 0 && (
                                             <Chip

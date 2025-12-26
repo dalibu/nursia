@@ -256,8 +256,33 @@ async def get_monthly_summary(
         salary = float(session_row.netto) if session_row and session_row.netto else 0  # Зарплата только из work_sessions
         currency = session_row.currency if session_row else "UAH"
         
-        # Выплаты за месяц (все оплаченные платежи, где пользователь — получатель)
+        # Кредит — оплаченные платежи из группы "Долги"
         paid_query = select(
+            func.sum(Payment.amount).label("total")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payment_date >= start_date,
+                Payment.payment_date <= end_date,
+                Payment.is_paid == True,
+                PaymentCategoryGroup.name == "Долги"
+            )
+        )
+        
+        if worker_id:
+            paid_query = paid_query.where(Payment.recipient_id == worker_id)
+        elif employer_id:
+            paid_query = paid_query.where(Payment.payer_id == employer_id)
+        
+        result = await db.execute(paid_query)
+        paid_row = result.one()
+        paid = float(paid_row.total or 0)
+        
+        # Итого — все оплаченные платежи любой категории
+        total_paid_query = select(
             func.sum(Payment.amount).label("total")
         ).where(
             and_(
@@ -267,15 +292,14 @@ async def get_monthly_summary(
             )
         )
         
-        # Фильтрация: платежи где пользователь - получатель (доход)
         if worker_id:
-            paid_query = paid_query.where(Payment.recipient_id == worker_id)
+            total_paid_query = total_paid_query.where(Payment.recipient_id == worker_id)
         elif employer_id:
-            paid_query = paid_query.where(Payment.payer_id == employer_id)
+            total_paid_query = total_paid_query.where(Payment.payer_id == employer_id)
         
-        result = await db.execute(paid_query)
-        paid_row = result.one()
-        paid = float(paid_row.total or 0)
+        result = await db.execute(total_paid_query)
+        total_paid_row = result.one()
+        total_paid = float(total_paid_row.total or 0)
         
         # Расходы за месяц (category_group.code = 'expense')
         expenses_query = select(
@@ -363,7 +387,7 @@ async def get_monthly_summary(
         to_pay = float(result.one().total or 0)
         
         remaining = expenses - expenses_paid
-        total = salary + expenses + bonus
+        total = total_paid  # Итого = все оплаченные платежи за период
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
