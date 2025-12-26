@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
     TrendingUp, AccessTime, Payment, AccountBalance,
-    AttachMoney, CardGiftcard
+    AttachMoney, CardGiftcard, ShoppingCart
 } from '@mui/icons-material';
 import { balances } from '../services/api';
 
@@ -93,7 +93,7 @@ function DashboardPage() {
                     }}>
                         <CardContent>
                             <Box display="flex" alignItems="center" gap={1}>
-                                <AttachMoney />
+                                <ShoppingCart />
                                 <Typography variant="subtitle2">Расходы</Typography>
                             </Box>
                             <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
@@ -129,7 +129,7 @@ function DashboardPage() {
                     }}>
                         <CardContent>
                             <Box display="flex" alignItems="center" gap={1}>
-                                <AccountBalance />
+                                <AttachMoney />
                                 <Typography variant="subtitle2">К оплате</Typography>
                             </Box>
                             <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
