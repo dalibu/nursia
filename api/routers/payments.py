@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
 from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency
 from api.schemas.payment import (
@@ -108,7 +108,7 @@ async def create_category(
 @router.get("/categories", response_model=List[PaymentCategorySchema])
 async def get_categories(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ) -> List[PaymentCategorySchema]:
     result = await db.execute(
         select(PaymentCategory).options(joinedload(PaymentCategory.category_group))
@@ -155,17 +155,17 @@ async def create_payment(
     await db.commit()
     await db.refresh(db_payment)
     
-    # Загружаем связанные объекты
+    # Загружаем связанные объекты с вложенной category_group
     result = await db.execute(
         select(Payment)
         .options(
-            joinedload(Payment.category),
+            joinedload(Payment.category).joinedload(PaymentCategory.category_group),
             joinedload(Payment.recipient),
             joinedload(Payment.payer)
         )
         .where(Payment.id == db_payment.id)
     )
-    db_payment = result.scalar_one()
+    db_payment = result.unique().scalar_one()
     
     return PaymentSchema.from_orm(db_payment)
 
@@ -181,7 +181,7 @@ async def get_payments(
     current_user: User = Depends(get_current_user)
 ) -> List[PaymentSchema]:
     query = select(Payment).options(
-        joinedload(Payment.category),
+        joinedload(Payment.category).joinedload(PaymentCategory.category_group),
         joinedload(Payment.recipient),
         joinedload(Payment.payer)
     )

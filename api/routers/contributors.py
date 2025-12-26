@@ -18,7 +18,7 @@ router = APIRouter(prefix="/contributors", tags=["contributors"])
 @router.get("/")
 async def get_contributors(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Список активных участников для использования в формах платежей."""
     contributors_result = await db.execute(
