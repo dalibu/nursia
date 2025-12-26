@@ -48,9 +48,12 @@ class MonthlySummary(BaseModel):
 
 class DashboardSummary(BaseModel):
     """Сводка для Dashboard"""
-    total_debt: float  # Общая задолженность
-    total_paid: float  # Общая сумма выплат
-    total_expenses: float  # Общие расходы
+    total_salary: float  # Зарплата (категория Зарплата)
+    total_expenses: float  # Расходы (группа Расходы)
+    total_credits: float  # Кредиты (оплаченные из группы Долги)
+    total_unpaid: float  # К оплате (неоплаченные платежи)
+    total_bonus: float  # Премии (группа Премии)
+    total: float  # Всего (все оплаченные платежи)
     currency: str
     balances: List[BalanceItem]  # Детальные балансы
 
@@ -62,73 +65,106 @@ async def get_balance_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить сводку задолженностей для Dashboard"""
+    """Получить сводку для Dashboard карточек"""
     
-    # Автофильтрация для не-админов: показываем только связанные данные
+    # Автофильтрация для не-админов
     user_contributor_id = None
     if current_user.role != UserRole.ADMIN:
         user_contributor = await get_user_contributor(current_user, db)
-        print(f"DEBUG: User {current_user.id} ({current_user.username}) -> Contributor: {user_contributor}")
         if user_contributor:
             user_contributor_id = user_contributor.id
-            print(f"DEBUG: Filtering by contributor_id={user_contributor_id}")
         else:
-            print(f"DEBUG: No contributor found for user {current_user.id}, returning empty")
-            # Нет связанного Contributor — возвращаем пустой результат
             return DashboardSummary(
-                total_debt=0,
-                total_paid=0,
-                total_expenses=0,
-                currency="UAH",
-                balances=[]
+                total_salary=0, total_expenses=0, total_credits=0,
+                total_unpaid=0, total_bonus=0, total=0,
+                currency="UAH", balances=[]
             )
     
-    # Для пользователя: Задолженность = все платежи, где он ПОЛУЧАТЕЛЬ (деньги, которые он должен вернуть)
-    # Для админа: показываем неоплаченные платежи между участниками
+    currency = "UAH"
+    
+    # 1. Зарплата — оплаченные платежи из категории "Зарплата" (id=3)
+    salary_query = select(func.sum(Payment.amount).label("total")).where(
+        and_(Payment.category_id == 3, Payment.is_paid == True)
+    )
+    if user_contributor_id:
+        salary_query = salary_query.where(Payment.recipient_id == user_contributor_id)
+    elif worker_id:
+        salary_query = salary_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(salary_query)
+    total_salary = float(result.one().total or 0)
+    
+    # 2. Расходы — платежи из группы "Расходы"
+    expenses_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(PaymentCategoryGroup.name == "Расходы")
+    if user_contributor_id:
+        expenses_query = expenses_query.where(Payment.payer_id == user_contributor_id)
+    elif worker_id:
+        expenses_query = expenses_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(expenses_query)
+    total_expenses = float(result.one().total or 0)
+    
+    # 3. Кредиты — оплаченные платежи из группы "Долги"
+    credits_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(and_(PaymentCategoryGroup.name == "Долги", Payment.is_paid == True))
+    if user_contributor_id:
+        credits_query = credits_query.where(Payment.recipient_id == user_contributor_id)
+    elif worker_id:
+        credits_query = credits_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(credits_query)
+    total_credits = float(result.one().total or 0)
+    
+    # 4. К оплате — неоплаченные платежи
+    unpaid_query = select(func.sum(Payment.amount).label("total")).where(Payment.is_paid == False)
+    if user_contributor_id:
+        unpaid_query = unpaid_query.where(Payment.recipient_id == user_contributor_id)
+    elif worker_id:
+        unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(unpaid_query)
+    total_unpaid = float(result.one().total or 0)
+    
+    # 5. Премии — оплаченные платежи из группы "Премии"
+    bonus_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(and_(PaymentCategoryGroup.name == "Премии", Payment.is_paid == True))
+    if user_contributor_id:
+        bonus_query = bonus_query.where(Payment.recipient_id == user_contributor_id)
+    elif worker_id:
+        bonus_query = bonus_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(bonus_query)
+    total_bonus = float(result.one().total or 0)
+    
+    # 6. Всего — все оплаченные платежи
+    total_query = select(func.sum(Payment.amount).label("total")).where(Payment.is_paid == True)
+    if user_contributor_id:
+        total_query = total_query.where(Payment.recipient_id == user_contributor_id)
+    elif worker_id:
+        total_query = total_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(total_query)
+    total = float(result.one().total or 0)
+    
+    # Балансы (неоплаченные долги)
+    balances = []
     debt_query = select(
-        Payment.payer_id,
-        Payment.recipient_id,
-        func.sum(Payment.amount).label("total"),
-        Payment.currency
-    ).group_by(
+        Payment.payer_id, Payment.recipient_id,
+        func.sum(Payment.amount).label("total"), Payment.currency
+    ).where(Payment.is_paid == False).group_by(
         Payment.payer_id, Payment.recipient_id, Payment.currency
     )
-    
     if user_contributor_id:
-        # Для обычного пользователя: долг = платежи где он получатель
         debt_query = debt_query.where(Payment.recipient_id == user_contributor_id)
-    else:
-        # Для админа: показываем только неоплаченные
-        debt_query = debt_query.where(Payment.is_paid == False)
-        if employer_id:
-            debt_query = debt_query.where(Payment.payer_id == employer_id)
-        if worker_id:
-            debt_query = debt_query.where(Payment.recipient_id == worker_id)
     
     result = await db.execute(debt_query)
     debt_rows = result.all()
     
-    # Выплачено = платежи, где пользователь ПЛАТЕЛЬЩИК (деньги, которые он вернул)
-    paid_query = select(
-        func.sum(Payment.amount).label("total"),
-        Payment.currency
-    ).where(
-        Payment.is_paid == True
-    ).group_by(Payment.currency)
-    
-    if user_contributor_id:
-        # Для пользователя: выплачено = платежи где он плательщик (деньги которые он отдал)
-        paid_query = paid_query.where(Payment.payer_id == user_contributor_id)
-    else:
-        if employer_id:
-            paid_query = paid_query.where(Payment.payer_id == employer_id)
-        if worker_id:
-            paid_query = paid_query.where(Payment.recipient_id == worker_id)
-    
-    result = await db.execute(paid_query)
-    paid_rows = result.all()
-    
-    # Собираем имена участников
+    # Получаем имена
     contributor_ids = set()
     for row in debt_rows:
         contributor_ids.add(row.payer_id)
@@ -137,56 +173,28 @@ async def get_balance_summary(
     
     contributor_names = {}
     if contributor_ids:
-        result = await db.execute(
-            select(Contributor).where(Contributor.id.in_(contributor_ids))
-        )
+        result = await db.execute(select(Contributor).where(Contributor.id.in_(contributor_ids)))
         for c in result.scalars().all():
             contributor_names[c.id] = c.name
     
-    # Формируем балансы
-    balances = []
-    total_debt = Decimal(0)
-    currency = "UAH"
-    
     for row in debt_rows:
         currency = row.currency
-        total_debt += row.total or Decimal(0)
         balances.append(BalanceItem(
-            debtor_id=row.recipient_id or 0,  # Получатель = должник
+            debtor_id=row.recipient_id or 0,
             debtor_name=contributor_names.get(row.recipient_id, "—") if row.recipient_id else "—",
-            creditor_id=row.payer_id,  # Плательщик = кредитор
+            creditor_id=row.payer_id,
             creditor_name=contributor_names.get(row.payer_id, f"ID:{row.payer_id}"),
             amount=float(row.total),
             currency=row.currency
         ))
     
-    total_paid = sum(float(r.total or 0) for r in paid_rows)
-    
-    # Получаем расходы (category_group.code = 'expense')
-    expenses_query = select(
-        func.sum(Payment.amount).label("total")
-    ).join(
-        PaymentCategory, Payment.category_id == PaymentCategory.id
-    ).join(
-        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(
-        PaymentCategoryGroup.name == "Расходы"
-    )
-    
-    # Фильтрация для не-админов
-    if user_contributor_id:
-        expenses_query = expenses_query.where(Payment.payer_id == user_contributor_id)
-    elif employer_id:
-        expenses_query = expenses_query.where(Payment.payer_id == employer_id)
-    
-    result = await db.execute(expenses_query)
-    expenses_row = result.one()
-    total_expenses = float(expenses_row.total or 0)
-    
     return DashboardSummary(
-        total_debt=float(total_debt),
-        total_paid=total_paid,
+        total_salary=total_salary,
         total_expenses=total_expenses,
+        total_credits=total_credits,
+        total_unpaid=total_unpaid,
+        total_bonus=total_bonus,
+        total=total,
         currency=currency,
         balances=balances
     )

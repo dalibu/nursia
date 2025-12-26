@@ -66,24 +66,8 @@ function DashboardPage() {
 
             {/* Summary Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
-                        color: 'white'
-                    }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <AccountBalance />
-                                <Typography variant="subtitle2">Задолженность</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_debt || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={3}>
+                {/* Зарплата */}
+                <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                         color: 'white'
@@ -91,16 +75,17 @@ function DashboardPage() {
                         <CardContent>
                             <Box display="flex" alignItems="center" gap={1}>
                                 <Payment />
-                                <Typography variant="subtitle2">Выплачено</Typography>
+                                <Typography variant="subtitle2">Зарплата</Typography>
                             </Box>
                             <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_paid || 0, summary?.currency)}
+                                {formatCurrency(summary?.total_salary || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                {/* Расходы */}
+                <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                         color: 'white'
@@ -117,7 +102,62 @@ function DashboardPage() {
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                {/* Кредиты */}
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white'
+                    }}>
+                        <CardContent>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <AccountBalance />
+                                <Typography variant="subtitle2">Кредиты</Typography>
+                            </Box>
+                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                                {formatCurrency(summary?.total_credits || 0, summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                {/* К оплате */}
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+                        color: 'white'
+                    }}>
+                        <CardContent>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <AccountBalance />
+                                <Typography variant="subtitle2">К оплате</Typography>
+                            </Box>
+                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                                {formatCurrency(summary?.total_unpaid || 0, summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                {/* Премии */}
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                        color: 'white'
+                    }}>
+                        <CardContent>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <CardGiftcard />
+                                <Typography variant="subtitle2">Премии</Typography>
+                            </Box>
+                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                                {formatCurrency(summary?.total_bonus || 0, summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                {/* Всего */}
+                <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                         color: 'white'
@@ -125,13 +165,10 @@ function DashboardPage() {
                         <CardContent>
                             <Box display="flex" alignItems="center" gap={1}>
                                 <TrendingUp />
-                                <Typography variant="subtitle2">Баланс</Typography>
+                                <Typography variant="subtitle2">Всего</Typography>
                             </Box>
                             <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
-                                {formatCurrency(
-                                    (summary?.total_paid || 0) - (summary?.total_debt || 0),
-                                    summary?.currency
-                                )}
+                                {formatCurrency(summary?.total || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
