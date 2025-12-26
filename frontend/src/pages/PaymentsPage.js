@@ -422,24 +422,22 @@ function PaymentsPage() {
                   Когда
                 </TableSortLabel>
               </TableCell>
-              {isAdmin && (
-                <TableCell>
-                  <TableSortLabel
-                    active={sortField === 'payer'}
-                    direction={sortField === 'payer' ? sortDirection : 'asc'}
-                    onClick={() => handleSort('payer')}
-                  >
-                    Кто
-                  </TableSortLabel>
-                </TableCell>
-              )}
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'payer'}
+                  direction={sortField === 'payer' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('payer')}
+                >
+                  Плательщик
+                </TableSortLabel>
+              </TableCell>
               <TableCell>
                 <TableSortLabel
                   active={sortField === 'recipient'}
                   direction={sortField === 'recipient' ? sortDirection : 'asc'}
                   onClick={() => handleSort('recipient')}
                 >
-                  Кому
+                  Получатель
                 </TableSortLabel>
               </TableCell>
               <TableCell>
@@ -480,7 +478,7 @@ function PaymentsPage() {
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 9 : 7} align="center">
+                <TableCell colSpan={isAdmin ? 10 : 8} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -496,24 +494,22 @@ function PaymentsPage() {
                       <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
                     </div>
                   </TableCell>
-                  {isAdmin && (
-                    <TableCell
-                      sx={{
-                        cursor: payment.payer?.name ? 'pointer' : 'default'
+                  <TableCell
+                    sx={{
+                      cursor: payment.payer?.name && isAdmin ? 'pointer' : 'default'
+                    }}
+                    onClick={() => isAdmin && handleContributorClick(payment.payer)}
+                  >
+                    <span
+                      style={{
+                        textDecoration: payment.payer?.name && isAdmin ? 'underline' : 'none',
+                        textDecorationStyle: 'dotted',
+                        textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                       }}
-                      onClick={() => handleContributorClick(payment.payer)}
                     >
-                      <span
-                        style={{
-                          textDecoration: payment.payer?.name ? 'underline' : 'none',
-                          textDecorationStyle: 'dotted',
-                          textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                        }}
-                      >
-                        {payment.payer?.name || '-'}
-                      </span>
-                    </TableCell>
-                  )}
+                      {payment.payer?.name || '-'}
+                    </span>
+                  </TableCell>
                   <TableCell
                     sx={{
                       cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'

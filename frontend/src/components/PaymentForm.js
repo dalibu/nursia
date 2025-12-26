@@ -147,7 +147,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           <Box display="flex" gap={2} flexWrap="wrap">
             <TextField
               select
-              label="От кого"
+              label="Плательщик"
               margin="normal"
               value={formData.payer_id}
               onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
@@ -160,7 +160,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             </TextField>
             <TextField
               select
-              label="Кому"
+              label="Получатель"
               margin="normal"
               value={formData.recipient_id}
               onChange={(e) => setFormData({ ...formData, recipient_id: e.target.value })}
