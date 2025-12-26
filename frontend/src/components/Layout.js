@@ -106,7 +106,7 @@ function Layout({ onLogout }) {
               NURSIA | {userName}
             </Typography>
             <Button color="inherit" component={Link} to="/">
-              Dashboard
+              Обозрение
             </Button>
             <Button color="inherit" component={Link} to="/time-tracker">
               ⏱️ Время

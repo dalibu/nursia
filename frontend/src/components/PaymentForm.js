@@ -16,6 +16,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
     description: '',
     is_paid: false
   });
+  const [originalTime, setOriginalTime] = useState(null); // Сохраняем оригинальное время при редактировании
   const [categories, setCategories] = useState([]);
   const [contributorList, setContributorList] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
@@ -26,13 +27,17 @@ function PaymentForm({ open, payment, initialData, onClose }) {
     if (open) {
       loadData();
       if (payment) {
+        // Сохраняем оригинальное время для редактирования
+        const dateTimeParts = payment.payment_date.split('T');
+        setOriginalTime(dateTimeParts[1] || null);
+
         setFormData({
           amount: payment.amount,
           currency: payment.currency,
           category_id: payment.category_id,
           recipient_id: payment.recipient_id,
           payer_id: payment.payer_id || '',
-          payment_date: payment.payment_date.split('T')[0],
+          payment_date: dateTimeParts[0],
           description: payment.description || '',
           is_paid: payment.is_paid || false
         });
@@ -92,13 +97,16 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // При редактировании используем оригинальное время, иначе 00:00:00 для новых платежей
+    const timeToUse = payment && originalTime ? originalTime : '00:00:00';
+
     const submitData = {
       ...formData,
       amount: parseFloat(formData.amount),
       category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
       recipient_id: parseInt(formData.recipient_id),
       payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
-      payment_date: formData.payment_date + 'T00:00:00'
+      payment_date: formData.payment_date + 'T' + timeToUse
     };
 
     try {

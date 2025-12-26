@@ -61,7 +61,7 @@ function DashboardPage() {
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: '#1a237e' }}>
-                📊 Dashboard
+                🧮 Обозрение
             </Typography>
 
             {/* Summary Cards */}
