@@ -49,7 +49,6 @@ class PaymentBase(BaseModel):
     recipient_id: Optional[int] = None
     amount: Decimal = Field(..., gt=0, decimal_places=2)
     currency: str = Field(max_length=3)
-    payment_type: str = Field(default="expense", max_length=20)  # expense, work, advance, gift, bonus
     description: Optional[str] = Field(None, max_length=1000)
     payment_date: datetime
     is_paid: Optional[bool] = False

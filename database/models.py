@@ -21,19 +21,6 @@ class UserStatusType(str, Enum):
     BLOCKED = "blocked"
     RESETED = "reseted"
 
-class PaymentType(str, Enum):
-    EXPENSE = "expense"       # Обычные расходы (покупки)
-    WORK = "work"             # Оплата за работу
-    ADVANCE = "advance"       # Аванс / долг
-    GIFT = "gift"             # Подарок
-    BONUS = "bonus"           # Премия
-
-class CategoryGroup(str, Enum):
-    WORK = "work"         # Зарплата, аванс (трудовые выплаты)
-    EXPENSE = "expense"   # Расходы на жизнь (продукты, транспорт и т.д.)
-    BONUS = "bonus"       # Подарки, премии
-    DEBT = "debt"         # Долги, займы
-
 class User(Base):
     __tablename__ = "users"
 
@@ -135,7 +122,6 @@ class Payment(Base):
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contributors.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
-    payment_type: Mapped[str] = mapped_column(String(20), default="expense")  # expense, work, advance, gift, bonus
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_paid: Mapped[bool] = mapped_column(default=False)

@@ -108,6 +108,33 @@ def upgrade() -> None:
         op.execute("DROP TABLE payment_categories")
         # Rename new table
         op.execute("ALTER TABLE payment_categories_new RENAME TO payment_categories")
+    
+    # Remove legacy 'payment_type' column from payments table
+    if column_exists('payments', 'payment_type'):
+        op.execute("""
+            CREATE TABLE IF NOT EXISTS payments_new (
+                id INTEGER PRIMARY KEY,
+                payer_id INTEGER NOT NULL REFERENCES contributors(id),
+                category_id INTEGER NOT NULL REFERENCES payment_categories(id),
+                recipient_id INTEGER REFERENCES contributors(id),
+                amount NUMERIC(10,2) NOT NULL,
+                currency VARCHAR(3) NOT NULL,
+                description TEXT,
+                payment_date DATETIME NOT NULL,
+                is_paid BOOLEAN DEFAULT 0,
+                paid_at DATETIME,
+                work_session_id INTEGER REFERENCES work_sessions(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        op.execute("""
+            INSERT INTO payments_new 
+            SELECT id, payer_id, category_id, recipient_id, amount, currency, 
+                   description, payment_date, is_paid, paid_at, work_session_id, created_at
+            FROM payments
+        """)
+        op.execute("DROP TABLE payments")
+        op.execute("ALTER TABLE payments_new RENAME TO payments")
 
 
 def downgrade() -> None:
@@ -118,3 +145,4 @@ def downgrade() -> None:
     # Drop payment_category_groups table
     if table_exists('payment_category_groups'):
         op.drop_table('payment_category_groups')
+
