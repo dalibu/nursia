@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, Contributor, Currency
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
+    PaymentCategoryGroupCreate, PaymentCategoryGroupResponse,
     PaymentReport
 )
 from api.auth.oauth import get_current_user, get_admin_user
@@ -21,13 +22,83 @@ from utils.timezone import now_server
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+# ==================== Payment Category Groups ====================
+
+@router.get("/groups", response_model=List[PaymentCategoryGroupResponse])
+async def get_groups(
+    include_inactive: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получить список групп категорий"""
+    query = select(PaymentCategoryGroup)
+    if not include_inactive:
+        query = query.where(PaymentCategoryGroup.is_active == True)
+    result = await db.execute(query.order_by(PaymentCategoryGroup.id))
+    return result.scalars().all()
+
+
+@router.post("/groups", response_model=PaymentCategoryGroupResponse)
+async def create_group(
+    group: PaymentCategoryGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Создать новую группу категорий"""
+    db_group = PaymentCategoryGroup(**group.model_dump())
+    db.add(db_group)
+    await db.commit()
+    await db.refresh(db_group)
+    return db_group
+
+
+@router.put("/groups/{group_id}", response_model=PaymentCategoryGroupResponse)
+async def update_group(
+    group_id: int,
+    group: PaymentCategoryGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Обновить группу категорий"""
+    result = await db.execute(select(PaymentCategoryGroup).where(PaymentCategoryGroup.id == group_id))
+    db_group = result.scalar_one_or_none()
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    for field, value in group.model_dump().items():
+        setattr(db_group, field, value)
+    
+    await db.commit()
+    await db.refresh(db_group)
+    return db_group
+
+
+@router.delete("/groups/{group_id}")
+async def delete_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Деактивировать группу категорий"""
+    result = await db.execute(select(PaymentCategoryGroup).where(PaymentCategoryGroup.id == group_id))
+    db_group = result.scalar_one_or_none()
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    db_group.is_active = False
+    await db.commit()
+    return {"message": "Group deactivated"}
+
+
+# ==================== Payment Categories ====================
+
 @router.post("/categories", response_model=PaymentCategorySchema)
 async def create_category(
     category: PaymentCategoryCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    db_category = PaymentCategory(**category.dict())
+    db_category = PaymentCategory(**category.model_dump())
     db.add(db_category)
     await db.commit()
     await db.refresh(db_category)
@@ -39,8 +110,10 @@ async def get_categories(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ) -> List[PaymentCategorySchema]:
-    result = await db.execute(select(PaymentCategory))
-    return [PaymentCategorySchema.from_orm(c) for c in result.scalars().all()]
+    result = await db.execute(
+        select(PaymentCategory).options(joinedload(PaymentCategory.category_group))
+    )
+    return result.scalars().unique().all()
 
 
 @router.post("/", response_model=PaymentSchema)

@@ -28,6 +28,12 @@ class PaymentType(str, Enum):
     GIFT = "gift"             # Подарок
     BONUS = "bonus"           # Премия
 
+class CategoryGroup(str, Enum):
+    WORK = "work"         # Зарплата, аванс (трудовые выплаты)
+    EXPENSE = "expense"   # Расходы на жизнь (продукты, транспорт и т.д.)
+    BONUS = "bonus"       # Подарки, премии
+    DEBT = "debt"         # Долги, займы
+
 class User(Base):
     __tablename__ = "users"
 
@@ -87,18 +93,37 @@ class RegistrationRequest(Base):
         return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
+class PaymentCategoryGroup(Base):
+    """Группы категорий платежей (Зарплата, Расходы, Премии, Долги и т.д.)"""
+    __tablename__ = "payment_category_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)  # Название группы
+    color: Mapped[str] = mapped_column(String(7), default="#808080")  # Hex color
+    emoji: Mapped[str] = mapped_column(String(10), default="💰")  # Emoji icon
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    categories: Mapped[list["PaymentCategory"]] = relationship("PaymentCategory", back_populates="category_group")
+
+    def __repr__(self) -> str:
+        return f"<PaymentCategoryGroup(id={self.id}, name={self.name})>"
+
+
 class PaymentCategory(Base):
     __tablename__ = "payment_categories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payment_category_groups.id"), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    category_group: Mapped[Optional["PaymentCategoryGroup"]] = relationship("PaymentCategoryGroup", back_populates="categories")
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="category")
 
     def __repr__(self) -> str:
-        return f"<PaymentCategory(id={self.id}, name={self.name})>"
+        return f"<PaymentCategory(id={self.id}, name={self.name}, group_id={self.group_id})>"
 
 
 class Payment(Base):

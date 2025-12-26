@@ -44,9 +44,10 @@ function DashboardPage() {
         }
     };
 
-    const formatCurrency = (amount, currency = 'UAH') => {
+    const formatCurrency = (amount, currency = 'UAH', showAbsolute = false) => {
         const symbol = currencySymbols[currency] || currency;
-        return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
+        return `${symbol}${value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
 
     if (loading) {
@@ -67,13 +68,13 @@ function DashboardPage() {
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12} sm={6} md={3}>
                     <Card sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
                         color: 'white'
                     }}>
                         <CardContent>
                             <Box display="flex" alignItems="center" gap={1}>
                                 <AccountBalance />
-                                <Typography variant="subtitle2">К выплате</Typography>
+                                <Typography variant="subtitle2">Задолженность</Typography>
                             </Box>
                             <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_debt || 0, summary?.currency)}
@@ -200,7 +201,7 @@ function DashboardPage() {
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
                                 <TableCell align="right"><strong>Netto</strong></TableCell>
                                 <TableCell align="right"><strong>Выплачено</strong></TableCell>
-                                <TableCell align="right"><strong>К выплате</strong></TableCell>
+                                <TableCell align="right"><strong>Задолженность</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
                                 <TableCell align="right"><strong>Премия</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
@@ -221,8 +222,8 @@ function DashboardPage() {
                                     <TableCell align="right" sx={{ color: 'success.main' }}>
                                         {formatCurrency(row.paid, row.currency)}
                                     </TableCell>
-                                    <TableCell align="right" sx={{ color: row.to_pay > 0 ? 'error.main' : 'inherit' }}>
-                                        {formatCurrency(row.to_pay, row.currency)}
+                                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: row.to_pay !== 0 ? 700 : 'inherit' }}>
+                                        {formatCurrency(Math.abs(row.to_pay), row.currency)}
                                     </TableCell>
                                     <TableCell align="right">{formatCurrency(row.expenses, row.currency)}</TableCell>
                                     <TableCell align="right">

@@ -53,6 +53,22 @@ def generate_password(length: int = 12) -> str:
             and any(c in "!@#$%" for c in password)):
             return password
 
+
+@router.get("/all")
+async def get_all_users(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Получить список всех пользователей (для выбора в формах)"""
+    result = await db.execute(
+        select(User).where(User.status == "active").order_by(User.full_name)
+    )
+    users = result.scalars().all()
+    return [
+        {"id": u.id, "username": u.username, "full_name": u.full_name}
+        for u in users
+    ]
+
 @router.get("/me")
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user)

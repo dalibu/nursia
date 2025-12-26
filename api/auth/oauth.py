@@ -9,11 +9,19 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.core import get_db
-from database.models import User
+from database.models import User, Contributor, UserRole
 from sqlalchemy import select
 from config.settings import settings
 
 security = HTTPBearer(auto_error=False)
+
+
+async def get_user_contributor(user: User, db: AsyncSession):
+    """Получить Contributor, связанный с User через user_id"""
+    result = await db.execute(
+        select(Contributor).where(Contributor.user_id == user.id, Contributor.is_active == True)
+    )
+    return result.scalar_one_or_none()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

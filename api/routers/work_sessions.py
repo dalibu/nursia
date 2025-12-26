@@ -15,8 +15,8 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, WorkSession, EmploymentRelation, Contributor, Payment, PaymentCategory
-from api.auth.oauth import get_current_user
+from database.models import User, WorkSession, EmploymentRelation, Contributor, Payment, PaymentCategory, UserRole
+from api.auth.oauth import get_current_user, get_user_contributor
 
 router = APIRouter(prefix="/work-sessions", tags=["work-sessions"])
 
@@ -227,8 +227,18 @@ async def get_work_sessions(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+):                                                         
     """Получить список рабочих сессий с фильтрами"""
+    
+    # Автофильтрация для не-админов
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if user_contributor:
+            worker_id = user_contributor.id
+        else:
+            # Нет связанного Contributor — возвращаем пустой результат
+            return []
+    
     query = select(WorkSession).options(
         joinedload(WorkSession.worker),
         joinedload(WorkSession.employer)
@@ -276,13 +286,22 @@ async def get_work_sessions(
 async def get_active_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+):                                    
     """Получить активные рабочие сессии"""
-    result = await db.execute(
-        select(WorkSession)
-        .options(joinedload(WorkSession.worker), joinedload(WorkSession.employer))
-        .where(WorkSession.is_active == True)
-    )
+    
+    # Автофильтрация для не-админов
+    user_contributor = None
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+    
+    query = select(WorkSession).options(
+        joinedload(WorkSession.worker), joinedload(WorkSession.employer)
+    ).where(WorkSession.is_active == True)
+    
+    if user_contributor:
+        query = query.where(WorkSession.worker_id == user_contributor.id)
+    
+    result = await db.execute(query)
     sessions = result.scalars().all()
     
     return [
@@ -315,9 +334,15 @@ async def get_sessions_summary(
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+):                                                       
     """Получить сводку по рабочим сессиям"""
     from utils.timezone import now_server
+    
+    # Автофильтрация для не-админов
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if user_contributor:
+            worker_id = user_contributor.id
     
     now = now_server()
     

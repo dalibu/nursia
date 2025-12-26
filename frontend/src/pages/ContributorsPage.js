@@ -6,15 +6,16 @@ import {
   DialogContent, DialogActions, TextField, DialogContentText, TablePagination,
   Chip, Switch, FormControlLabel, TableSortLabel, MenuItem, Alert
 } from '@mui/material';
-import { Add, Edit, Delete } from '@mui/icons-material';
-import { contributors } from '../services/api';
+import { Add, Edit, Delete, Person } from '@mui/icons-material';
+import { contributors, users } from '../services/api';
 
 function ContributorsPage() {
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ name: '', type: '', description: '', is_active: true });
+  const [formData, setFormData] = useState({ name: '', type: '', description: '', is_active: true, user_id: '' });
+  const [usersList, setUsersList] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [sortField, setSortField] = useState('id');
@@ -25,7 +26,17 @@ function ContributorsPage() {
 
   useEffect(() => {
     loadContributors();
+    loadUsers();
   }, []);
+
+  const loadUsers = async () => {
+    try {
+      const response = await users.listAll();
+      setUsersList(response.data);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
 
   useEffect(() => {
     const editId = searchParams.get('edit');
@@ -37,7 +48,8 @@ function ContributorsPage() {
           name: itemToEdit.name,
           type: itemToEdit.type,
           description: itemToEdit.description || '',
-          is_active: itemToEdit.is_active !== false
+          is_active: itemToEdit.is_active !== false,
+          user_id: itemToEdit.user_id || ''
         });
         setShowForm(true);
       }
@@ -79,6 +91,7 @@ function ContributorsPage() {
       type: item.type,
       description: item.description || '',
       is_active: item.is_active,
+      user_id: item.user_id || ''
     });
     setShowForm(true);
   };
@@ -86,7 +99,7 @@ function ContributorsPage() {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingItem(null);
-    setFormData({ name: '', type: '', description: '', is_active: true });
+    setFormData({ name: '', type: '', description: '', is_active: true, user_id: '' });
   };
 
   const handleToggleActive = async (item) => {
@@ -278,6 +291,7 @@ function ContributorsPage() {
                 </TableSortLabel>
               </TableCell>
               <TableCell>Описание</TableCell>
+              <TableCell>Связан с User</TableCell>
               <TableCell>Активен</TableCell>
               <TableCell>
                 <TableSortLabel
@@ -309,6 +323,13 @@ function ContributorsPage() {
                   <TableCell>{item.name}</TableCell>
                   <TableCell>{item.type}</TableCell>
                   <TableCell>{item.description || '-'}</TableCell>
+                  <TableCell>
+                    {item.user_name ? (
+                      <Chip icon={<Person />} label={item.user_name} size="small" color="primary" />
+                    ) : (
+                      <span style={{ color: '#999' }}>—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={item.is_active ? 'Активен' : 'Неактивен'}
@@ -380,6 +401,22 @@ function ContributorsPage() {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
+            <TextField
+              select
+              fullWidth
+              label="Связать с пользователем"
+              margin="normal"
+              value={formData.user_id}
+              onChange={(e) => setFormData({ ...formData, user_id: e.target.value || null })}
+              helperText="Пользователь будет видеть только данные этого участника"
+            >
+              <MenuItem value="">Не связан</MenuItem>
+              {usersList.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.full_name} (@{user.username})
+                </MenuItem>
+              ))}
+            </TextField>
             <FormControlLabel
               control={
                 <Switch

@@ -32,6 +32,10 @@ export const auth = {
   me: () => api.get('/auth/me'),
 };
 
+export const users = {
+  listAll: () => api.get('/users/all'),
+};
+
 export const payments = {
   list: (params) => api.get('/payments/', { params }),
   create: (data) => api.post('/payments/', data),
@@ -42,6 +46,11 @@ export const payments = {
   createCategory: (data) => api.post('/payments/categories', data),
   updateCategory: (id, data) => api.put(`/payments/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/payments/categories/${id}`),
+  // Category groups
+  groups: () => api.get('/payments/groups'),
+  createGroup: (data) => api.post('/payments/groups', data),
+  updateGroup: (id, data) => api.put(`/payments/groups/${id}`, data),
+  deleteGroup: (id) => api.delete(`/payments/groups/${id}`),
   getUserInfo: () => api.get('/auth/me'),
 };
 

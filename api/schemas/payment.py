@@ -4,8 +4,30 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+# Payment Category Group schemas
+class PaymentCategoryGroupBase(BaseModel):
+    name: str = Field(..., max_length=100)
+    color: str = Field(default="#808080", max_length=7)
+    emoji: str = Field(default="💰", max_length=10)
+    is_active: bool = True
+
+
+class PaymentCategoryGroupCreate(PaymentCategoryGroupBase):
+    pass
+
+
+class PaymentCategoryGroupResponse(PaymentCategoryGroupBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Payment Category schemas
 class PaymentCategoryBase(BaseModel):
     name: str = Field(..., max_length=100)
+    group_id: Optional[int] = None
     description: Optional[str] = None
 
 
@@ -16,6 +38,7 @@ class PaymentCategoryCreate(PaymentCategoryBase):
 class PaymentCategory(PaymentCategoryBase):
     id: int
     created_at: datetime
+    category_group: Optional[PaymentCategoryGroupResponse] = None
 
     class Config:
         from_attributes = True

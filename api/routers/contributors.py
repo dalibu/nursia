@@ -37,14 +37,33 @@ async def get_contributors(
     return contributors
 
 
-@router.get("/admin", response_model=List[ContributorSchema])
+@router.get("/admin")
 async def get_contributors_admin(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_admin_user)
 ):
-    """Полный список участников для админки."""
-    result = await db.execute(select(Contributor).order_by(Contributor.name))
-    return result.scalars().all()
+    """Полный список участников для админки с именами связанных пользователей."""
+    from sqlalchemy.orm import joinedload
+    
+    result = await db.execute(
+        select(Contributor).options(joinedload(Contributor.user)).order_by(Contributor.name)
+    )
+    contributors = result.scalars().all()
+    
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "type": c.type,
+            "description": c.description,
+            "is_active": c.is_active,
+            "user_id": c.user_id,
+            "user_name": c.user.full_name if c.user else None,
+            "created_at": c.created_at,
+            "changed_at": c.changed_at
+        }
+        for c in contributors
+    ]
 
 
 @router.post("/", response_model=ContributorSchema)
