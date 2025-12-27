@@ -21,7 +21,7 @@ class UserStatusType(str, Enum):
     BLOCKED = "blocked"
     RESETED = "reseted"
 
-class SessionType(str, Enum):
+class TaskType(str, Enum):
     WORK = "work"
     PAUSE = "pause"
 
@@ -130,13 +130,13 @@ class Payment(Base):
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_paid: Mapped[bool] = mapped_column(default=False)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    work_session_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_sessions.id"), nullable=True)
+    assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assignments.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     payer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[payer_id])
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
     recipient: Mapped[Optional["Contributor"]] = relationship("Contributor", foreign_keys=[recipient_id], back_populates="payments")
-    work_session: Mapped[Optional["WorkSession"]] = relationship("WorkSession", back_populates="payment")
+    assignment: Mapped[Optional["Assignment"]] = relationship("Assignment", back_populates="payment")
 
     def __repr__(self) -> str:
         return f"<Payment(id={self.id}, amount={self.amount}, category_id={self.category_id})>"
@@ -209,29 +209,64 @@ class EmploymentRelation(Base):
         return f"<EmploymentRelation(employer={self.employer_id}, employee={self.employee_id}, rate={self.hourly_rate})>"
 
 
-class WorkSession(Base):
-    """Рабочая сессия: начало и конец работы"""
-    __tablename__ = "work_sessions"
+class Assignment(Base):
+    """Посещение/смена - родительская сущность для tasks"""
+    __tablename__ = "assignments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    worker_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает (Е)
-    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанял (А)
-    session_date: Mapped[date] = mapped_column(Date)  # Дата работы
-    start_time: Mapped[time] = mapped_column(Time)  # Время начала
-    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)  # Время окончания
-    duration_hours: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)  # Длительность в часах
+    worker_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает
+    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанял
+    assignment_date: Mapped[date] = mapped_column(Date)  # Дата работы
     hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # Ставка за час
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
-    amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)  # duration × rate
     is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
-    session_type: Mapped[str] = mapped_column(String(10), default="work")  # work или pause
-    assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_sessions.id"), nullable=True)  # ID первой сессии в цепочке
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     worker: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[worker_id])
     employer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employer_id])
-    payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="work_session", uselist=False)
+    tasks: Mapped[list["Task"]] = relationship("Task", back_populates="assignment", order_by="Task.start_time")
+    payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="assignment", uselist=False)
 
     def __repr__(self) -> str:
-        return f"<WorkSession(id={self.id}, date={self.session_date}, worker={self.worker_id})>"
+        return f"<Assignment(id={self.id}, date={self.assignment_date}, worker={self.worker_id})>"
+
+
+class Task(Base):
+    """Рабочий или паузный сегмент внутри assignment"""
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"))
+    start_time: Mapped[time] = mapped_column(Time)  # Время начала
+    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)  # Время окончания
+    task_type: Mapped[str] = mapped_column(String(10), default="work")  # work или pause
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    assignment: Mapped["Assignment"] = relationship("Assignment", back_populates="tasks")
+
+    @property
+    def duration_seconds(self) -> int:
+        """Вычисляемая длительность в секундах"""
+        if not self.end_time or not self.start_time:
+            return 0
+        from datetime import datetime as dt
+        start = dt.combine(dt.today(), self.start_time)
+        end = dt.combine(dt.today(), self.end_time)
+        return int((end - start).total_seconds())
+
+    @property
+    def duration_hours(self) -> float:
+        """Вычисляемая длительность в часах"""
+        return self.duration_seconds / 3600
+
+    @property
+    def amount(self) -> Decimal:
+        """Вычисляемая сумма (только для work)"""
+        if self.task_type != "work" or not self.assignment:
+            return Decimal(0)
+        hours = Decimal(str(self.duration_hours))
+        return hours * self.assignment.hourly_rate
+
+    def __repr__(self) -> str:
+        return f"<Task(id={self.id}, type={self.task_type}, start={self.start_time})>"

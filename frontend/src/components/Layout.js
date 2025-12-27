@@ -87,7 +87,7 @@ function Layout({ onLogout }) {
   const checkActiveSession = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/work-sessions/active', {
+      const response = await axios.get('/api/assignments/active', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data && response.data.length > 0) {
@@ -104,7 +104,7 @@ function Layout({ onLogout }) {
     if (!activeSession) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`/api/work-sessions/${activeSession.id}/stop`, {}, {
+      await axios.post(`/api/assignments/${activeSession.id}/stop`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setActiveSession(null);
@@ -118,7 +118,7 @@ function Layout({ onLogout }) {
     try {
       const token = localStorage.getItem('token');
       const endpoint = activeSession.session_type === 'pause' ? 'resume' : 'pause';
-      await axios.post(`/api/work-sessions/${activeSession.id}/${endpoint}`, {}, {
+      await axios.post(`/api/assignments/${activeSession.id}/${endpoint}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Refresh to get correct aggregated times
@@ -140,7 +140,7 @@ function Layout({ onLogout }) {
     if (!activeSession) return { work: '00:00:00', pause: '00:00:00' };
 
     // Calculate current segment time
-    const dateTimeStr = `${activeSession.session_date}T${activeSession.start_time}`;
+    const dateTimeStr = `${activeSession.assignment_date}T${activeSession.start_time}`;
     const start = new Date(dateTimeStr);
     const now = currentTime;
     const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));

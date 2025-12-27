@@ -14,7 +14,7 @@ from sqlalchemy import select, func, and_, case
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Payment, WorkSession, Contributor, UserRole, PaymentCategory, PaymentCategoryGroup
+from database.models import User, Payment, Assignment, Task, Contributor, UserRole, PaymentCategory, PaymentCategoryGroup
 from api.auth.oauth import get_current_user, get_user_contributor
 
 router = APIRouter(prefix="/balances", tags=["balances"])
@@ -237,32 +237,80 @@ async def get_monthly_summary(
         else:
             end_date = date(year, month + 1, 1) - timedelta(days=1)
         
-        # Рабочие сессии за месяц
+        # Рабочие сессии за месяц (из Assignment + Task)
         sessions_query = select(
-            func.count(WorkSession.id).label("visits"),
-            func.sum(WorkSession.duration_hours).label("hours"),
-            func.sum(WorkSession.amount).label("netto"),
-            WorkSession.currency
-        ).where(
+            func.count(func.distinct(Assignment.id)).label("visits"),
+            Assignment.currency
+        ).select_from(Assignment).join(Task).where(
             and_(
-                WorkSession.session_date >= start_date,
-                WorkSession.session_date <= end_date,
-                WorkSession.is_active == False
+                Assignment.assignment_date >= start_date,
+                Assignment.assignment_date <= end_date,
+                Assignment.is_active == False,
+                Task.task_type == "work",
+                Task.end_time != None
             )
-        ).group_by(WorkSession.currency)
+        ).group_by(Assignment.currency)
         
         if worker_id:
-            sessions_query = sessions_query.where(WorkSession.worker_id == worker_id)
+            sessions_query = sessions_query.where(Assignment.worker_id == worker_id)
         if employer_id:
-            sessions_query = sessions_query.where(WorkSession.employer_id == employer_id)
+            sessions_query = sessions_query.where(Assignment.employer_id == employer_id)
         
         result = await db.execute(sessions_query)
         session_row = result.first()
         
         visits = session_row.visits if session_row else 0
-        hours = float(session_row.hours) if session_row and session_row.hours else 0
-        salary = float(session_row.netto) if session_row and session_row.netto else 0  # Зарплата только из work_sessions
         currency = session_row.currency if session_row else "UAH"
+        
+        # Подсчёт часов и суммы отдельным запросом
+        hours_query = select(
+            func.sum(
+                (func.julianday(
+                    func.datetime(Assignment.assignment_date, Task.end_time)
+                ) - func.julianday(
+                    func.datetime(Assignment.assignment_date, Task.start_time)
+                )) * 24
+            ).label("hours")
+        ).select_from(Task).join(Assignment).where(
+            and_(
+                Assignment.assignment_date >= start_date,
+                Assignment.assignment_date <= end_date,
+                Assignment.is_active == False,
+                Task.task_type == "work",
+                Task.end_time != None
+            )
+        )
+        
+        if worker_id:
+            hours_query = hours_query.where(Assignment.worker_id == worker_id)
+        if employer_id:
+            hours_query = hours_query.where(Assignment.employer_id == employer_id)
+        
+        result = await db.execute(hours_query)
+        hours_row = result.first()
+        hours = float(hours_row.hours) if hours_row and hours_row.hours else 0
+        
+        # Зарплата из payments, связанных с assignments
+        salary_query = select(
+            func.sum(Payment.amount).label("salary")
+        ).select_from(Payment).join(
+            Assignment, Assignment.id == Payment.assignment_id
+        ).where(
+            and_(
+                Assignment.assignment_date >= start_date,
+                Assignment.assignment_date <= end_date,
+                Payment.category_id == 3  # Зарплата
+            )
+        )
+        
+        if worker_id:
+            salary_query = salary_query.where(Assignment.worker_id == worker_id)
+        if employer_id:
+            salary_query = salary_query.where(Assignment.employer_id == employer_id)
+        
+        result = await db.execute(salary_query)
+        salary_row = result.first()
+        salary = float(salary_row.salary) if salary_row and salary_row.salary else 0
         
         # Кредит — оплаченные платежи из группы "Долги"
         paid_query = select(

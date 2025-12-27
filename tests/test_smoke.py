@@ -13,12 +13,14 @@ def test_models_import():
     """Все модели импортируются без ошибок"""
     from database.models import (
         User, Payment, PaymentCategory, PaymentCategoryGroup,
-        Contributor, Currency, WorkSession
+        Contributor, Currency, Assignment, Task
     )
     assert User.__tablename__ == "users"
     assert Payment.__tablename__ == "payments"
     assert PaymentCategory.__tablename__ == "payment_categories"
     assert PaymentCategoryGroup.__tablename__ == "payment_category_groups"
+    assert Assignment.__tablename__ == "assignments"
+    assert Task.__tablename__ == "tasks"
 
 
 def test_schemas_import():
@@ -37,10 +39,11 @@ def test_routers_import():
     from api.routers.balances import router as balances_router
     from api.routers.contributors import router as contributors_router
     from api.routers.currencies import router as currencies_router
-    from api.routers.work_sessions import router as work_sessions_router
+    from api.routers.assignments import router as assignments_router
     
     assert payments_router is not None
     assert balances_router is not None
+    assert assignments_router is not None
 
 
 def test_app_import():

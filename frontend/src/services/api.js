@@ -71,15 +71,15 @@ export const currencies = {
   delete: (id) => api.delete(`/currencies/${id}`)
 };
 
-export const workSessions = {
-  start: (data) => api.post('/work-sessions/start', data),
-  stop: (id) => api.post(`/work-sessions/${id}/stop`),
-  pause: (id) => api.post(`/work-sessions/${id}/pause`),
-  resume: (id) => api.post(`/work-sessions/${id}/resume`),
-  list: (params) => api.get('/work-sessions/', { params }),
-  getGrouped: (params) => api.get('/work-sessions/grouped', { params }),
-  getActive: () => api.get('/work-sessions/active'),
-  getSummary: (params) => api.get('/work-sessions/summary', { params })
+export const assignments = {
+  start: (data) => api.post('/assignments/start', data),
+  stop: (id) => api.post(`/assignments/${id}/stop`),
+  pause: (id) => api.post(`/assignments/${id}/pause`),
+  resume: (id) => api.post(`/assignments/${id}/resume`),
+  list: (params) => api.get('/assignments/', { params }),
+  getGrouped: (params) => api.get('/assignments/grouped', { params }),
+  getActive: () => api.get('/assignments/active'),
+  getSummary: (params) => api.get('/assignments/summary', { params })
 };
 
 export const employment = {

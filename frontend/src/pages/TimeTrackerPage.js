@@ -10,7 +10,7 @@ import {
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp
 } from '@mui/icons-material';
-import { workSessions, employment, contributors, payments } from '../services/api';
+import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
 
 // Символы валют
 const currencySymbols = {
@@ -22,7 +22,7 @@ const currencySymbols = {
 
 function TimeTrackerPage() {
     const [loading, setLoading] = useState(true);
-    const [assignments, setAssignments] = useState([]);  // Grouped sessions
+    const [groupedAssignments, setGroupedAssignments] = useState([]);  // Grouped sessions
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
     const [contributorsList, setContributorsList] = useState([]);
@@ -38,7 +38,7 @@ function TimeTrackerPage() {
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editSession, setEditSession] = useState(null);
     const [editForm, setEditForm] = useState({
-        session_date: '',
+        assignment_date: '',
         start_time: '',
         end_time: '',
         description: ''
@@ -69,13 +69,13 @@ function TimeTrackerPage() {
         setLoading(true);
         try {
             const [groupedRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
-                workSessions.getGrouped({ period }),
-                workSessions.getActive(),
-                employment.list({ is_active: true }),
-                contributors.list(),
-                payments.getUserInfo()
+                assignmentsService.getGrouped({ period }),
+                assignmentsService.getActive(),
+                employmentService.list({ is_active: true }),
+                contributorsService.list(),
+                paymentsService.getUserInfo()
             ]);
-            setAssignments(groupedRes.data);
+            setGroupedAssignments(groupedRes.data);
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setContributorsList(contribRes.data);
@@ -89,7 +89,7 @@ function TimeTrackerPage() {
 
     const loadSummary = async () => {
         try {
-            const res = await workSessions.getSummary({ period });
+            const res = await assignmentsService.getSummary({ period });
             setSummary(res.data);
         } catch (error) {
             console.error('Failed to load summary:', error);
@@ -101,7 +101,7 @@ function TimeTrackerPage() {
         if (!isAdmin && employmentList.length === 1) {
             const emp = employmentList[0];
             try {
-                await workSessions.start({
+                await assignmentsService.start({
                     worker_id: emp.employee_id,
                     employer_id: emp.employer_id
                 });
@@ -121,7 +121,7 @@ function TimeTrackerPage() {
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
         try {
-            await workSessions.start({
+            await assignmentsService.start({
                 worker_id: emp.employee_id,
                 employer_id: emp.employer_id
             });
@@ -136,7 +136,7 @@ function TimeTrackerPage() {
 
     const handleStopSession = async (sessionId) => {
         try {
-            await workSessions.stop(sessionId);
+            await assignmentsService.stop(sessionId);
             loadData();
             loadSummary();
         } catch (error) {
@@ -148,7 +148,7 @@ function TimeTrackerPage() {
     const handlePauseResume = async (session) => {
         try {
             const endpoint = session.session_type === 'pause' ? 'resume' : 'pause';
-            await workSessions[endpoint](session.id);
+            await assignmentsService[endpoint](session.id);
             loadData();
         } catch (error) {
             console.error('Failed to toggle pause:', error);
@@ -159,7 +159,7 @@ function TimeTrackerPage() {
     const handleEditClick = (session) => {
         setEditSession(session);
         setEditForm({
-            session_date: session.session_date,
+            assignment_date: session.assignment_date,
             start_time: session.start_time?.substring(0, 5) || '',
             end_time: session.end_time?.substring(0, 5) || '',
             description: session.description || ''
@@ -172,14 +172,14 @@ function TimeTrackerPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await fetch(`/api/work-sessions/${editSession.id}`, {
+            await fetch(`/api/assignments/${editSession.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    session_date: editForm.session_date,
+                    assignment_date: editForm.assignment_date,
                     start_time: editForm.start_time ? editForm.start_time + ':00' : null,
                     end_time: editForm.end_time ? editForm.end_time + ':00' : null,
                     description: editForm.description || null
@@ -206,7 +206,7 @@ function TimeTrackerPage() {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/work-sessions/${sessionToDelete}`, {
+            const response = await fetch(`/api/assignments/${sessionToDelete}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -255,7 +255,7 @@ function TimeTrackerPage() {
 
     // Calculate real-time session times (same logic as header)
     const getSessionTimes = (session) => {
-        const dateTimeStr = `${session.session_date}T${session.start_time}`;
+        const dateTimeStr = `${session.assignment_date}T${session.start_time}`;
         const start = new Date(dateTimeStr);
         const now = currentTime;
         const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));
@@ -446,7 +446,7 @@ function TimeTrackerPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {assignments.map((assignment) => (
+                            {groupedAssignments.map((assignment) => (
                                 <React.Fragment key={assignment.assignment_id}>
                                     {/* Main assignment row */}
                                     <TableRow
@@ -465,7 +465,7 @@ function TimeTrackerPage() {
                                                 {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
                                             </IconButton>
                                         </TableCell>
-                                        <TableCell><strong>{formatDate(assignment.session_date)}</strong></TableCell>
+                                        <TableCell><strong>{formatDate(assignment.assignment_date)}</strong></TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
                                         <TableCell align="center">{formatTime(assignment.start_time)}</TableCell>
                                         <TableCell align="center">{assignment.end_time ? formatTime(assignment.end_time) : '—'}</TableCell>
@@ -590,8 +590,8 @@ function TimeTrackerPage() {
                         fullWidth
                         type="date"
                         label="Дата"
-                        value={editForm.session_date}
-                        onChange={(e) => setEditForm({ ...editForm, session_date: e.target.value })}
+                        value={editForm.assignment_date}
+                        onChange={(e) => setEditForm({ ...editForm, assignment_date: e.target.value })}
                         sx={{ mt: 2 }}
                         InputLabelProps={{ shrink: true }}
                     />
