@@ -77,6 +77,7 @@ export const workSessions = {
   pause: (id) => api.post(`/work-sessions/${id}/pause`),
   resume: (id) => api.post(`/work-sessions/${id}/resume`),
   list: (params) => api.get('/work-sessions/', { params }),
+  getGrouped: (params) => api.get('/work-sessions/grouped', { params }),
   getActive: () => api.get('/work-sessions/active'),
   getSummary: (params) => api.get('/work-sessions/summary', { params })
 };

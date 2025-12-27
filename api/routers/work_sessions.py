@@ -60,6 +60,25 @@ class WorkSessionSummary(BaseModel):
     currency: str
 
 
+class AssignmentResponse(BaseModel):
+    """Группировка сегментов по assignment"""
+    assignment_id: int
+    session_date: date
+    worker_id: int
+    worker_name: Optional[str] = None
+    employer_id: int
+    employer_name: Optional[str] = None
+    start_time: time  # Начало первого сегмента
+    end_time: Optional[time] = None  # Конец последнего сегмента
+    total_work_seconds: int
+    total_pause_seconds: int
+    total_hours: float
+    total_amount: float
+    currency: str
+    is_active: bool
+    segments: List[WorkSessionResponse] = []  # Все сегменты (work + pause)
+
+
 class WorkSessionUpdate(BaseModel):
     """Обновление рабочей сессии"""
     session_date: Optional[date] = None
@@ -403,6 +422,132 @@ async def get_work_sessions(
     ]
 
 
+@router.get("/grouped", response_model=List[AssignmentResponse])
+async def get_grouped_sessions(
+    worker_id: Optional[int] = Query(None),
+    employer_id: Optional[int] = Query(None),
+    period: str = Query("month", regex="^(day|week|month|year)$"),
+    limit: int = Query(50, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получить сессии сгруппированные по assignment_id"""
+    from utils.timezone import now_server
+    now = now_server()
+    
+    # Calculate date range
+    if period == "day":
+        start_date = now.date()
+    elif period == "week":
+        start_date = now.date() - timedelta(days=7)
+    elif period == "month":
+        start_date = now.date().replace(day=1)
+    else:
+        start_date = now.date().replace(month=1, day=1)
+    
+    # Get all sessions in date range
+    query = select(WorkSession).options(
+        joinedload(WorkSession.worker), joinedload(WorkSession.employer)
+    ).where(
+        WorkSession.session_date >= start_date
+    ).order_by(WorkSession.assignment_id, WorkSession.start_time)
+    
+    if worker_id:
+        query = query.where(WorkSession.worker_id == worker_id)
+    if employer_id:
+        query = query.where(WorkSession.employer_id == employer_id)
+    
+    # Auto-filter for non-admins
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if user_contributor:
+            query = query.where(WorkSession.worker_id == user_contributor.id)
+    
+    result = await db.execute(query)
+    all_sessions = result.scalars().all()
+    
+    # Group by assignment_id
+    from collections import defaultdict
+    assignments = defaultdict(list)
+    for s in all_sessions:
+        if s.assignment_id:
+            assignments[s.assignment_id].append(s)
+    
+    # Build response
+    responses = []
+    for assignment_id, segments in sorted(assignments.items(), key=lambda x: (x[1][0].session_date, x[1][0].start_time) if x[1] else (now.date(), now.time()), reverse=True):
+        if not segments:
+            continue
+        
+        # Calculate totals
+        total_work_seconds = 0
+        total_pause_seconds = 0
+        total_amount = 0
+        is_active = False
+        
+        for seg in segments:
+            if seg.duration_hours:
+                seg_seconds = int(float(seg.duration_hours) * 3600)
+            elif seg.is_active:
+                is_active = True
+                start_dt = datetime.combine(seg.session_date, seg.start_time)
+                seg_seconds = int((now - start_dt).total_seconds())
+            else:
+                seg_seconds = 0
+            
+            if seg.session_type == "work":
+                total_work_seconds += seg_seconds
+                if seg.amount:
+                    total_amount += float(seg.amount)
+            else:
+                total_pause_seconds += seg_seconds
+        
+        first_seg = segments[0]
+        last_seg = segments[-1]
+        
+        segment_responses = [
+            WorkSessionResponse(
+                id=seg.id,
+                worker_id=seg.worker_id,
+                employer_id=seg.employer_id,
+                session_date=seg.session_date,
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+                duration_hours=float(seg.duration_hours) if seg.duration_hours else None,
+                hourly_rate=float(seg.hourly_rate),
+                currency=seg.currency,
+                amount=float(seg.amount) if seg.amount else None,
+                is_active=seg.is_active,
+                session_type=seg.session_type,
+                assignment_id=seg.assignment_id,
+                description=seg.description,
+                worker_name=seg.worker.name if seg.worker else None,
+                employer_name=seg.employer.name if seg.employer else None
+            )
+            for seg in reversed(segments)
+        ]
+        
+        responses.append(AssignmentResponse(
+            assignment_id=assignment_id,
+            session_date=first_seg.session_date,
+            worker_id=first_seg.worker_id,
+            worker_name=first_seg.worker.name if first_seg.worker else None,
+            employer_id=first_seg.employer_id,
+            employer_name=first_seg.employer.name if first_seg.employer else None,
+            start_time=first_seg.start_time,
+            end_time=last_seg.end_time if not is_active else None,
+            total_work_seconds=total_work_seconds,
+            total_pause_seconds=total_pause_seconds,
+            total_hours=round(total_work_seconds / 3600, 2),
+            total_amount=total_amount,
+            currency=first_seg.currency,
+            is_active=is_active,
+            segments=segment_responses
+        ))
+    
+    return responses[:limit]
+
+
 @router.get("/active")
 async def get_active_sessions(
     db: AsyncSession = Depends(get_db),
@@ -517,7 +662,7 @@ async def get_sessions_summary(
         end_date = now.date()
     
     query = select(
-        func.count(WorkSession.id).label("total_sessions"),
+        func.count(func.distinct(WorkSession.assignment_id)).label("total_sessions"),
         func.sum(WorkSession.duration_hours).label("total_hours"),
         func.sum(WorkSession.amount).label("total_amount"),
         WorkSession.currency
@@ -525,7 +670,8 @@ async def get_sessions_summary(
         and_(
             WorkSession.session_date >= start_date,
             WorkSession.session_date <= end_date,
-            WorkSession.is_active == False  # Только завершённые сессии
+            WorkSession.is_active == False,  # Только завершённые сессии
+            WorkSession.session_type == "work"  # Только рабочие сегменты
         )
     ).group_by(WorkSession.currency)
     

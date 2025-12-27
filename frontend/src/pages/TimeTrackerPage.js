@@ -3,11 +3,12 @@ import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, IconButton
+    DialogContent, DialogActions, Alert, IconButton, Collapse
 } from '@mui/material';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
-    Refresh, Timer, Edit, Delete, Pause, Coffee
+    Refresh, Timer, Edit, Delete, Pause, Coffee,
+    KeyboardArrowDown, KeyboardArrowUp
 } from '@mui/icons-material';
 import { workSessions, employment, contributors, payments } from '../services/api';
 
@@ -21,7 +22,7 @@ const currencySymbols = {
 
 function TimeTrackerPage() {
     const [loading, setLoading] = useState(true);
-    const [sessions, setSessions] = useState([]);
+    const [assignments, setAssignments] = useState([]);  // Grouped sessions
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
     const [contributorsList, setContributorsList] = useState([]);
@@ -43,6 +44,13 @@ function TimeTrackerPage() {
         description: ''
     });
 
+    // Expanded rows state
+    const [expandedRows, setExpandedRows] = useState({});
+
+    // Delete confirmation dialog
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [sessionToDelete, setSessionToDelete] = useState(null);
+
     // Timer for active sessions
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -53,20 +61,21 @@ function TimeTrackerPage() {
     }, []);
 
     useEffect(() => {
+        loadData();
         loadSummary();
     }, [period]);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const [sessionsRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
-                workSessions.list({ limit: 50 }),
+            const [groupedRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
+                workSessions.getGrouped({ period }),
                 workSessions.getActive(),
                 employment.list({ is_active: true }),
                 contributors.list(),
                 payments.getUserInfo()
             ]);
-            setSessions(sessionsRes.data);
+            setAssignments(groupedRes.data);
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setContributorsList(contribRes.data);
@@ -186,12 +195,18 @@ function TimeTrackerPage() {
         }
     };
 
-    const handleDeleteSession = async (sessionId) => {
-        if (!window.confirm('Удалить эту сессию?')) return;
+    const handleDeleteClick = (sessionId, e) => {
+        if (e) e.stopPropagation();
+        setSessionToDelete(sessionId);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!sessionToDelete) return;
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/work-sessions/${sessionId}`, {
+            const response = await fetch(`/api/work-sessions/${sessionToDelete}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -204,6 +219,9 @@ function TimeTrackerPage() {
         } catch (error) {
             console.error('Failed to delete session:', error);
             alert(error.message || 'Ошибка при удалении');
+        } finally {
+            setDeleteDialogOpen(false);
+            setSessionToDelete(null);
         }
     };
 
@@ -215,6 +233,12 @@ function TimeTrackerPage() {
     const formatTime = (timeStr) => {
         if (!timeStr) return '—';
         return timeStr.substring(0, 5);
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '—';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}.${month}.${year}`;
     };
 
     const formatDuration = (startTime, startDate) => {
@@ -407,66 +431,111 @@ function TimeTrackerPage() {
                 </Box>
 
                 <TableContainer>
-                    <Table>
+                    <Table size="small">
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                <TableCell width={40}></TableCell>
                                 <TableCell><strong>Дата</strong></TableCell>
                                 <TableCell><strong>Работник</strong></TableCell>
                                 <TableCell align="center"><strong>Начало</strong></TableCell>
                                 <TableCell align="center"><strong>Конец</strong></TableCell>
-                                <TableCell align="right"><strong>Часы</strong></TableCell>
-                                <TableCell align="right"><strong>Ставка</strong></TableCell>
+                                <TableCell align="right"><strong>⏱ Работа</strong></TableCell>
+                                <TableCell align="right"><strong>☕ Пауза</strong></TableCell>
                                 <TableCell align="right"><strong>Сумма</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
-                                <TableCell align="center"><strong></strong></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {sessions.map((session) => (
-                                <TableRow
-                                    key={session.id}
-                                    sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
-                                >
-                                    <TableCell>
-                                        <strong>{session.session_date}</strong>
-                                    </TableCell>
-                                    <TableCell>{session.worker_name}</TableCell>
-                                    <TableCell align="center">{formatTime(session.start_time)}</TableCell>
-                                    <TableCell align="center">{formatTime(session.end_time)}</TableCell>
-                                    <TableCell align="right">
-                                        {session.duration_hours ? session.duration_hours.toFixed(2) : '—'}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {formatCurrency(session.hourly_rate, session.currency)}/ч
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {session.amount ? formatCurrency(session.amount, session.currency) : '—'}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {session.is_active ? (
-                                            <Chip label="В работе" color="warning" size="small" />
-                                        ) : (
-                                            <Chip label="Завершено" color="success" size="small" />
-                                        )}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleEditClick(session)}
-                                            title="Редактировать"
-                                        >
-                                            <Edit fontSize="small" />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleDeleteSession(session.id)}
-                                            title="Удалить"
-                                            color="error"
-                                        >
-                                            <Delete fontSize="small" />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
+                            {assignments.map((assignment) => (
+                                <React.Fragment key={assignment.assignment_id}>
+                                    {/* Main assignment row */}
+                                    <TableRow
+                                        sx={{
+                                            '&:hover': { backgroundColor: '#f9f9f9' },
+                                            cursor: 'pointer',
+                                            backgroundColor: assignment.is_active ? '#e8f5e9' : 'inherit'
+                                        }}
+                                        onClick={() => setExpandedRows(prev => ({
+                                            ...prev,
+                                            [assignment.assignment_id]: !prev[assignment.assignment_id]
+                                        }))}
+                                    >
+                                        <TableCell>
+                                            <IconButton size="small">
+                                                {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                                            </IconButton>
+                                        </TableCell>
+                                        <TableCell><strong>{formatDate(assignment.session_date)}</strong></TableCell>
+                                        <TableCell>{assignment.worker_name}</TableCell>
+                                        <TableCell align="center">{formatTime(assignment.start_time)}</TableCell>
+                                        <TableCell align="center">{assignment.end_time ? formatTime(assignment.end_time) : '—'}</TableCell>
+                                        <TableCell align="right" sx={{ color: '#4caf50', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                            {Math.floor(assignment.total_work_seconds / 3600)}:{String(Math.floor((assignment.total_work_seconds % 3600) / 60)).padStart(2, '0')}
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ color: '#ff9800', fontFamily: 'monospace' }}>
+                                            {Math.floor(assignment.total_pause_seconds / 3600)}:{String(Math.floor((assignment.total_pause_seconds % 3600) / 60)).padStart(2, '0')}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            {formatCurrency(assignment.total_amount, assignment.currency)}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {assignment.is_active ? (
+                                                <Chip label="В работе" color="warning" size="small" />
+                                            ) : (
+                                                <Chip label="Завершено" color="success" size="small" />
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+
+                                    {/* Expandable segments */}
+                                    <TableRow>
+                                        <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                                            <Collapse in={expandedRows[assignment.assignment_id]} timeout="auto" unmountOnExit>
+                                                <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
+                                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Сегменты:</Typography>
+                                                    <Table size="small">
+                                                        <TableBody>
+                                                            {assignment.segments.map((seg) => (
+                                                                <TableRow key={seg.id} sx={{
+                                                                    backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : '#e8f5e9'
+                                                                }}>
+                                                                    <TableCell width={80}>
+                                                                        <Chip
+                                                                            label={seg.session_type === 'pause' ? '☕ Пауза' : '⏱ Работа'}
+                                                                            size="small"
+                                                                            sx={{
+                                                                                backgroundColor: seg.session_type === 'pause' ? '#ff9800' : '#4caf50',
+                                                                                color: 'white'
+                                                                            }}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>{formatTime(seg.start_time)} — {seg.end_time ? formatTime(seg.end_time) : 'сейчас'}</TableCell>
+                                                                    <TableCell>
+                                                                        {seg.duration_hours ? `${seg.duration_hours.toFixed(2)} ч` : '—'}
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        {seg.amount ? formatCurrency(seg.amount, seg.currency) : '—'}
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ fontStyle: 'italic', color: '#666' }}>
+                                                                        {seg.description || ''}
+                                                                    </TableCell>
+                                                                    <TableCell align="right">
+                                                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(seg); }}>
+                                                                            <Edit fontSize="small" />
+                                                                        </IconButton>
+                                                                        <IconButton size="small" color="error" onClick={(e) => handleDeleteClick(seg.id, e)}>
+                                                                            <Delete fontSize="small" />
+                                                                        </IconButton>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </Box>
+                                            </Collapse>
+                                        </TableCell>
+                                    </TableRow>
+                                </React.Fragment>
                             ))}
                         </TableBody>
                     </Table>
@@ -558,6 +627,51 @@ function TimeTrackerPage() {
                     <Button onClick={() => setEditDialogOpen(false)}>Отмена</Button>
                     <Button variant="contained" onClick={handleEditSave}>
                         Сохранить
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        minWidth: 350
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #ff5252 0%, #f44336 100%)',
+                    color: 'white',
+                    fontWeight: 'bold'
+                }}>
+                    🗑️ Удаление сегмента
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                        Вы уверены, что хотите удалить этот сегмент?
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Это действие нельзя отменить.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setDeleteDialogOpen(false)}
+                        sx={{ borderRadius: 2, minWidth: 100 }}
+                    >
+                        Отмена
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDeleteConfirm}
+                        sx={{ borderRadius: 2, minWidth: 100 }}
+                    >
+                        Удалить
                     </Button>
                 </DialogActions>
             </Dialog>
