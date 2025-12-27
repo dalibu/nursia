@@ -21,6 +21,10 @@ class UserStatusType(str, Enum):
     BLOCKED = "blocked"
     RESETED = "reseted"
 
+class SessionType(str, Enum):
+    WORK = "work"
+    PAUSE = "pause"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -220,6 +224,8 @@ class WorkSession(Base):
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
     amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)  # duration × rate
     is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
+    session_type: Mapped[str] = mapped_column(String(10), default="work")  # work или pause
+    assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_sessions.id"), nullable=True)  # ID первой сессии в цепочке
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

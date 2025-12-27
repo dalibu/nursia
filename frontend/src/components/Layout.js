@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem, Chip } from '@mui/material';
-import { ExpandMore, Timer, Stop } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem, Chip, IconButton } from '@mui/material';
+import { ExpandMore, Timer, Stop, Pause, PlayArrow, Coffee, AccessTime } from '@mui/icons-material';
 import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
 
@@ -113,18 +113,53 @@ function Layout({ onLogout }) {
     }
   };
 
-  const formatElapsedTime = () => {
-    if (!activeSession) return '';
-    // Combine session_date and start_time
+  const togglePauseSession = async () => {
+    if (!activeSession) return;
+    try {
+      const token = localStorage.getItem('token');
+      const endpoint = activeSession.session_type === 'pause' ? 'resume' : 'pause';
+      await axios.post(`/api/work-sessions/${activeSession.id}/${endpoint}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Refresh to get correct aggregated times
+      await checkActiveSession();
+    } catch (error) {
+      console.error('Failed to toggle pause:', error);
+    }
+  };
+
+  const formatSeconds = (secs) => {
+    if (isNaN(secs) || secs < 0) secs = 0;
+    const hours = Math.floor(secs / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
+    const seconds = secs % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getAssignmentTimes = () => {
+    if (!activeSession) return { work: '00:00:00', pause: '00:00:00' };
+
+    // Calculate current segment time
     const dateTimeStr = `${activeSession.session_date}T${activeSession.start_time}`;
     const start = new Date(dateTimeStr);
     const now = currentTime;
-    const diff = Math.floor((now - start) / 1000);
-    if (isNaN(diff) || diff < 0) return '00:00:00';
-    const hours = Math.floor(diff / 3600);
-    const minutes = Math.floor((diff % 3600) / 60);
-    const seconds = diff % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));
+
+    // Calculate totals
+    let workSeconds = activeSession.total_work_seconds || 0;
+    let pauseSeconds = activeSession.total_pause_seconds || 0;
+
+    // Add current segment to appropriate counter
+    if (activeSession.session_type === 'pause') {
+      pauseSeconds += currentSegmentSeconds;
+    } else {
+      workSeconds += currentSegmentSeconds;
+    }
+
+    return {
+      work: formatSeconds(workSeconds),
+      pause: formatSeconds(pauseSeconds)
+    };
   };
 
   const checkRequests = async () => {
@@ -162,20 +197,36 @@ function Layout({ onLogout }) {
             {/* Active Session Timer */}
             {activeSession && (
               <Chip
-                icon={<Timer />}
-                label={`${activeSession.worker_name}: ${formatElapsedTime()}`}
-                onClick={() => navigate('/time-tracker')}
-                onDelete={stopActiveSession}
-                deleteIcon={<Stop />}
+                icon={activeSession.session_type === 'pause' ? <Pause /> : <Timer />}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span onClick={() => navigate('/time-tracker')} style={{ cursor: 'pointer' }}>
+                      {activeSession.worker_name}: <AccessTime sx={{ fontSize: 16, verticalAlign: 'middle' }} /> {getAssignmentTimes().work} | <Coffee sx={{ fontSize: 16, verticalAlign: 'middle' }} /> {getAssignmentTimes().pause}
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); togglePauseSession(); }}
+                      sx={{ p: 0, color: 'white' }}
+                    >
+                      {activeSession.session_type === 'pause' ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />}
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); stopActiveSession(); }}
+                      sx={{ p: 0, color: 'white' }}
+                    >
+                      <Stop fontSize="small" />
+                    </IconButton>
+                  </Box>
+                }
                 sx={{
                   mx: 2,
-                  backgroundColor: '#4caf50',
+                  backgroundColor: activeSession.session_type === 'pause' ? '#ff9800' : '#4caf50',
                   color: 'white',
                   fontFamily: 'monospace',
                   fontSize: '1rem',
                   '& .MuiChip-icon': { color: 'white' },
-                  '& .MuiChip-deleteIcon': { color: 'white' },
-                  cursor: 'pointer'
+                  '& .MuiChip-label': { pr: 1 }
                 }}
               />
             )}

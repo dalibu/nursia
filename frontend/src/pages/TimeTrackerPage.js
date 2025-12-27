@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
-    Refresh, Timer, Edit, Delete
+    Refresh, Timer, Edit, Delete, Pause, Coffee
 } from '@mui/icons-material';
 import { workSessions, employment, contributors, payments } from '../services/api';
 
@@ -136,6 +136,17 @@ function TimeTrackerPage() {
         }
     };
 
+    const handlePauseResume = async (session) => {
+        try {
+            const endpoint = session.session_type === 'pause' ? 'resume' : 'pause';
+            await workSessions[endpoint](session.id);
+            loadData();
+        } catch (error) {
+            console.error('Failed to toggle pause:', error);
+            alert(error.response?.data?.detail || 'Ошибка при переключении паузы');
+        }
+    };
+
     const handleEditClick = (session) => {
         setEditSession(session);
         setEditForm({
@@ -218,6 +229,32 @@ function TimeTrackerPage() {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
+    // Calculate real-time session times (same logic as header)
+    const getSessionTimes = (session) => {
+        const dateTimeStr = `${session.session_date}T${session.start_time}`;
+        const start = new Date(dateTimeStr);
+        const now = currentTime;
+        const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));
+
+        let workSeconds = session.total_work_seconds || 0;
+        let pauseSeconds = session.total_pause_seconds || 0;
+
+        if (session.session_type === 'pause') {
+            pauseSeconds += currentSegmentSeconds;
+        } else {
+            workSeconds += currentSegmentSeconds;
+        }
+
+        const formatSecs = (s) => {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        };
+
+        return { work: formatSecs(workSeconds), pause: formatSecs(pauseSeconds) };
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -256,40 +293,59 @@ function TimeTrackerPage() {
                     </Typography>
                     <Grid container spacing={2}>
                         {activeSessions.map((session) => (
-                            <Grid item xs={12} md={6} key={session.id}>
-                                <Card>
-                                    <CardContent>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                                            <Box>
-                                                <Typography variant="h6">
-                                                    <Person sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                                    {session.worker_name}
-                                                </Typography>
-                                                <Typography color="text.secondary">
-                                                    Работодатель: {session.employer_name}
-                                                </Typography>
-                                                <Box display="flex" gap={2} mt={1}>
-                                                    <Chip
-                                                        icon={<Timer />}
-                                                        label={`Начало: ${formatTime(session.start_time)}`}
-                                                        size="small"
-                                                    />
-                                                    <Chip
-                                                        icon={<AccessTime />}
-                                                        label={formatDuration(session.start_time, session.session_date)}
-                                                        color="primary"
-                                                        size="small"
-                                                    />
+                            <Grid item xs={12} key={session.id}>
+                                <Card sx={{
+                                    backgroundColor: session.session_type === 'pause' ? '#fff3e0' : '#e8f5e9',
+                                    border: session.session_type === 'pause' ? '2px solid #ff9800' : '2px solid #4caf50'
+                                }}>
+                                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                        <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                                            {/* Name & Status */}
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Person />
+                                                <Typography variant="subtitle1" fontWeight="bold">{session.worker_name}</Typography>
+                                                {session.session_type === 'pause' && (
+                                                    <Chip label="ПАУЗА" size="small" sx={{ backgroundColor: '#ff9800', color: 'white' }} />
+                                                )}
+                                            </Box>
+
+                                            {/* Timers */}
+                                            <Box display="flex" alignItems="center" gap={2} sx={{ fontFamily: 'monospace', fontSize: '1rem' }}>
+                                                <Box display="flex" alignItems="center" gap={0.5}>
+                                                    <AccessTime sx={{ color: '#4caf50', fontSize: 18 }} />
+                                                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#4caf50' }}>
+                                                        {getSessionTimes(session).work}
+                                                    </Typography>
+                                                </Box>
+                                                <Box display="flex" alignItems="center" gap={0.5}>
+                                                    <Coffee sx={{ color: '#ff9800', fontSize: 18 }} />
+                                                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#ff9800' }}>
+                                                        {getSessionTimes(session).pause}
+                                                    </Typography>
                                                 </Box>
                                             </Box>
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                startIcon={<Stop />}
-                                                onClick={() => handleStopSession(session.id)}
-                                            >
-                                                Стоп
-                                            </Button>
+
+                                            {/* Buttons */}
+                                            <Box display="flex" gap={1}>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color={session.session_type === 'pause' ? 'success' : 'warning'}
+                                                    startIcon={session.session_type === 'pause' ? <PlayArrow /> : <Pause />}
+                                                    onClick={() => handlePauseResume(session)}
+                                                >
+                                                    {session.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="error"
+                                                    startIcon={<Stop />}
+                                                    onClick={() => handleStopSession(session.id)}
+                                                >
+                                                    Стоп
+                                                </Button>
+                                            </Box>
                                         </Box>
                                     </CardContent>
                                 </Card>

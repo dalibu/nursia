@@ -40,9 +40,14 @@ class WorkSessionResponse(BaseModel):
     currency: str
     amount: Optional[float] = None
     is_active: bool
+    session_type: str = "work"
+    assignment_id: Optional[int] = None
     description: Optional[str] = None
     worker_name: Optional[str] = None
     employer_name: Optional[str] = None
+    # Aggregated times for the assignment
+    total_work_seconds: Optional[int] = None
+    total_pause_seconds: Optional[int] = None
 
 
 class WorkSessionSummary(BaseModel):
@@ -115,6 +120,10 @@ async def start_work_session(
     db.add(new_session)
     await db.commit()
     await db.refresh(new_session)
+    
+    # Set assignment_id to self (this is the first session in the assignment chain)
+    new_session.assignment_id = new_session.id
+    await db.commit()
     
     # Загружаем имена участников
     result = await db.execute(
@@ -416,8 +425,40 @@ async def get_active_sessions(
     result = await db.execute(query)
     sessions = result.scalars().all()
     
-    return [
-        WorkSessionResponse(
+    responses = []
+    for s in sessions:
+        # Calculate aggregated times for this assignment
+        total_work_seconds = 0
+        total_pause_seconds = 0
+        
+        if s.assignment_id:
+            # Get all sessions in this assignment
+            assignment_query = select(WorkSession).where(
+                WorkSession.assignment_id == s.assignment_id
+            )
+            assignment_result = await db.execute(assignment_query)
+            assignment_sessions = assignment_result.scalars().all()
+            
+            from utils.timezone import now_server
+            now = now_server()
+            
+            for seg in assignment_sessions:
+                if seg.duration_hours:
+                    # Completed segment
+                    seg_seconds = int(float(seg.duration_hours) * 3600)
+                elif seg.is_active:
+                    # Current running segment
+                    start_dt = datetime.combine(seg.session_date, seg.start_time)
+                    seg_seconds = int((now - start_dt).total_seconds())
+                else:
+                    seg_seconds = 0
+                
+                if seg.session_type == "work":
+                    total_work_seconds += seg_seconds
+                else:
+                    total_pause_seconds += seg_seconds
+        
+        responses.append(WorkSessionResponse(
             id=s.id,
             worker_id=s.worker_id,
             employer_id=s.employer_id,
@@ -429,12 +470,16 @@ async def get_active_sessions(
             currency=s.currency,
             amount=float(s.amount) if s.amount else None,
             is_active=s.is_active,
+            session_type=s.session_type,
+            assignment_id=s.assignment_id,
             description=s.description,
             worker_name=s.worker.name if s.worker else None,
-            employer_name=s.employer.name if s.employer else None
-        )
-        for s in sessions
-    ]
+            employer_name=s.employer.name if s.employer else None,
+            total_work_seconds=total_work_seconds,
+            total_pause_seconds=total_pause_seconds
+        ))
+    
+    return responses
 
 
 @router.get("/summary")
@@ -504,3 +549,168 @@ async def get_sessions_summary(
         ))
     
     return summaries
+
+
+@router.post("/{session_id}/pause", response_model=WorkSessionResponse)
+async def pause_work_session(
+    session_id: int,
+    description: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Pause active work session - ends current 'work' segment and starts 'pause' segment"""
+    from utils.timezone import now_server
+    
+    # Get current session
+    result = await db.execute(
+        select(WorkSession).where(WorkSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if not session.is_active:
+        raise HTTPException(status_code=400, detail="Session is not active")
+    
+    if session.session_type == "pause":
+        raise HTTPException(status_code=400, detail="Session is already paused")
+    
+    now = now_server()
+    
+    # End current work session
+    session.end_time = now.time()
+    session.is_active = False
+    start_dt = datetime.combine(session.session_date, session.start_time)
+    end_dt = datetime.combine(session.session_date, session.end_time)
+    if end_dt < start_dt:
+        end_dt += timedelta(days=1)
+    duration = (end_dt - start_dt).total_seconds() / 3600
+    session.duration_hours = Decimal(str(round(duration, 2)))
+    session.amount = session.duration_hours * session.hourly_rate
+    if description:
+        session.description = description
+    
+    # Start new pause session
+    pause_session = WorkSession(
+        worker_id=session.worker_id,
+        employer_id=session.employer_id,
+        session_date=now.date(),
+        start_time=now.time(),
+        hourly_rate=session.hourly_rate,
+        currency=session.currency,
+        is_active=True,
+        session_type="pause",
+        assignment_id=session.assignment_id  # Inherit assignment from parent
+    )
+    db.add(pause_session)
+    
+    await db.commit()
+    await db.refresh(pause_session)
+    
+    # Get names
+    worker = await db.execute(select(Contributor).where(Contributor.id == pause_session.worker_id))
+    worker_name = worker.scalar_one_or_none()
+    employer = await db.execute(select(Contributor).where(Contributor.id == pause_session.employer_id))
+    employer_name = employer.scalar_one_or_none()
+    
+    return WorkSessionResponse(
+        id=pause_session.id,
+        worker_id=pause_session.worker_id,
+        employer_id=pause_session.employer_id,
+        session_date=pause_session.session_date,
+        start_time=pause_session.start_time,
+        end_time=pause_session.end_time,
+        duration_hours=float(pause_session.duration_hours) if pause_session.duration_hours else None,
+        hourly_rate=float(pause_session.hourly_rate),
+        currency=pause_session.currency,
+        amount=float(pause_session.amount) if pause_session.amount else None,
+        is_active=pause_session.is_active,
+        session_type=pause_session.session_type,
+        description=pause_session.description,
+        worker_name=worker_name.name if worker_name else None,
+        employer_name=employer_name.name if employer_name else None
+    )
+
+
+@router.post("/{session_id}/resume", response_model=WorkSessionResponse)
+async def resume_work_session(
+    session_id: int,
+    description: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Resume paused session - ends 'pause' segment and starts new 'work' segment"""
+    from utils.timezone import now_server
+    
+    # Get current pause session
+    result = await db.execute(
+        select(WorkSession).where(WorkSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if not session.is_active:
+        raise HTTPException(status_code=400, detail="Session is not active")
+    
+    if session.session_type != "pause":
+        raise HTTPException(status_code=400, detail="Session is not paused - cannot resume")
+    
+    now = now_server()
+    
+    # End pause session (no payment created for pause)
+    session.end_time = now.time()
+    session.is_active = False
+    start_dt = datetime.combine(session.session_date, session.start_time)
+    end_dt = datetime.combine(session.session_date, session.end_time)
+    if end_dt < start_dt:
+        end_dt += timedelta(days=1)
+    duration = (end_dt - start_dt).total_seconds() / 3600
+    session.duration_hours = Decimal(str(round(duration, 2)))
+    # No amount for pause
+    session.amount = Decimal("0")
+    if description:
+        session.description = description
+    
+    # Start new work session
+    work_session = WorkSession(
+        worker_id=session.worker_id,
+        employer_id=session.employer_id,
+        session_date=now.date(),
+        start_time=now.time(),
+        hourly_rate=session.hourly_rate,
+        currency=session.currency,
+        is_active=True,
+        session_type="work",
+        assignment_id=session.assignment_id  # Inherit assignment from parent
+    )
+    db.add(work_session)
+    
+    await db.commit()
+    await db.refresh(work_session)
+    
+    # Get names
+    worker = await db.execute(select(Contributor).where(Contributor.id == work_session.worker_id))
+    worker_name = worker.scalar_one_or_none()
+    employer = await db.execute(select(Contributor).where(Contributor.id == work_session.employer_id))
+    employer_name = employer.scalar_one_or_none()
+    
+    return WorkSessionResponse(
+        id=work_session.id,
+        worker_id=work_session.worker_id,
+        employer_id=work_session.employer_id,
+        session_date=work_session.session_date,
+        start_time=work_session.start_time,
+        end_time=work_session.end_time,
+        duration_hours=float(work_session.duration_hours) if work_session.duration_hours else None,
+        hourly_rate=float(work_session.hourly_rate),
+        currency=work_session.currency,
+        amount=float(work_session.amount) if work_session.amount else None,
+        is_active=work_session.is_active,
+        session_type=work_session.session_type,
+        description=work_session.description,
+        worker_name=worker_name.name if worker_name else None,
+        employer_name=employer_name.name if employer_name else None
+    )
