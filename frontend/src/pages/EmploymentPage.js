@@ -3,7 +3,7 @@ import {
     Typography, Paper, Box, Button,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
-    IconButton, Chip, CircularProgress, Alert
+    IconButton, Chip, CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import {
     Add, Edit, Delete, Work, Person, AttachMoney
@@ -35,6 +35,11 @@ function EmploymentPage() {
         is_active: true
     });
     const [error, setError] = useState('');
+
+    // Snackbar for notifications
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+    const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
+    const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
     useEffect(() => {
         loadData();
@@ -131,7 +136,7 @@ function EmploymentPage() {
             await employment.delete(id);
             loadData();
         } catch (error) {
-            alert(error.response?.data?.detail || 'Ошибка удаления');
+            showError(error.response?.data?.detail || 'Ошибка удаления');
         }
     };
 
@@ -339,6 +344,18 @@ function EmploymentPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={closeSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={closeSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

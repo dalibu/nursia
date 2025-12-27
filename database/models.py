@@ -219,6 +219,7 @@ class Assignment(Base):
     assignment_date: Mapped[date] = mapped_column(Date)  # Дата работы
     hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # Ставка за час
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Комментарий
     is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

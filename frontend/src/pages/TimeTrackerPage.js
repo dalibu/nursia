@@ -3,7 +3,7 @@ import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, IconButton, Collapse
+    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar
 } from '@mui/material';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
@@ -53,6 +53,12 @@ function TimeTrackerPage() {
 
     // Timer for active sessions
     const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Snackbar for error messages
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+    const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
+    const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
+    const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
     useEffect(() => {
         loadData();
@@ -108,7 +114,7 @@ function TimeTrackerPage() {
                 loadData();
             } catch (error) {
                 console.error('Failed to start session:', error);
-                alert(error.response?.data?.detail || 'Ошибка при запуске сессии');
+                showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
             }
         } else {
             // Для админа или при нескольких отношениях — показываем диалог
@@ -130,7 +136,7 @@ function TimeTrackerPage() {
             loadData();
         } catch (error) {
             console.error('Failed to start session:', error);
-            alert(error.response?.data?.detail || 'Ошибка при запуске сессии');
+            showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
         }
     };
 
@@ -141,7 +147,7 @@ function TimeTrackerPage() {
             loadSummary();
         } catch (error) {
             console.error('Failed to stop session:', error);
-            alert(error.response?.data?.detail || 'Ошибка при остановке сессии');
+            showError(error.response?.data?.detail || 'Ошибка при остановке сессии');
         }
     };
 
@@ -152,7 +158,7 @@ function TimeTrackerPage() {
             loadData();
         } catch (error) {
             console.error('Failed to toggle pause:', error);
-            alert(error.response?.data?.detail || 'Ошибка при переключении паузы');
+            showError(error.response?.data?.detail || 'Ошибка при переключении паузы');
         }
     };
 
@@ -172,7 +178,7 @@ function TimeTrackerPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await fetch(`/api/assignments/${editSession.id}`, {
+            const response = await fetch(`/api/assignments/${editSession.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -185,13 +191,26 @@ function TimeTrackerPage() {
                     description: editForm.description || null
                 })
             });
+
+            if (!response.ok) {
+                let errorMessage = 'Ошибка при сохранении';
+                try {
+                    const data = await response.json();
+                    errorMessage = data.detail || errorMessage;
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                showError(errorMessage);
+                return;
+            }
+
             setEditDialogOpen(false);
             setEditSession(null);
             loadData();
             loadSummary();
         } catch (error) {
             console.error('Failed to update session:', error);
-            alert('Ошибка при сохранении');
+            showError('Ошибка при сохранении');
         }
     };
 
@@ -224,7 +243,7 @@ function TimeTrackerPage() {
             loadSummary();
         } catch (error) {
             console.error('Failed to delete session:', error);
-            alert(error.message || 'Ошибка при удалении');
+            showError(error.message || 'Ошибка при удалении');
         } finally {
             setDeleteDialogOpen(false);
             setSessionToDelete(null);
@@ -681,6 +700,18 @@ function TimeTrackerPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={closeSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={closeSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

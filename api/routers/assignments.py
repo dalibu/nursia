@@ -75,17 +75,35 @@ class AssignmentResponse(BaseModel):
     total_pause_seconds: int
     total_hours: float
     total_amount: float
+    hourly_rate: float
     currency: str
+    description: Optional[str] = None
     is_active: bool
     segments: List[WorkSessionResponse] = []  # Все сегменты (work + pause)
 
 
 class WorkSessionUpdate(BaseModel):
-    """Обновление рабочей сессии"""
+    """Обновление рабочей сессии (устаревшее, для совместимости)"""
     assignment_date: Optional[date] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     duration_hours: Optional[float] = None
+    description: Optional[str] = None
+
+
+class AssignmentUpdate(BaseModel):
+    """Обновление Assignment"""
+    assignment_date: Optional[date] = None
+    hourly_rate: Optional[float] = None
+    currency: Optional[str] = None
+    description: Optional[str] = None
+
+
+class TaskUpdate(BaseModel):
+    """Обновление Task"""
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    task_type: Optional[str] = None  # work или pause
     description: Optional[str] = None
 
 
@@ -287,6 +305,42 @@ async def update_work_session(
         if not user_contributor or assignment.worker_id != user_contributor.id:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование этой сессии")
     
+    # Готовим новые значения
+    new_start = update_data.start_time if update_data.start_time is not None else task.start_time
+    new_end = update_data.end_time if update_data.end_time is not None else task.end_time
+    
+    # Хелпер для сравнения времени в минутах (игнорируем секунды)
+    def to_minutes(t: time) -> int:
+        return t.hour * 60 + t.minute
+    
+    # Валидация: конец должен быть после начала
+    if new_end is not None and to_minutes(new_end) <= to_minutes(new_start):
+        raise HTTPException(status_code=400, detail="Время окончания должно быть позже времени начала")
+    
+    # Валидация: проверяем пересечение с другими tasks в assignment
+    result = await db.execute(
+        select(Task).where(
+            Task.assignment_id == assignment.id,
+            Task.id != session_id
+        )
+    )
+    other_tasks = result.scalars().all()
+    
+    new_start_min = to_minutes(new_start)
+    new_end_min = to_minutes(new_end) if new_end else 24 * 60  # До конца дня
+    
+    for other in other_tasks:
+        other_start_min = to_minutes(other.start_time)
+        other_end_min = to_minutes(other.end_time) if other.end_time else 24 * 60
+        
+        # Строгое пересечение: (start1 < end2) AND (end1 > start2)
+        # Смежные интервалы НЕ считаются пересекающимися
+        if new_start_min < other_end_min and new_end_min > other_start_min:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Время пересекается с другим сегментом ({other.start_time.strftime('%H:%M')}-{other.end_time.strftime('%H:%M') if other.end_time else '...'})"
+            )
+    
     # Обновляем поля Task
     if update_data.start_time is not None:
         task.start_time = update_data.start_time
@@ -364,6 +418,171 @@ async def delete_work_session(
     await db.commit()
     
     return {"message": "Сессия удалена"}
+
+
+@router.put("/assignment/{assignment_id}")
+async def update_assignment(
+    assignment_id: int,
+    update_data: AssignmentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Обновить Assignment (дату, ставку, валюту, описание)"""
+    
+    result = await db.execute(
+        select(Assignment).where(Assignment.id == assignment_id)
+    )
+    assignment = result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment не найден")
+    
+    # Проверка прав
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or assignment.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на редактирование")
+    
+    # Обновляем поля
+    if update_data.assignment_date is not None:
+        assignment.assignment_date = update_data.assignment_date
+    if update_data.hourly_rate is not None:
+        assignment.hourly_rate = Decimal(str(update_data.hourly_rate))
+    if update_data.currency is not None:
+        assignment.currency = update_data.currency
+    if update_data.description is not None:
+        assignment.description = update_data.description
+    
+    await db.commit()
+    
+    return {"message": "Assignment обновлён", "id": assignment_id}
+
+
+@router.delete("/assignment/{assignment_id}")
+async def delete_assignment(
+    assignment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удалить весь Assignment со всеми tasks и payment"""
+    
+    result = await db.execute(
+        select(Assignment)
+        .options(
+            joinedload(Assignment.tasks),
+            joinedload(Assignment.payment)
+        )
+        .where(Assignment.id == assignment_id)
+    )
+    assignment = result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment не найден")
+    
+    # Проверка прав
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or assignment.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на удаление")
+    
+    # Проверяем платёж
+    if assignment.payment and assignment.payment.is_paid:
+        raise HTTPException(
+            status_code=400,
+            detail="Невозможно удалить: платёж уже оплачен"
+        )
+    
+    # Удаляем платёж если есть
+    if assignment.payment:
+        await db.delete(assignment.payment)
+    
+    # Удаляем все tasks
+    for task in assignment.tasks:
+        await db.delete(task)
+    
+    # Удаляем assignment
+    await db.delete(assignment)
+    
+    await db.commit()
+    
+    return {"message": "Assignment удалён", "id": assignment_id}
+
+
+@router.put("/tasks/{task_id}")
+async def update_task(
+    task_id: int,
+    update_data: TaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Обновить Task (время начала/конца, тип, описание)"""
+    
+    result = await db.execute(
+        select(Task).options(joinedload(Task.assignment)).where(Task.id == task_id)
+    )
+    task = result.scalar_one_or_none()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task не найден")
+    
+    assignment = task.assignment
+    
+    # Проверка прав
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or assignment.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на редактирование")
+    
+    # Готовим новые значения
+    new_start = update_data.start_time if update_data.start_time is not None else task.start_time
+    new_end = update_data.end_time if update_data.end_time is not None else task.end_time
+    
+    # Хелпер для сравнения времени в минутах (игнорируем секунды)
+    def to_minutes(t: time) -> int:
+        return t.hour * 60 + t.minute
+    
+    # Валидация: конец должен быть после начала
+    if new_end is not None and to_minutes(new_end) <= to_minutes(new_start):
+        raise HTTPException(status_code=400, detail="Время окончания должно быть позже времени начала")
+    
+    # Валидация: проверяем пересечение с другими tasks в assignment
+    result = await db.execute(
+        select(Task).where(
+            Task.assignment_id == assignment.id,
+            Task.id != task_id
+        )
+    )
+    other_tasks = result.scalars().all()
+    
+    new_start_min = to_minutes(new_start)
+    new_end_min = to_minutes(new_end) if new_end else 24 * 60
+    
+    for other in other_tasks:
+        other_start_min = to_minutes(other.start_time)
+        other_end_min = to_minutes(other.end_time) if other.end_time else 24 * 60
+        
+        # Строгое пересечение: смежные интервалы НЕ считаются пересекающимися
+        if new_start_min < other_end_min and new_end_min > other_start_min:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Время пересекается с другим сегментом ({other.start_time.strftime('%H:%M')}-{other.end_time.strftime('%H:%M') if other.end_time else '...'})"
+            )
+    
+    # Обновляем поля
+    if update_data.start_time is not None:
+        task.start_time = update_data.start_time
+    if update_data.end_time is not None:
+        task.end_time = update_data.end_time
+    if update_data.task_type is not None:
+        if update_data.task_type not in ["work", "pause"]:
+            raise HTTPException(status_code=400, detail="task_type должен быть 'work' или 'pause'")
+        task.task_type = update_data.task_type
+    if update_data.description is not None:
+        task.description = update_data.description
+    
+    await db.commit()
+    
+    return {"message": "Task обновлён", "id": task_id}
 
 
 @router.get("/", response_model=List[WorkSessionResponse])
@@ -471,7 +690,7 @@ async def get_grouped_sessions(
     
     responses = []
     for assignment in assignments[:limit]:
-        tasks = sorted(assignment.tasks, key=lambda t: t.start_time)
+        tasks = sorted(assignment.tasks, key=lambda t: (t.start_time, t.id))
         if not tasks:
             continue
         
@@ -501,13 +720,14 @@ async def get_grouped_sessions(
         first_task = tasks[0]
         last_task = tasks[-1]
         
+        # Segments in descending order (newest first), stable sort by (start_time, id)
         segment_responses = [
             _task_to_response(
                 task, assignment,
                 worker_name=assignment.worker.name if assignment.worker else None,
                 employer_name=assignment.employer.name if assignment.employer else None
             )
-            for task in reversed(tasks)
+            for task in sorted(tasks, key=lambda t: (t.start_time, t.id), reverse=True)
         ]
         
         responses.append(AssignmentResponse(
@@ -523,7 +743,9 @@ async def get_grouped_sessions(
             total_pause_seconds=total_pause_seconds,
             total_hours=round(total_work_seconds / 3600, 2),
             total_amount=total_amount,
+            hourly_rate=float(assignment.hourly_rate),
             currency=assignment.currency,
+            description=assignment.description,
             is_active=is_active,
             segments=segment_responses
         ))
