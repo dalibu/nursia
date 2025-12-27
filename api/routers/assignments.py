@@ -319,7 +319,9 @@ async def delete_work_session(
     
     result = await db.execute(
         select(Task)
-        .options(joinedload(Task.assignment))
+        .options(
+            joinedload(Task.assignment).joinedload(Assignment.payment)
+        )
         .where(Task.id == session_id)
     )
     task = result.scalar_one_or_none()

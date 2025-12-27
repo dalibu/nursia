@@ -211,8 +211,14 @@ function TimeTrackerPage() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || 'Ошибка');
+                let errorMessage = 'Ошибка удаления';
+                try {
+                    const data = await response.json();
+                    errorMessage = data.detail || errorMessage;
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                throw new Error(errorMessage);
             }
             loadData();
             loadSummary();
