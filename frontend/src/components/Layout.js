@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } from '@mui/material';
-import { ExpandMore } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem, Chip } from '@mui/material';
+import { ExpandMore, Timer, Stop } from '@mui/icons-material';
 import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
 
@@ -22,10 +22,20 @@ function Layout({ onLogout }) {
   const [settingsAnchor, setSettingsAnchor] = useState(null);
   const [accountAnchor, setAccountAnchor] = useState(null);
   const [hasRequests, setHasRequests] = useState(false);
-  const [checkInterval, setCheckInterval] = useState(30); // По умолчанию 30 минут
+  const [checkInterval, setCheckInterval] = useState(30);
+  const [activeSession, setActiveSession] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     checkUserRole();
+    checkActiveSession();
+    const sessionInterval = setInterval(checkActiveSession, 30000);
+    const timerInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => {
+      clearInterval(sessionInterval);
+      clearInterval(timerInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -74,6 +84,49 @@ function Layout({ onLogout }) {
     }
   };
 
+  const checkActiveSession = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/work-sessions/active', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data && response.data.length > 0) {
+        setActiveSession(response.data[0]);
+      } else {
+        setActiveSession(null);
+      }
+    } catch (error) {
+      console.error('Failed to check active session:', error);
+    }
+  };
+
+  const stopActiveSession = async () => {
+    if (!activeSession) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/work-sessions/${activeSession.id}/stop`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setActiveSession(null);
+    } catch (error) {
+      console.error('Failed to stop session:', error);
+    }
+  };
+
+  const formatElapsedTime = () => {
+    if (!activeSession) return '';
+    // Combine session_date and start_time
+    const dateTimeStr = `${activeSession.session_date}T${activeSession.start_time}`;
+    const start = new Date(dateTimeStr);
+    const now = currentTime;
+    const diff = Math.floor((now - start) / 1000);
+    if (isNaN(diff) || diff < 0) return '00:00:00';
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   const checkRequests = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -101,10 +154,33 @@ function Layout({ onLogout }) {
       <Box sx={{ flexGrow: 1 }}>
         <AppBar position="static">
           <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <img src="/favicon.svg" alt="Nursia" style={{ width: 32, height: 32 }} />
               NURSIA | {userName}
             </Typography>
+
+            {/* Active Session Timer */}
+            {activeSession && (
+              <Chip
+                icon={<Timer />}
+                label={`${activeSession.worker_name}: ${formatElapsedTime()}`}
+                onClick={() => navigate('/time-tracker')}
+                onDelete={stopActiveSession}
+                deleteIcon={<Stop />}
+                sx={{
+                  mx: 2,
+                  backgroundColor: '#4caf50',
+                  color: 'white',
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  '& .MuiChip-icon': { color: 'white' },
+                  '& .MuiChip-deleteIcon': { color: 'white' },
+                  cursor: 'pointer'
+                }}
+              />
+            )}
+
+            <Box sx={{ flexGrow: 1 }} />
             <Button color="inherit" component={Link} to="/">
               Обозрение
             </Button>
