@@ -474,7 +474,7 @@ async def delete_assignment(
         )
         .where(Assignment.id == assignment_id)
     )
-    assignment = result.scalar_one_or_none()
+    assignment = result.unique().scalar_one_or_none()
     
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment не найден")

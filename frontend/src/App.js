@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { ActiveSessionProvider } from './context/ActiveSessionContext';
 import Layout from './components/Layout';
 import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
@@ -54,7 +55,11 @@ function App() {
             isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />
           } />
           <Route path="/" element={
-            isAuthenticated ? <Layout onLogout={() => setIsAuthenticated(false)} /> : <Navigate to="/login" replace />
+            isAuthenticated ? (
+              <ActiveSessionProvider>
+                <Layout onLogout={() => setIsAuthenticated(false)} />
+              </ActiveSessionProvider>
+            ) : <Navigate to="/login" replace />
           }>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />

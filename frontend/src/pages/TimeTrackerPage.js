@@ -11,6 +11,7 @@ import {
     KeyboardArrowDown, KeyboardArrowUp
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
+import { useActiveSession } from '../context/ActiveSessionContext';
 
 // Символы валют
 const currencySymbols = {
@@ -22,13 +23,16 @@ const currencySymbols = {
 
 function TimeTrackerPage() {
     const [loading, setLoading] = useState(true);
-    const [groupedAssignments, setGroupedAssignments] = useState([]);  // Grouped sessions
+    const [groupedAssignments, setGroupedAssignments] = useState([]);
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
     const [contributorsList, setContributorsList] = useState([]);
     const [summary, setSummary] = useState([]);
     const [period, setPeriod] = useState('month');
     const [isAdmin, setIsAdmin] = useState(false);
+
+    // Use shared context for active session - provides synchronized timer
+    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime } = useActiveSession();
 
     // Start session dialog
     const [startDialogOpen, setStartDialogOpen] = useState(false);
@@ -47,12 +51,23 @@ function TimeTrackerPage() {
     // Expanded rows state
     const [expandedRows, setExpandedRows] = useState({});
 
-    // Delete confirmation dialog
+    // Delete confirmation dialog (for tasks)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
 
-    // Timer for active sessions
-    const [currentTime, setCurrentTime] = useState(new Date());
+    // Assignment edit dialog
+    const [assignmentEditOpen, setAssignmentEditOpen] = useState(false);
+    const [assignmentToEdit, setAssignmentToEdit] = useState(null);
+    const [assignmentForm, setAssignmentForm] = useState({
+        assignment_date: '',
+        hourly_rate: '',
+        currency: 'UAH',
+        description: ''
+    });
+
+    // Assignment delete dialog
+    const [assignmentDeleteOpen, setAssignmentDeleteOpen] = useState(false);
+    const [assignmentToDelete, setAssignmentToDelete] = useState(null);
 
     // Snackbar for error messages
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
@@ -62,8 +77,6 @@ function TimeTrackerPage() {
 
     useEffect(() => {
         loadData();
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
     }, []);
 
     useEffect(() => {
@@ -250,6 +263,80 @@ function TimeTrackerPage() {
         }
     };
 
+    // Assignment edit handlers
+    const handleEditAssignment = (assignment, e) => {
+        if (e) e.stopPropagation();
+        setAssignmentToEdit(assignment);
+        setAssignmentForm({
+            assignment_date: assignment.assignment_date,
+            hourly_rate: assignment.hourly_rate || '',
+            currency: assignment.currency || 'UAH',
+            description: assignment.description || ''
+        });
+        setAssignmentEditOpen(true);
+    };
+
+    const handleSaveAssignment = async () => {
+        if (!assignmentToEdit) return;
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/assignments/assignment/${assignmentToEdit.assignment_id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    assignment_date: assignmentForm.assignment_date,
+                    hourly_rate: parseFloat(assignmentForm.hourly_rate),
+                    currency: assignmentForm.currency,
+                    description: assignmentForm.description || null
+                })
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Ошибка сохранения');
+            }
+            showSuccess('Assignment обновлён');
+            setAssignmentEditOpen(false);
+            setAssignmentToEdit(null);
+            loadData();
+            loadSummary();
+        } catch (error) {
+            showError(error.message);
+        }
+    };
+
+    // Assignment delete handlers
+    const handleDeleteAssignment = (assignment, e) => {
+        if (e) e.stopPropagation();
+        setAssignmentToDelete(assignment);
+        setAssignmentDeleteOpen(true);
+    };
+
+    const handleConfirmDeleteAssignment = async () => {
+        if (!assignmentToDelete) return;
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/assignments/assignment/${assignmentToDelete.assignment_id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Ошибка удаления');
+            }
+            showSuccess('Assignment удалён');
+            loadData();
+            loadSummary();
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            setAssignmentDeleteOpen(false);
+            setAssignmentToDelete(null);
+        }
+    };
+
     const formatCurrency = (amount, currency = 'UAH') => {
         const symbol = currencySymbols[currency] || currency;
         return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -278,8 +365,14 @@ function TimeTrackerPage() {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    // Calculate real-time session times (same logic as header)
+    // Calculate real-time session times - use context for active session, or local calculation as fallback
     const getSessionTimes = (session) => {
+        // If this is the active session from context, use synchronized timer
+        if (activeSession && activeSession.id === session.id) {
+            return getElapsedTimes();
+        }
+
+        // Fallback for other sessions (shouldn't happen, but keep for safety)
         const dateTimeStr = `${session.assignment_date}T${session.start_time}`;
         const start = new Date(dateTimeStr);
         const now = currentTime;
@@ -334,75 +427,8 @@ function TimeTrackerPage() {
                 </Box>
             </Box>
 
-            {/* Active Sessions */}
-            {activeSessions.length > 0 && (
-                <Paper sx={{ p: 3, mb: 4, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                    <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-                        🟢 Активные сессии
-                    </Typography>
-                    <Grid container spacing={2}>
-                        {activeSessions.map((session) => (
-                            <Grid item xs={12} key={session.id}>
-                                <Card sx={{
-                                    backgroundColor: session.session_type === 'pause' ? '#fff3e0' : '#e8f5e9',
-                                    border: session.session_type === 'pause' ? '2px solid #ff9800' : '2px solid #4caf50'
-                                }}>
-                                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                                        <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-                                            {/* Name & Status */}
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                <Person />
-                                                <Typography variant="subtitle1" fontWeight="bold">{session.worker_name}</Typography>
-                                                {session.session_type === 'pause' && (
-                                                    <Chip label="ПАУЗА" size="small" sx={{ backgroundColor: '#ff9800', color: 'white' }} />
-                                                )}
-                                            </Box>
 
-                                            {/* Timers */}
-                                            <Box display="flex" alignItems="center" gap={2} sx={{ fontFamily: 'monospace', fontSize: '1rem' }}>
-                                                <Box display="flex" alignItems="center" gap={0.5}>
-                                                    <AccessTime sx={{ color: '#4caf50', fontSize: 18 }} />
-                                                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#4caf50' }}>
-                                                        {getSessionTimes(session).work}
-                                                    </Typography>
-                                                </Box>
-                                                <Box display="flex" alignItems="center" gap={0.5}>
-                                                    <Coffee sx={{ color: '#ff9800', fontSize: 18 }} />
-                                                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#ff9800' }}>
-                                                        {getSessionTimes(session).pause}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-
-                                            {/* Buttons */}
-                                            <Box display="flex" gap={1}>
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color={session.session_type === 'pause' ? 'success' : 'warning'}
-                                                    startIcon={session.session_type === 'pause' ? <PlayArrow /> : <Pause />}
-                                                    onClick={() => handlePauseResume(session)}
-                                                >
-                                                    {session.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
-                                                </Button>
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="error"
-                                                    startIcon={<Stop />}
-                                                    onClick={() => handleStopSession(session.id)}
-                                                >
-                                                    Стоп
-                                                </Button>
-                                            </Box>
-                                        </Box>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                        ))}
-                    </Grid>
-                </Paper>
-            )}
+            {/* Active session is now shown in FloatingTimer */}
 
             {/* Summary Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -462,12 +488,13 @@ function TimeTrackerPage() {
                                 <TableCell width={40}></TableCell>
                                 <TableCell><strong>Дата</strong></TableCell>
                                 <TableCell><strong>Работник</strong></TableCell>
-                                <TableCell align="center"><strong>Начало</strong></TableCell>
-                                <TableCell align="center"><strong>Конец</strong></TableCell>
-                                <TableCell align="right"><strong>⏱ Работа</strong></TableCell>
-                                <TableCell align="right"><strong>☕ Пауза</strong></TableCell>
+                                <TableCell align="center"><strong>Время</strong></TableCell>
+                                <TableCell align="right"><strong>Пауза</strong></TableCell>
+                                <TableCell align="right"><strong>Работа</strong></TableCell>
                                 <TableCell align="right"><strong>Сумма</strong></TableCell>
+                                <TableCell><strong>Описание</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
+                                <TableCell align="center" width={80}></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -492,29 +519,53 @@ function TimeTrackerPage() {
                                         </TableCell>
                                         <TableCell><strong>{formatDate(assignment.assignment_date)}</strong></TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
-                                        <TableCell align="center">{formatTime(assignment.start_time)}</TableCell>
-                                        <TableCell align="center">{assignment.end_time ? formatTime(assignment.end_time) : '—'}</TableCell>
-                                        <TableCell align="right" sx={{ color: '#4caf50', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                                            {Math.floor(assignment.total_work_seconds / 3600)}:{String(Math.floor((assignment.total_work_seconds % 3600) / 60)).padStart(2, '0')}
+                                        <TableCell align="center" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                                            {formatTime(assignment.start_time)} — {assignment.end_time ? formatTime(assignment.end_time) : '...'}
                                         </TableCell>
                                         <TableCell align="right" sx={{ color: '#ff9800', fontFamily: 'monospace' }}>
                                             {Math.floor(assignment.total_pause_seconds / 3600)}:{String(Math.floor((assignment.total_pause_seconds % 3600) / 60)).padStart(2, '0')}
                                         </TableCell>
+                                        <TableCell align="right" sx={{ color: '#4caf50', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                            {Math.floor(assignment.total_work_seconds / 3600)}:{String(Math.floor((assignment.total_work_seconds % 3600) / 60)).padStart(2, '0')}
+                                        </TableCell>
                                         <TableCell align="right">
                                             {formatCurrency(assignment.total_amount, assignment.currency)}
+                                        </TableCell>
+                                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {assignment.description || '—'}
                                         </TableCell>
                                         <TableCell align="center">
                                             {assignment.is_active ? (
                                                 <Chip label="В работе" color="warning" size="small" />
                                             ) : (
-                                                <Chip label="Завершено" color="success" size="small" />
+                                                <Chip label="Готово" color="success" size="small" />
+                                            )}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <IconButton
+                                                size="small"
+                                                color="primary"
+                                                onClick={(e) => handleEditAssignment(assignment, e)}
+                                                title="Редактировать"
+                                            >
+                                                <Edit fontSize="small" />
+                                            </IconButton>
+                                            {!assignment.is_active && (
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={(e) => handleDeleteAssignment(assignment, e)}
+                                                    title="Удалить"
+                                                >
+                                                    <Delete fontSize="small" />
+                                                </IconButton>
                                             )}
                                         </TableCell>
                                     </TableRow>
 
                                     {/* Expandable segments */}
                                     <TableRow>
-                                        <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                                        <TableCell colSpan={10} sx={{ p: 0, border: 0 }}>
                                             <Collapse in={expandedRows[assignment.assignment_id]} timeout="auto" unmountOnExit>
                                                 <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
                                                     <Typography variant="subtitle2" sx={{ mb: 1 }}>Сегменты:</Typography>
@@ -697,6 +748,88 @@ function TimeTrackerPage() {
                         sx={{ borderRadius: 2, minWidth: 100 }}
                     >
                         Удалить
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Assignment Edit Dialog */}
+            <Dialog open={assignmentEditOpen} onClose={() => setAssignmentEditOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                    color: 'white',
+                    fontWeight: 'bold'
+                }}>
+                    ✏️ Редактировать Assignment
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3 }}>
+                    <TextField
+                        fullWidth
+                        label="Дата"
+                        type="date"
+                        value={assignmentForm.assignment_date}
+                        onChange={(e) => setAssignmentForm({ ...assignmentForm, assignment_date: e.target.value })}
+                        sx={{ mb: 2 }}
+                        InputLabelProps={{ shrink: true }}
+                    />
+                    <Box display="flex" gap={2} sx={{ mb: 2 }}>
+                        <TextField
+                            fullWidth
+                            label="Ставка за час"
+                            type="number"
+                            value={assignmentForm.hourly_rate}
+                            onChange={(e) => setAssignmentForm({ ...assignmentForm, hourly_rate: e.target.value })}
+                        />
+                        <TextField
+                            select
+                            label="Валюта"
+                            value={assignmentForm.currency}
+                            onChange={(e) => setAssignmentForm({ ...assignmentForm, currency: e.target.value })}
+                            sx={{ minWidth: 100 }}
+                        >
+                            {['UAH', 'EUR', 'USD'].map((curr) => (
+                                <MenuItem key={curr} value={curr}>
+                                    {currencySymbols[curr] || curr}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
+                    <TextField
+                        fullWidth
+                        label="Описание"
+                        multiline
+                        rows={3}
+                        value={assignmentForm.description}
+                        onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })}
+                        placeholder="Комментарий к рабочему дню..."
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setAssignmentEditOpen(false)}>Отмена</Button>
+                    <Button variant="contained" onClick={handleSaveAssignment}>Сохранить</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Assignment Delete Dialog */}
+            <Dialog open={assignmentDeleteOpen} onClose={() => setAssignmentDeleteOpen(false)}>
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #ff5252 0%, #f44336 100%)',
+                    color: 'white',
+                    fontWeight: 'bold'
+                }}>
+                    🗑️ Удалить Assignment
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                        Вы уверены, что хотите удалить этот Assignment?
+                    </Typography>
+                    <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
+                        Все сегменты (tasks) будут удалены!
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
+                    <Button variant="outlined" onClick={() => setAssignmentDeleteOpen(false)}>Отмена</Button>
+                    <Button variant="contained" color="error" onClick={handleConfirmDeleteAssignment}>
+                        Удалить всё
                     </Button>
                 </DialogActions>
             </Dialog>

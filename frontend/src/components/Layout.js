@@ -1,9 +1,11 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem, Chip, IconButton } from '@mui/material';
-import { ExpandMore, Timer, Stop, Pause, PlayArrow, Coffee, AccessTime } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
+import { useActiveSession } from '../context/ActiveSessionContext';
+import FloatingTimer from './FloatingTimer';
 
 const NotificationContext = createContext();
 
@@ -23,19 +25,11 @@ function Layout({ onLogout }) {
   const [accountAnchor, setAccountAnchor] = useState(null);
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
-  const [activeSession, setActiveSession] = useState(null);
-  const [elapsedTime, setElapsedTime] = useState('');
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Use shared context for active session (needed for FloatingTimer)
+  const { activeSession } = useActiveSession();
 
   useEffect(() => {
     checkUserRole();
-    checkActiveSession();
-    const sessionInterval = setInterval(checkActiveSession, 30000);
-    const timerInterval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => {
-      clearInterval(sessionInterval);
-      clearInterval(timerInterval);
-    };
   }, []);
 
   useEffect(() => {
@@ -84,83 +78,7 @@ function Layout({ onLogout }) {
     }
   };
 
-  const checkActiveSession = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/assignments/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data && response.data.length > 0) {
-        setActiveSession(response.data[0]);
-      } else {
-        setActiveSession(null);
-      }
-    } catch (error) {
-      console.error('Failed to check active session:', error);
-    }
-  };
 
-  const stopActiveSession = async () => {
-    if (!activeSession) return;
-    try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/assignments/${activeSession.id}/stop`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setActiveSession(null);
-    } catch (error) {
-      console.error('Failed to stop session:', error);
-    }
-  };
-
-  const togglePauseSession = async () => {
-    if (!activeSession) return;
-    try {
-      const token = localStorage.getItem('token');
-      const endpoint = activeSession.session_type === 'pause' ? 'resume' : 'pause';
-      await axios.post(`/api/assignments/${activeSession.id}/${endpoint}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Refresh to get correct aggregated times
-      await checkActiveSession();
-    } catch (error) {
-      console.error('Failed to toggle pause:', error);
-    }
-  };
-
-  const formatSeconds = (secs) => {
-    if (isNaN(secs) || secs < 0) secs = 0;
-    const hours = Math.floor(secs / 3600);
-    const minutes = Math.floor((secs % 3600) / 60);
-    const seconds = secs % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const getAssignmentTimes = () => {
-    if (!activeSession) return { work: '00:00:00', pause: '00:00:00' };
-
-    // Calculate current segment time
-    const dateTimeStr = `${activeSession.assignment_date}T${activeSession.start_time}`;
-    const start = new Date(dateTimeStr);
-    const now = currentTime;
-    const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));
-
-    // Calculate totals
-    let workSeconds = activeSession.total_work_seconds || 0;
-    let pauseSeconds = activeSession.total_pause_seconds || 0;
-
-    // Add current segment to appropriate counter
-    if (activeSession.session_type === 'pause') {
-      pauseSeconds += currentSegmentSeconds;
-    } else {
-      workSeconds += currentSegmentSeconds;
-    }
-
-    return {
-      work: formatSeconds(workSeconds),
-      pause: formatSeconds(pauseSeconds)
-    };
-  };
 
   const checkRequests = async () => {
     try {
@@ -186,6 +104,7 @@ function Layout({ onLogout }) {
 
   return (
     <NotificationContext.Provider value={{ checkRequests }}>
+      <FloatingTimer />
       <Box sx={{ flexGrow: 1 }}>
         <AppBar position="static">
           <Toolbar>
@@ -193,43 +112,6 @@ function Layout({ onLogout }) {
               <img src="/favicon.svg" alt="Nursia" style={{ width: 32, height: 32 }} />
               NURSIA | {userName}
             </Typography>
-
-            {/* Active Session Timer */}
-            {activeSession && (
-              <Chip
-                icon={activeSession.session_type === 'pause' ? <Pause /> : <Timer />}
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <span onClick={() => navigate('/time-tracker')} style={{ cursor: 'pointer' }}>
-                      {activeSession.worker_name}: <AccessTime sx={{ fontSize: 16, verticalAlign: 'middle' }} /> {getAssignmentTimes().work} | <Coffee sx={{ fontSize: 16, verticalAlign: 'middle' }} /> {getAssignmentTimes().pause}
-                    </span>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => { e.stopPropagation(); togglePauseSession(); }}
-                      sx={{ p: 0, color: 'white' }}
-                    >
-                      {activeSession.session_type === 'pause' ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />}
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => { e.stopPropagation(); stopActiveSession(); }}
-                      sx={{ p: 0, color: 'white' }}
-                    >
-                      <Stop fontSize="small" />
-                    </IconButton>
-                  </Box>
-                }
-                sx={{
-                  mx: 2,
-                  backgroundColor: activeSession.session_type === 'pause' ? '#ff9800' : '#4caf50',
-                  color: 'white',
-                  fontFamily: 'monospace',
-                  fontSize: '1rem',
-                  '& .MuiChip-icon': { color: 'white' },
-                  '& .MuiChip-label': { pr: 1 }
-                }}
-              />
-            )}
 
             <Box sx={{ flexGrow: 1 }} />
             <Button color="inherit" component={Link} to="/">
