@@ -27,7 +27,7 @@ function Layout({ onLogout }) {
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
   // Use shared context for active session (needed for FloatingTimer)
-  const { activeSession } = useActiveSession();
+  const { activeSession, togglePause } = useActiveSession();
 
   useEffect(() => {
     checkUserRole();
@@ -155,6 +155,9 @@ function Layout({ onLogout }) {
                   </MenuItem>
                   <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=newTask'); }}>
                     ➕ Новое задание
+                  </MenuItem>
+                  <MenuItem onClick={() => { setZadaniyaAnchor(null); togglePause(); }}>
+                    {activeSession?.session_type === 'pause' ? '▶️ Продолжить' : '☕ Пауза'}
                   </MenuItem>
                 </>
               )}

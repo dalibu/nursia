@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -22,6 +23,8 @@ const currencySymbols = {
 };
 
 function TimeTrackerPage() {
+    const location = useLocation();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [groupedAssignments, setGroupedAssignments] = useState([]);
     const [activeSessions, setActiveSessions] = useState([]);
@@ -42,7 +45,7 @@ function TimeTrackerPage() {
     const [filteredAssignments, setFilteredAssignments] = useState([]);
 
     // Use shared context for active session - provides synchronized timer
-    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange } = useActiveSession();
+    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange } = useActiveSession();
 
     // Register callback to refresh table when session actions happen (pause/resume/stop)
     useEffect(() => {
@@ -57,6 +60,10 @@ function TimeTrackerPage() {
     const [startDialogOpen, setStartDialogOpen] = useState(false);
     const [selectedEmployment, setSelectedEmployment] = useState('');
     const [startDescription, setStartDescription] = useState('');
+
+    // New task dialog (for switching tasks)
+    const [newTaskOpen, setNewTaskOpen] = useState(false);
+    const [newTaskDescription, setNewTaskDescription] = useState('');
 
     // Edit session dialog
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -92,6 +99,28 @@ function TimeTrackerPage() {
     // Snackbar for error messages
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
+
+    // Handle URL actions from menu navigation
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const action = params.get('action');
+        if (action) {
+            // Clear the URL parameter
+            navigate('/time-tracker', { replace: true });
+
+            if (action === 'start') {
+                setStartDialogOpen(true);
+            } else if (action === 'stop' && activeSession) {
+                // Stop current session
+                assignmentsService.stop(activeSession.id).then(() => {
+                    fetchActiveSession();
+                    notifySessionChange();
+                }).catch(err => showError('Ошибка при остановке смены'));
+            } else if (action === 'newTask' && activeSession) {
+                setNewTaskOpen(true);
+            }
+        }
+    }, [location.search, activeSession]);
     const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
     const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
@@ -221,6 +250,24 @@ function TimeTrackerPage() {
         } catch (error) {
             console.error('Failed to start session:', error);
             showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
+        }
+    };
+
+    // Handle new task creation (switch to new task in current session)
+    const handleNewTask = async () => {
+        if (!activeSession) return;
+        try {
+            await assignmentsService.switchTask(activeSession.assignment_id, {
+                description: newTaskDescription || null
+            });
+            setNewTaskOpen(false);
+            setNewTaskDescription('');
+            loadData();
+            fetchActiveSession();
+            notifySessionChange();
+        } catch (error) {
+            console.error('Failed to switch task:', error);
+            showError(error.response?.data?.detail || 'Ошибка при создании задания');
         }
     };
 
@@ -824,6 +871,28 @@ function TimeTrackerPage() {
                     >
                         Начать
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* New Task Dialog (Switch Task) */}
+            <Dialog open={newTaskOpen} onClose={() => setNewTaskOpen(false)}>
+                <DialogTitle>Новое задание</DialogTitle>
+                <DialogContent sx={{ minWidth: 350 }}>
+                    <TextField
+                        fullWidth
+                        label="Описание задания"
+                        value={newTaskDescription}
+                        onChange={(e) => setNewTaskDescription(e.target.value)}
+                        placeholder="Что вы будете делать?"
+                        multiline
+                        rows={2}
+                        sx={{ mt: 2 }}
+                        autoFocus
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setNewTaskOpen(false)}>Отмена</Button>
+                    <Button variant="contained" onClick={handleNewTask}>Начать</Button>
                 </DialogActions>
             </Dialog>
 

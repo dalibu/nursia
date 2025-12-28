@@ -5,7 +5,7 @@ import { useActiveSession } from '../context/ActiveSessionContext';
 import { assignments as assignmentsService } from '../services/api';
 
 function FloatingTimer() {
-    const { activeSession, stopSession, togglePause, fetchActiveSession } = useActiveSession();
+    const { activeSession, stopSession, togglePause, fetchActiveSession, notifySessionChange } = useActiveSession();
     // Initial position: right of logo (approximately x=230, y=12 for inside header area)
     const [position, setPosition] = useState({ x: 230, y: 12 });
     const [isDragging, setIsDragging] = useState(false);
@@ -31,6 +31,7 @@ function FloatingTimer() {
             setNewTaskOpen(false);
             setNewTaskDescription('');
             fetchActiveSession();
+            notifySessionChange(); // Trigger table refresh
         } catch (error) {
             console.error('Failed to switch task:', error);
         }

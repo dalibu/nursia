@@ -158,7 +158,8 @@ export function ActiveSessionProvider({ children }) {
         fetchActiveSession,
         stopSession,
         togglePause,
-        setOnSessionChange
+        setOnSessionChange,
+        notifySessionChange
     };
 
     return (
