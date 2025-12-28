@@ -8,7 +8,7 @@ import {
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
-    KeyboardArrowDown, KeyboardArrowUp
+    KeyboardArrowDown, KeyboardArrowUp, Search
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
@@ -31,8 +31,27 @@ function TimeTrackerPage() {
     const [period, setPeriod] = useState('month');
     const [isAdmin, setIsAdmin] = useState(false);
 
+    // Filters
+    const [filters, setFilters] = useState({
+        search: '',
+        worker: '',
+        status: 'all',
+        dateFrom: '',
+        dateTo: ''
+    });
+    const [filteredAssignments, setFilteredAssignments] = useState([]);
+
     // Use shared context for active session - provides synchronized timer
-    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime } = useActiveSession();
+    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange } = useActiveSession();
+
+    // Register callback to refresh table when session actions happen (pause/resume/stop)
+    useEffect(() => {
+        setOnSessionChange(() => {
+            loadData();
+            loadSummary();
+        });
+        return () => setOnSessionChange(null);
+    }, [setOnSessionChange]);
 
     // Start session dialog
     const [startDialogOpen, setStartDialogOpen] = useState(false);
@@ -95,6 +114,7 @@ function TimeTrackerPage() {
                 paymentsService.getUserInfo()
             ]);
             setGroupedAssignments(groupedRes.data);
+            setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setContributorsList(contribRes.data);
@@ -105,6 +125,59 @@ function TimeTrackerPage() {
             setLoading(false);
         }
     };
+
+    // Apply filters to assignments
+    useEffect(() => {
+        let filtered = [...groupedAssignments];
+
+        // Search filter
+        if (filters.search) {
+            const searchTerm = filters.search.toLowerCase();
+            filtered = filtered.filter(a => {
+                // Search in assignment fields
+                const assignmentFields = [
+                    a.worker_name,
+                    a.description,
+                    a.assignment_date,
+                    formatCurrency(a.total_amount, a.currency)
+                ];
+                const assignmentMatch = assignmentFields.some(field =>
+                    field && field.toString().toLowerCase().includes(searchTerm)
+                );
+
+                // Search in task (segment) descriptions
+                const taskMatch = a.segments && a.segments.some(seg =>
+                    seg.description && seg.description.toLowerCase().includes(searchTerm)
+                );
+
+                return assignmentMatch || taskMatch;
+            });
+        }
+
+        // Worker filter (admin only)
+        if (filters.worker) {
+            filtered = filtered.filter(a => a.worker_id === parseInt(filters.worker));
+        }
+
+        // Status filter
+        if (filters.status === 'active') {
+            filtered = filtered.filter(a => a.is_active);
+        } else if (filters.status === 'completed') {
+            filtered = filtered.filter(a => !a.is_active);
+        }
+
+        // Date from filter
+        if (filters.dateFrom) {
+            filtered = filtered.filter(a => a.assignment_date >= filters.dateFrom);
+        }
+
+        // Date to filter
+        if (filters.dateTo) {
+            filtered = filtered.filter(a => a.assignment_date <= filters.dateTo);
+        }
+
+        setFilteredAssignments(filtered);
+    }, [groupedAssignments, filters]);
 
     const loadSummary = async () => {
         try {
@@ -297,7 +370,7 @@ function TimeTrackerPage() {
                 const data = await response.json();
                 throw new Error(data.detail || 'Ошибка сохранения');
             }
-            showSuccess('Assignment обновлён');
+            showSuccess('Смена обновлена');
             setAssignmentEditOpen(false);
             setAssignmentToEdit(null);
             loadData();
@@ -326,7 +399,7 @@ function TimeTrackerPage() {
                 const data = await response.json();
                 throw new Error(data.detail || 'Ошибка удаления');
             }
-            showSuccess('Assignment удалён');
+            showSuccess('Смена удалена');
             loadData();
             loadSummary();
         } catch (error) {
@@ -460,26 +533,86 @@ function TimeTrackerPage() {
                 ))}
             </Grid>
 
-            {/* Period filter */}
-            <Paper sx={{ p: 3 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6">
-                        <Work sx={{ verticalAlign: 'middle', mr: 1 }} />
-                        История сессий
-                    </Typography>
+            {/* Filters */}
+            <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+                <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                    <TextField
+                        label="Поиск"
+                        size="small"
+                        value={filters.search}
+                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                        placeholder="Поиск по сменам..."
+                        InputProps={{
+                            startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+                        }}
+                        sx={{ minWidth: 200 }}
+                    />
+                    {isAdmin && (
+                        <TextField
+                            select
+                            label="Работник"
+                            size="small"
+                            value={filters.worker}
+                            onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
+                            sx={{ minWidth: 150 }}
+                        >
+                            <MenuItem value="">Все</MenuItem>
+                            {contributorsList.map(c => (
+                                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                            ))}
+                        </TextField>
+                    )}
                     <TextField
                         select
+                        label="Статус"
+                        size="small"
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                        sx={{ minWidth: 120 }}
+                    >
+                        <MenuItem value="all">Все</MenuItem>
+                        <MenuItem value="active">В работе</MenuItem>
+                        <MenuItem value="completed">Завершено</MenuItem>
+                    </TextField>
+                    <TextField
+                        label="Дата от"
+                        type="date"
+                        size="small"
+                        value={filters.dateFrom}
+                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                        InputLabelProps={{ shrink: true }}
+                    />
+                    <TextField
+                        label="Дата до"
+                        type="date"
+                        size="small"
+                        value={filters.dateTo}
+                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                        InputLabelProps={{ shrink: true }}
+                    />
+                    <TextField
+                        select
+                        label="Период"
                         size="small"
                         value={period}
                         onChange={(e) => setPeriod(e.target.value)}
-                        sx={{ minWidth: 120 }}
+                        sx={{ minWidth: 100 }}
                     >
                         <MenuItem value="day">День</MenuItem>
                         <MenuItem value="week">Неделя</MenuItem>
                         <MenuItem value="month">Месяц</MenuItem>
                         <MenuItem value="year">Год</MenuItem>
                     </TextField>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setFilters({ search: '', worker: '', status: 'all', dateFrom: '', dateTo: '' })}
+                    >
+                        Очистить
+                    </Button>
                 </Box>
+            </Paper>
+
+            <Paper sx={{ p: 3 }}>
 
                 <TableContainer>
                     <Table size="small">
@@ -489,7 +622,6 @@ function TimeTrackerPage() {
                                 <TableCell><strong>Дата</strong></TableCell>
                                 <TableCell><strong>Работник</strong></TableCell>
                                 <TableCell align="center"><strong>Время</strong></TableCell>
-                                <TableCell align="right"><strong>Пауза</strong></TableCell>
                                 <TableCell align="right"><strong>Работа</strong></TableCell>
                                 <TableCell align="right"><strong>Сумма</strong></TableCell>
                                 <TableCell><strong>Описание</strong></TableCell>
@@ -498,7 +630,7 @@ function TimeTrackerPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {groupedAssignments.map((assignment) => (
+                            {filteredAssignments.map((assignment) => (
                                 <React.Fragment key={assignment.assignment_id}>
                                     {/* Main assignment row */}
                                     <TableRow
@@ -519,14 +651,17 @@ function TimeTrackerPage() {
                                         </TableCell>
                                         <TableCell><strong>{formatDate(assignment.assignment_date)}</strong></TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
-                                        <TableCell align="center" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                                        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                                             {formatTime(assignment.start_time)} — {assignment.end_time ? formatTime(assignment.end_time) : '...'}
                                         </TableCell>
-                                        <TableCell align="right" sx={{ color: '#ff9800', fontFamily: 'monospace' }}>
-                                            {Math.floor(assignment.total_pause_seconds / 3600)}:{String(Math.floor((assignment.total_pause_seconds % 3600) / 60)).padStart(2, '0')}
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ color: '#4caf50', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                                            {Math.floor(assignment.total_work_seconds / 3600)}:{String(Math.floor((assignment.total_work_seconds % 3600) / 60)).padStart(2, '0')}
+                                        <TableCell align="right">
+                                            {(() => {
+                                                const totalMinutes = Math.floor(assignment.total_work_seconds / 60);
+                                                const h = Math.floor(totalMinutes / 60);
+                                                const m = totalMinutes % 60;
+                                                const hours = (assignment.total_work_seconds / 3600).toFixed(2).replace('.', ',');
+                                                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
+                                            })()}
                                         </TableCell>
                                         <TableCell align="right">
                                             {formatCurrency(assignment.total_amount, assignment.currency)}
@@ -568,7 +703,7 @@ function TimeTrackerPage() {
                                         <TableCell colSpan={10} sx={{ p: 0, border: 0 }}>
                                             <Collapse in={expandedRows[assignment.assignment_id]} timeout="auto" unmountOnExit>
                                                 <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Сегменты:</Typography>
+
                                                     <Table size="small">
                                                         <TableBody>
                                                             {assignment.segments.map((seg) => (
@@ -577,7 +712,7 @@ function TimeTrackerPage() {
                                                                 }}>
                                                                     <TableCell width={80}>
                                                                         <Chip
-                                                                            label={seg.session_type === 'pause' ? '☕ Пауза' : '⏱ Работа'}
+                                                                            label={seg.session_type === 'pause' ? 'Пауза' : 'Работа'}
                                                                             size="small"
                                                                             sx={{
                                                                                 backgroundColor: seg.session_type === 'pause' ? '#ff9800' : '#4caf50',
@@ -587,10 +722,14 @@ function TimeTrackerPage() {
                                                                     </TableCell>
                                                                     <TableCell>{formatTime(seg.start_time)} — {seg.end_time ? formatTime(seg.end_time) : 'сейчас'}</TableCell>
                                                                     <TableCell>
-                                                                        {seg.duration_hours ? `${seg.duration_hours.toFixed(2)} ч` : '—'}
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        {seg.amount ? formatCurrency(seg.amount, seg.currency) : '—'}
+                                                                        {seg.duration_hours ? (
+                                                                            (() => {
+                                                                                const totalMinutes = Math.round(seg.duration_hours * 60);
+                                                                                const h = Math.floor(totalMinutes / 60);
+                                                                                const m = totalMinutes % 60;
+                                                                                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                                                            })()
+                                                                        ) : '—'}
                                                                     </TableCell>
                                                                     <TableCell sx={{ fontStyle: 'italic', color: '#666' }}>
                                                                         {seg.description || ''}
@@ -658,19 +797,10 @@ function TimeTrackerPage() {
                 </DialogActions>
             </Dialog>
 
-            {/* Edit Session Dialog */}
+            {/* Edit Task Dialog */}
             <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-                <DialogTitle>Редактировать сессию</DialogTitle>
+                <DialogTitle>Редактировать задание</DialogTitle>
                 <DialogContent sx={{ minWidth: 400 }}>
-                    <TextField
-                        fullWidth
-                        type="date"
-                        label="Дата"
-                        value={editForm.assignment_date}
-                        onChange={(e) => setEditForm({ ...editForm, assignment_date: e.target.value })}
-                        sx={{ mt: 2 }}
-                        InputLabelProps={{ shrink: true }}
-                    />
                     <Box display="flex" gap={2} mt={2}>
                         <TextField
                             type="time"
@@ -759,7 +889,7 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    ✏️ Редактировать Assignment
+                    ✏️ Редактировать смену
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     <TextField
@@ -816,14 +946,14 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    🗑️ Удалить Assignment
+                    🗑️ Удалить смену
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ mb: 1 }}>
-                        Вы уверены, что хотите удалить этот Assignment?
+                        Вы уверены, что хотите удалить эту смену?
                     </Typography>
                     <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
-                        Все сегменты (tasks) будут удалены!
+                        Все задания будут удалены!
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>

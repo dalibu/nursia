@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const ActiveSessionContext = createContext();
@@ -11,6 +11,21 @@ export function ActiveSessionProvider({ children }) {
     const [activeSession, setActiveSession] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [loading, setLoading] = useState(true);
+
+    // Callback ref for session change notifications
+    const sessionChangeCallback = useRef(null);
+
+    // Register callback for session changes (used by TimeTrackerPage to refresh table)
+    const setOnSessionChange = useCallback((callback) => {
+        sessionChangeCallback.current = callback;
+    }, []);
+
+    // Notify subscribers of session change
+    const notifySessionChange = useCallback(() => {
+        if (sessionChangeCallback.current) {
+            sessionChangeCallback.current();
+        }
+    }, []);
 
     // Fetch active session
     const fetchActiveSession = useCallback(async () => {
@@ -112,6 +127,7 @@ export function ActiveSessionProvider({ children }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             await fetchActiveSession();
+            notifySessionChange(); // Notify subscribers to refresh
         } catch (error) {
             console.error('Failed to stop session:', error);
             throw error;
@@ -127,6 +143,7 @@ export function ActiveSessionProvider({ children }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             await fetchActiveSession();
+            notifySessionChange(); // Notify subscribers to refresh
         } catch (error) {
             console.error('Failed to toggle pause:', error);
             throw error;
@@ -140,7 +157,8 @@ export function ActiveSessionProvider({ children }) {
         getElapsedTimes,
         fetchActiveSession,
         stopSession,
-        togglePause
+        togglePause,
+        setOnSessionChange
     };
 
     return (
@@ -149,3 +167,4 @@ export function ActiveSessionProvider({ children }) {
         </ActiveSessionContext.Provider>
     );
 }
+
