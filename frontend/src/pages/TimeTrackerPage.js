@@ -4,17 +4,40 @@ import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader
+    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
+    Popover
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs from 'dayjs';
+import { DateRangePicker } from 'react-date-range';
+import { ru } from 'date-fns/locale';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths } from 'date-fns';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
-    KeyboardArrowDown, KeyboardArrowUp, Search
+    KeyboardArrowDown, KeyboardArrowUp, Search, DateRange
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
+
+// Russian localized static ranges for DateRangePicker
+const ruStaticRanges = [
+    { label: 'Сегодня', range: () => ({ startDate: new Date(), endDate: new Date() }), isSelected: () => false },
+    { label: 'Вчера', range: () => ({ startDate: addDays(new Date(), -1), endDate: addDays(new Date(), -1) }), isSelected: () => false },
+    { label: 'Эта неделя', range: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }), isSelected: () => false },
+    { label: 'Прошлая неделя', range: () => ({ startDate: startOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }), endDate: endOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }) }), isSelected: () => false },
+    { label: 'Этот месяц', range: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }), isSelected: () => false },
+    { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false }
+];
+
+// Helper to format Date to YYYY-MM-DD without timezone issues
+const toLocalDateString = (date) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 // Символы валют
 const currencySymbols = {
@@ -40,10 +63,14 @@ function TimeTrackerPage() {
     const [filters, setFilters] = useState({
         search: '',
         worker: '',
-        status: 'all',
-        dateFrom: '',
-        dateTo: ''
+        status: 'all'
     });
+    const [dateRange, setDateRange] = useState([{
+        startDate: null,
+        endDate: null,
+        key: 'selection'
+    }]);
+    const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
     const [filteredAssignments, setFilteredAssignments] = useState([]);
 
     // Use shared context for active session - provides synchronized timer
@@ -224,18 +251,18 @@ function TimeTrackerPage() {
             filtered = filtered.filter(a => !a.is_active);
         }
 
-        // Date from filter
-        if (filters.dateFrom) {
-            filtered = filtered.filter(a => a.assignment_date >= filters.dateFrom);
+        // Date range filter
+        if (dateRange[0].startDate) {
+            const startStr = toLocalDateString(dateRange[0].startDate);
+            filtered = filtered.filter(a => a.assignment_date >= startStr);
         }
-
-        // Date to filter
-        if (filters.dateTo) {
-            filtered = filtered.filter(a => a.assignment_date <= filters.dateTo);
+        if (dateRange[0].endDate) {
+            const endStr = toLocalDateString(dateRange[0].endDate);
+            filtered = filtered.filter(a => a.assignment_date <= endStr);
         }
 
         setFilteredAssignments(filtered);
-    }, [groupedAssignments, filters]);
+    }, [groupedAssignments, filters, dateRange]);
 
     const loadSummary = async () => {
         try {
@@ -572,22 +599,12 @@ function TimeTrackerPage() {
 
                 // Format period label dynamically based on filters
                 const getPeriodLabel = () => {
-                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-
-                    if (filters.dateFrom || filters.dateTo) {
+                    if (dateRange[0].startDate || dateRange[0].endDate) {
                         // Date range filter - format as DD.MM.YYYY
-                        const from = filters.dateFrom ? formatDate(filters.dateFrom) : '...';
-                        const to = filters.dateTo ? formatDate(filters.dateTo) : '...';
+                        const from = dateRange[0].startDate ? formatDate(toLocalDateString(dateRange[0].startDate)) : '...';
+                        const to = dateRange[0].endDate ? formatDate(toLocalDateString(dateRange[0].endDate)) : '...';
                         return `${from} — ${to}`;
                     }
-
-                    if (period === 'month') {
-                        const now = new Date();
-                        return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
-                    }
-                    if (period === 'week') return 'Неделя';
-                    if (period === 'year') return 'Год';
                     return 'Все время';
                 };
 
@@ -658,34 +675,40 @@ function TimeTrackerPage() {
                         <MenuItem value="active">В работе</MenuItem>
                         <MenuItem value="completed">Завершено</MenuItem>
                     </TextField>
-                    <DatePicker
-                        label="Дата от"
-                        value={filters.dateFrom ? dayjs(filters.dateFrom) : null}
-                        onChange={(newValue) => setFilters({ ...filters, dateFrom: newValue ? newValue.format('YYYY-MM-DD') : '' })}
-                        slotProps={{ textField: { size: 'small', sx: { width: 150 } } }}
-                    />
-                    <DatePicker
-                        label="Дата до"
-                        value={filters.dateTo ? dayjs(filters.dateTo) : null}
-                        onChange={(newValue) => setFilters({ ...filters, dateTo: newValue ? newValue.format('YYYY-MM-DD') : '' })}
-                        slotProps={{ textField: { size: 'small', sx: { width: 150 } } }}
-                    />
-                    <TextField
-                        select
-                        label="Период"
-                        size="small"
-                        value={period}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        sx={{ minWidth: 100 }}
-                    >
-                        <MenuItem value="day">День</MenuItem>
-                        <MenuItem value="week">Неделя</MenuItem>
-                        <MenuItem value="month">Месяц</MenuItem>
-                        <MenuItem value="year">Год</MenuItem>
-                    </TextField>
                     <Button
                         variant="outlined"
-                        onClick={() => setFilters({ search: '', worker: '', status: 'all', dateFrom: '', dateTo: '' })}
+                        size="small"
+                        startIcon={<DateRange />}
+                        onClick={(e) => setDateRangeAnchor(e.currentTarget)}
+                        sx={{ minWidth: 200 }}
+                    >
+                        {dateRange[0].startDate && dateRange[0].endDate
+                            ? `${formatDate(toLocalDateString(dateRange[0].startDate))} — ${formatDate(toLocalDateString(dateRange[0].endDate))}`
+                            : 'Выберите период'}
+                    </Button>
+                    <Popover
+                        open={Boolean(dateRangeAnchor)}
+                        anchorEl={dateRangeAnchor}
+                        onClose={() => setDateRangeAnchor(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                    >
+                        <DateRangePicker
+                            onChange={(item) => setDateRange([item.selection])}
+                            ranges={dateRange}
+                            locale={ru}
+                            months={1}
+                            direction="horizontal"
+                            rangeColors={['#1976d2']}
+                            staticRanges={ruStaticRanges}
+                            inputRanges={[]}
+                        />
+                    </Popover>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            setFilters({ search: '', worker: '', status: 'all' });
+                            setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
+                        }}
                     >
                         Очистить
                     </Button>
