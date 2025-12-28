@@ -79,6 +79,7 @@ class UserInfo(BaseModel):
 class Payment(PaymentBase):
     id: int
     payer_id: int
+    tracking_nr: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
     category: Optional[PaymentCategory] = None

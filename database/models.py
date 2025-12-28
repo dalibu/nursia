@@ -131,6 +131,7 @@ class Payment(Base):
     is_paid: Mapped[bool] = mapped_column(default=False)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assignments.id"), nullable=True)
+    tracking_nr: Mapped[str] = mapped_column(String(20), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     payer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[payer_id])
@@ -221,6 +222,7 @@ class Assignment(Base):
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Комментарий
     is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
+    tracking_nr: Mapped[str] = mapped_column(String(20), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     worker: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[worker_id])

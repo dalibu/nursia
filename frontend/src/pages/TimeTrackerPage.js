@@ -762,7 +762,12 @@ function TimeTrackerPage() {
                                                 {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
                                             </IconButton>
                                         </TableCell>
-                                        <TableCell><strong>{formatDate(assignment.assignment_date)}</strong></TableCell>
+                                        <TableCell>
+                                            <strong>{formatDate(assignment.assignment_date)}</strong>
+                                            <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '8px' }}>
+                                                {assignment.tracking_nr || ''}
+                                            </span>
+                                        </TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
                                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                                             {formatTime(assignment.start_time)} — {assignment.end_time ? formatTime(assignment.end_time) : '...'}
@@ -1081,7 +1086,7 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    ✏️ Редактировать смену
+                    ✏️ Редактировать смену {assignmentToEdit?.tracking_nr || ''}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     {isAdmin && (

@@ -149,9 +149,14 @@ async def create_payment(
         payment_data['paid_at'] = now_server()
     else:
         payment_data['paid_at'] = None
+    
+    # Generate tracking number after getting ID
+    from utils.tracking import format_payment_tracking_nr
         
     db_payment = Payment(**payment_data)
     db.add(db_payment)
+    await db.flush()  # Получаем ID
+    db_payment.tracking_nr = format_payment_tracking_nr(db_payment.id)
     await db.commit()
     await db.refresh(db_payment)
     
@@ -206,6 +211,7 @@ async def get_payments(
     for payment in payments:
         payment_dict = {
             "id": payment.id,
+            "tracking_nr": payment.tracking_nr,
             "category_id": payment.category_id,
             "recipient_id": payment.recipient_id,
             "amount": str(payment.amount),

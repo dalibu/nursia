@@ -50,7 +50,7 @@ function PaymentsPage() {
   const [editingPayment, setEditingPayment] = useState(null);
   const [showContributorForm, setShowContributorForm] = useState(false);
   const [editingContributor, setEditingContributor] = useState(null);
-  const [sortField, setSortField] = useState('number');
+  const [sortField, setSortField] = useState('tracking_nr');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filters, setFilters] = useState({
     search: '',
@@ -170,9 +170,10 @@ function PaymentsPage() {
       let aVal, bVal;
 
       switch (sortField) {
-        case 'number':
-          aVal = a.rowNumber;
-          bVal = b.rowNumber;
+        case 'tracking_nr':
+          // Extract numeric ID from tracking_nr (P-21 -> 21)
+          aVal = parseInt((a.tracking_nr || '').replace(/\D/g, '')) || 0;
+          bVal = parseInt((b.tracking_nr || '').replace(/\D/g, '')) || 0;
           break;
         case 'id':
           aVal = a.id;
@@ -461,13 +462,13 @@ function PaymentsPage() {
         <Table size="small" stickyHeader sx={{ tableLayout: 'fixed' }}>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
-              <TableCell sx={{ width: 36, minWidth: 36, maxWidth: 36, px: 0.5 }}>
+              <TableCell sx={{ width: 55, minWidth: 55, px: 0.5 }}>
                 <TableSortLabel
-                  active={sortField === 'number'}
-                  direction={sortField === 'number' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('number')}
+                  active={sortField === 'tracking_nr'}
+                  direction={sortField === 'tracking_nr' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('tracking_nr')}
                 >
-                  №
+                  Номер
                 </TableSortLabel>
               </TableCell>
               <TableCell>
@@ -544,7 +545,7 @@ function PaymentsPage() {
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((payment, index) => (
                 <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
-                  <TableCell sx={{ width: 32, minWidth: 32, maxWidth: 32, px: 0.5, textAlign: 'center' }}>{payment.rowNumber}</TableCell>
+                  <TableCell sx={{ width: 55, minWidth: 55, px: 0.5, fontSize: '0.75rem' }}>{payment.tracking_nr || '-'}</TableCell>
                   <TableCell>
                     <div style={{ lineHeight: 1 }}>
                       <div>{new Date(payment.payment_date).toLocaleDateString()}</div>

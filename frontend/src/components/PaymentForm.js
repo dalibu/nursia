@@ -123,7 +123,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{payment ? 'Редактировать платёж' : 'Новый платёж'}</DialogTitle>
+      <DialogTitle>{payment ? `Редактировать платёж ${payment.tracking_nr || ''}` : 'Новый платёж'}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent>
           <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">

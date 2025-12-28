@@ -65,6 +65,7 @@ class WorkSessionSummary(BaseModel):
 class AssignmentResponse(BaseModel):
     """Группировка сегментов по assignment"""
     assignment_id: int
+    tracking_nr: str
     assignment_date: date
     worker_id: int
     worker_name: Optional[str] = None
@@ -175,7 +176,7 @@ async def start_work_session(
     
     now = datetime.now()
     
-    # Создаём Assignment
+    # Создаём Assignment (tracking_nr будет присвоен после flush)
     new_assignment = Assignment(
         worker_id=session_data.worker_id,
         employer_id=session_data.employer_id,
@@ -187,6 +188,10 @@ async def start_work_session(
     )
     db.add(new_assignment)
     await db.flush()  # Получаем ID
+    
+    # Generate tracking number using assignment ID
+    from utils.tracking import format_assignment_tracking_nr
+    new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
     
     # Создаём первый Task (use task_description if provided, else fallback to assignment description)
     new_task = Task(
@@ -257,18 +262,41 @@ async def stop_work_session(
     
     # Создаём платёж только если сумма > 0
     if total_amount > 0:
+        # Собираем комментарии из смены и всех заданий
+        comments = []
+        if assignment.description:
+            comments.append(assignment.description)
+        
+        for t in all_tasks:
+            if t.description and t.description not in comments:
+                comments.append(t.description)
+        
+        joined_comments = ", ".join(comments)
+        full_description = f"Смена {assignment.tracking_nr}"
+        if joined_comments:
+            full_description += f": {joined_comments}"
+            
+        # Ограничиваем длину до 500 символов
+        if len(full_description) > 500:
+            full_description = full_description[:497] + "..."
+
+        # Generate tracking number for payment
+        from utils.tracking import format_payment_tracking_nr
+
         payment = Payment(
             payer_id=assignment.employer_id,
             recipient_id=assignment.worker_id,
             category_id=3,  # Зарплата
             amount=total_amount,
             currency=assignment.currency,
-            description=f"Оплата за работу {assignment.assignment_date}",
+            description=full_description,
             payment_date=now,
             is_paid=False,
             assignment_id=assignment.id
         )
         db.add(payment)
+        await db.flush()  # Получаем ID
+        payment.tracking_nr = format_payment_tracking_nr(payment.id)
     await db.commit()
     await db.refresh(task)
     
@@ -796,6 +824,7 @@ async def get_grouped_sessions(
         
         responses.append(AssignmentResponse(
             assignment_id=assignment.id,
+            tracking_nr=assignment.tracking_nr,
             assignment_date=assignment.assignment_date,
             worker_id=assignment.worker_id,
             worker_name=assignment.worker.name if assignment.worker else None,
