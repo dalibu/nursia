@@ -154,7 +154,7 @@ function Layout({ onLogout }) {
                     ➕ Новое задание
                   </MenuItem>
                   <MenuItem onClick={() => { setZadaniyaAnchor(null); togglePause(); }}>
-                    {activeSession?.session_type === 'pause' ? '▶️ Продолжить' : '☕ Пауза'}
+                    {activeSession?.session_type === 'pause' ? '▶️ Продолжить' : '⏸ Пауза'}
                   </MenuItem>
                 </>
               )}
