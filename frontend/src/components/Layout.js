@@ -120,7 +120,7 @@ function Layout({ onLogout }) {
             </Button>
             <Button
               color="inherit"
-              onClick={(e) => setZadaniyaAnchor(e.currentTarget)}
+              onClick={(e) => { navigate('/time-tracker'); setZadaniyaAnchor(e.currentTarget); }}
               endIcon={<ExpandMore />}
             >
               📋 Задания
@@ -141,9 +141,6 @@ function Layout({ onLogout }) {
                 }
               }}
             >
-              <MenuItem component={Link} to="/time-tracker" onClick={() => setZadaniyaAnchor(null)}>
-                📋 Учёт заданий
-              </MenuItem>
               {!activeSession ? (
                 <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=start'); }}>
                   ▶️ Начать смену
