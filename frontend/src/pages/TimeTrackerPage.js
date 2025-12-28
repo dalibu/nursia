@@ -3,7 +3,7 @@ import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar
+    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader
 } from '@mui/material';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
@@ -56,6 +56,7 @@ function TimeTrackerPage() {
     // Start session dialog
     const [startDialogOpen, setStartDialogOpen] = useState(false);
     const [selectedEmployment, setSelectedEmployment] = useState('');
+    const [startDescription, setStartDescription] = useState('');
 
     // Edit session dialog
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -189,23 +190,12 @@ function TimeTrackerPage() {
     };
 
     const handleStartClick = async () => {
-        // Для обычного пользователя с одним трудовым отношением — сразу старт
-        if (!isAdmin && employmentList.length === 1) {
-            const emp = employmentList[0];
-            try {
-                await assignmentsService.start({
-                    worker_id: emp.employee_id,
-                    employer_id: emp.employer_id
-                });
-                loadData();
-            } catch (error) {
-                console.error('Failed to start session:', error);
-                showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
-            }
-        } else {
-            // Для админа или при нескольких отношениях — показываем диалог
-            setStartDialogOpen(true);
+        // Pre-select employment if user has only one
+        if (employmentList.length === 1) {
+            setSelectedEmployment(employmentList[0].id);
         }
+        // Always show dialog for comment input
+        setStartDialogOpen(true);
     };
 
     const handleStartSession = async () => {
@@ -213,13 +203,21 @@ function TimeTrackerPage() {
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
         try {
+            // If there's an active session, stop it first
+            if (activeSession) {
+                await assignmentsService.stop(activeSession.id);
+            }
+
             await assignmentsService.start({
                 worker_id: emp.employee_id,
-                employer_id: emp.employer_id
+                employer_id: emp.employer_id,
+                description: startDescription || null
             });
             setStartDialogOpen(false);
             setSelectedEmployment('');
+            setStartDescription('');
             loadData();
+            fetchActiveSession(); // Refresh active session in context
         } catch (error) {
             console.error('Failed to start session:', error);
             showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
@@ -623,7 +621,6 @@ function TimeTrackerPage() {
                                 <TableCell><strong>Работник</strong></TableCell>
                                 <TableCell align="center"><strong>Время</strong></TableCell>
                                 <TableCell align="right"><strong>Работа</strong></TableCell>
-                                <TableCell align="right"><strong>Сумма</strong></TableCell>
                                 <TableCell><strong>Описание</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
                                 <TableCell align="center" width={80}></TableCell>
@@ -663,9 +660,6 @@ function TimeTrackerPage() {
                                                 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
                                             })()}
                                         </TableCell>
-                                        <TableCell align="right">
-                                            {formatCurrency(assignment.total_amount, assignment.currency)}
-                                        </TableCell>
                                         <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {assignment.description || '—'}
                                         </TableCell>
@@ -677,24 +671,26 @@ function TimeTrackerPage() {
                                             )}
                                         </TableCell>
                                         <TableCell align="center">
-                                            <IconButton
-                                                size="small"
-                                                color="primary"
-                                                onClick={(e) => handleEditAssignment(assignment, e)}
-                                                title="Редактировать"
-                                            >
-                                                <Edit fontSize="small" />
-                                            </IconButton>
-                                            {!assignment.is_active && (
+                                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
                                                 <IconButton
                                                     size="small"
-                                                    color="error"
-                                                    onClick={(e) => handleDeleteAssignment(assignment, e)}
-                                                    title="Удалить"
+                                                    color="primary"
+                                                    onClick={(e) => handleEditAssignment(assignment, e)}
+                                                    title="Редактировать"
                                                 >
-                                                    <Delete fontSize="small" />
+                                                    <Edit fontSize="small" />
                                                 </IconButton>
-                                            )}
+                                                {!assignment.is_active && (
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={(e) => handleDeleteAssignment(assignment, e)}
+                                                        title="Удалить"
+                                                    >
+                                                        <Delete fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </Box>
                                         </TableCell>
                                     </TableRow>
 
@@ -759,30 +755,78 @@ function TimeTrackerPage() {
 
             {/* Start Session Dialog */}
             <Dialog open={startDialogOpen} onClose={() => setStartDialogOpen(false)}>
-                <DialogTitle>Начать рабочую сессию</DialogTitle>
+                <DialogTitle>Начать смену</DialogTitle>
                 <DialogContent sx={{ minWidth: 400 }}>
                     {employmentList.length === 0 ? (
                         <Alert severity="warning" sx={{ mt: 2 }}>
                             Нет активных трудовых отношений. Сначала создайте их в настройках.
                         </Alert>
                     ) : (
-                        <TextField
-                            select
-                            fullWidth
-                            label={isAdmin ? "Выберите работника" : "Выберите работодателя"}
-                            value={selectedEmployment}
-                            onChange={(e) => setSelectedEmployment(e.target.value)}
-                            sx={{ mt: 2 }}
-                        >
-                            {employmentList.map((emp) => (
-                                <MenuItem key={emp.id} value={emp.id}>
-                                    {isAdmin
-                                        ? `${emp.employee_name} → ${emp.employer_name} (${formatCurrency(emp.hourly_rate, emp.currency)}/ч)`
-                                        : `${emp.employer_name} (${formatCurrency(emp.hourly_rate, emp.currency)}/ч)`
-                                    }
-                                </MenuItem>
-                            ))}
-                        </TextField>
+                        <>
+                            {/* Warning if there's an active session */}
+                            {activeSession && (
+                                <Alert severity="warning" sx={{ mt: 2 }}>
+                                    Текущая смена будет завершена и создастся новая.
+                                </Alert>
+                            )}
+                            {/* Show employer selection only if admin or user has multiple employers */}
+                            {(isAdmin || employmentList.length > 1) && (
+                                <TextField
+                                    select
+                                    fullWidth
+                                    label={isAdmin ? "Выберите работника" : "Выберите работодателя"}
+                                    value={selectedEmployment}
+                                    onChange={(e) => setSelectedEmployment(e.target.value)}
+                                    sx={{ mt: 2 }}
+                                >
+                                    {isAdmin ? (
+                                        // Admin view: group workers by employer if multiple employers
+                                        (() => {
+                                            const employers = [...new Set(employmentList.map(e => e.employer_name))];
+                                            if (employers.length === 1) {
+                                                // Single employer - just list workers
+                                                return employmentList.map((emp) => (
+                                                    <MenuItem key={emp.id} value={emp.id}>
+                                                        {emp.employee_name}
+                                                    </MenuItem>
+                                                ));
+                                            } else {
+                                                // Multiple employers - group by employer
+                                                return employers.flatMap(employer => [
+                                                    <ListSubheader key={`header-${employer}`} sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>
+                                                        {employer}
+                                                    </ListSubheader>,
+                                                    ...employmentList
+                                                        .filter(e => e.employer_name === employer)
+                                                        .map((emp) => (
+                                                            <MenuItem key={emp.id} value={emp.id} sx={{ pl: 4 }}>
+                                                                {emp.employee_name}
+                                                            </MenuItem>
+                                                        ))
+                                                ]);
+                                            }
+                                        })()
+                                    ) : (
+                                        // Non-admin: simple employer list
+                                        employmentList.map((emp) => (
+                                            <MenuItem key={emp.id} value={emp.id}>
+                                                {emp.employer_name}
+                                            </MenuItem>
+                                        ))
+                                    )}
+                                </TextField>
+                            )}
+                            <TextField
+                                fullWidth
+                                label="Комментарий"
+                                value={startDescription}
+                                onChange={(e) => setStartDescription(e.target.value)}
+                                placeholder="Опишите смену..."
+                                multiline
+                                rows={2}
+                                sx={{ mt: 2 }}
+                            />
+                        </>
                     )}
                 </DialogContent>
                 <DialogActions>
@@ -892,45 +936,39 @@ function TimeTrackerPage() {
                     ✏️ Редактировать смену
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
+                    {isAdmin && (
+                        <Box display="flex" gap={2} sx={{ mt: 3, mb: 2 }}>
+                            <TextField
+                                fullWidth
+                                label="Ставка за час"
+                                type="number"
+                                value={assignmentForm.hourly_rate}
+                                onChange={(e) => setAssignmentForm({ ...assignmentForm, hourly_rate: e.target.value })}
+                            />
+                            <TextField
+                                select
+                                label="Валюта"
+                                value={assignmentForm.currency}
+                                onChange={(e) => setAssignmentForm({ ...assignmentForm, currency: e.target.value })}
+                                sx={{ minWidth: 100 }}
+                            >
+                                {['UAH', 'EUR', 'USD'].map((curr) => (
+                                    <MenuItem key={curr} value={curr}>
+                                        {currencySymbols[curr] || curr}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
+                    )}
                     <TextField
                         fullWidth
-                        label="Дата"
-                        type="date"
-                        value={assignmentForm.assignment_date}
-                        onChange={(e) => setAssignmentForm({ ...assignmentForm, assignment_date: e.target.value })}
-                        sx={{ mb: 2 }}
-                        InputLabelProps={{ shrink: true }}
-                    />
-                    <Box display="flex" gap={2} sx={{ mb: 2 }}>
-                        <TextField
-                            fullWidth
-                            label="Ставка за час"
-                            type="number"
-                            value={assignmentForm.hourly_rate}
-                            onChange={(e) => setAssignmentForm({ ...assignmentForm, hourly_rate: e.target.value })}
-                        />
-                        <TextField
-                            select
-                            label="Валюта"
-                            value={assignmentForm.currency}
-                            onChange={(e) => setAssignmentForm({ ...assignmentForm, currency: e.target.value })}
-                            sx={{ minWidth: 100 }}
-                        >
-                            {['UAH', 'EUR', 'USD'].map((curr) => (
-                                <MenuItem key={curr} value={curr}>
-                                    {currencySymbols[curr] || curr}
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                    </Box>
-                    <TextField
-                        fullWidth
-                        label="Описание"
+                        label="Комментарий"
                         multiline
                         rows={3}
                         value={assignmentForm.description}
                         onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })}
-                        placeholder="Комментарий к рабочему дню..."
+                        placeholder="Комментарий к смене..."
+                        sx={{ mt: isAdmin ? 0 : 3 }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>

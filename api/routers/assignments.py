@@ -181,6 +181,7 @@ async def start_work_session(
         assignment_date=now.date(),
         hourly_rate=employment.hourly_rate,
         currency=employment.currency,
+        description=session_data.description,  # Save description to assignment
         is_active=True
     )
     db.add(new_assignment)
