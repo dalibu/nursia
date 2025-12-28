@@ -109,6 +109,10 @@ function TimeTrackerPage() {
             navigate('/time-tracker', { replace: true });
 
             if (action === 'start') {
+                // Pre-select employment if user has only one
+                if (employmentList.length === 1) {
+                    setSelectedEmployment(employmentList[0].id);
+                }
                 setStartDialogOpen(true);
             } else if (action === 'stop' && activeSession) {
                 // Stop current session
@@ -124,6 +128,9 @@ function TimeTrackerPage() {
     const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
     const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
+    // Track previous session ID to detect changes
+    const prevSessionIdRef = React.useRef(activeSession?.id);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -132,6 +139,24 @@ function TimeTrackerPage() {
         loadData();
         loadSummary();
     }, [period]);
+
+    // Smart sync: reload table when activeSession changes (started/stopped by any client)
+    useEffect(() => {
+        const currentSessionId = activeSession?.id ?? null;
+        const prevSessionId = prevSessionIdRef.current;
+
+        // If session ID changed (started, stopped, or switched), reload data
+        if (currentSessionId !== prevSessionId) {
+            const isInitialRender = prevSessionId === undefined;
+            prevSessionIdRef.current = currentSessionId;
+
+            // Reload data when session state changes (but not on initial render)
+            if (!isInitialRender) {
+                loadData();
+                loadSummary();
+            }
+        }
+    }, [activeSession?.id]);
 
     const loadData = async () => {
         setLoading(true);
