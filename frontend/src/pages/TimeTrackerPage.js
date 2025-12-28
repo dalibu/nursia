@@ -6,6 +6,8 @@ import {
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import {
     PlayArrow, Stop, AccessTime, Person, Work,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
@@ -562,35 +564,58 @@ function TimeTrackerPage() {
 
             {/* Active session is now shown in FloatingTimer */}
 
-            {/* Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                {summary.map((s, index) => (
-                    <Grid item xs={12} sm={4} key={index}>
-                        <Card sx={{
-                            background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                            color: 'white'
-                        }}>
-                            <CardContent>
-                                <Typography variant="subtitle2">За период ({period})</Typography>
-                                <Box display="flex" justifyContent="space-between" mt={1}>
-                                    <Box>
-                                        <Typography variant="h4">{s.total_sessions}</Typography>
-                                        <Typography variant="caption">сессий</Typography>
+            {/* Summary Card - calculated from filtered data */}
+            {(() => {
+                // Calculate dynamic summary from filtered assignments
+                const totalSessions = filteredAssignments.length;
+                const totalHours = filteredAssignments.reduce((sum, a) => sum + (a.total_work_seconds || 0), 0) / 3600;
+
+                // Format period label dynamically based on filters
+                const getPeriodLabel = () => {
+                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+                    if (filters.dateFrom || filters.dateTo) {
+                        // Date range filter - format as DD.MM.YYYY
+                        const from = filters.dateFrom ? formatDate(filters.dateFrom) : '...';
+                        const to = filters.dateTo ? formatDate(filters.dateTo) : '...';
+                        return `${from} — ${to}`;
+                    }
+
+                    if (period === 'month') {
+                        const now = new Date();
+                        return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+                    }
+                    if (period === 'week') return 'Неделя';
+                    if (period === 'year') return 'Год';
+                    return 'Все время';
+                };
+
+                return (
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                        <Grid item xs={12}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                                color: 'white'
+                            }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">{getPeriodLabel()}</Typography>
+                                    <Box display="flex" justifyContent="flex-start" gap={6} mt={1}>
+                                        <Box>
+                                            <Typography variant="h4">{totalSessions}</Typography>
+                                            <Typography variant="caption">смен</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="h4">{totalHours.toFixed(1)}</Typography>
+                                            <Typography variant="caption">часов</Typography>
+                                        </Box>
                                     </Box>
-                                    <Box>
-                                        <Typography variant="h4">{s.total_hours.toFixed(1)}</Typography>
-                                        <Typography variant="caption">часов</Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="h4">{formatCurrency(s.total_amount, s.currency)}</Typography>
-                                        <Typography variant="caption">заработано</Typography>
-                                    </Box>
-                                </Box>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
-                ))}
-            </Grid>
+                );
+            })()}
 
             {/* Filters */}
             <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
@@ -633,21 +658,17 @@ function TimeTrackerPage() {
                         <MenuItem value="active">В работе</MenuItem>
                         <MenuItem value="completed">Завершено</MenuItem>
                     </TextField>
-                    <TextField
+                    <DatePicker
                         label="Дата от"
-                        type="date"
-                        size="small"
-                        value={filters.dateFrom}
-                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                        InputLabelProps={{ shrink: true }}
+                        value={filters.dateFrom ? dayjs(filters.dateFrom) : null}
+                        onChange={(newValue) => setFilters({ ...filters, dateFrom: newValue ? newValue.format('YYYY-MM-DD') : '' })}
+                        slotProps={{ textField: { size: 'small', sx: { width: 150 } } }}
                     />
-                    <TextField
+                    <DatePicker
                         label="Дата до"
-                        type="date"
-                        size="small"
-                        value={filters.dateTo}
-                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                        InputLabelProps={{ shrink: true }}
+                        value={filters.dateTo ? dayjs(filters.dateTo) : null}
+                        onChange={(newValue) => setFilters({ ...filters, dateTo: newValue ? newValue.format('YYYY-MM-DD') : '' })}
+                        slotProps={{ textField: { size: 'small', sx: { width: 150 } } }}
                     />
                     <TextField
                         select
