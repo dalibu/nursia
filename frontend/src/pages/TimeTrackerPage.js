@@ -60,6 +60,7 @@ function TimeTrackerPage() {
     const [startDialogOpen, setStartDialogOpen] = useState(false);
     const [selectedEmployment, setSelectedEmployment] = useState('');
     const [startDescription, setStartDescription] = useState('');
+    const [startTaskDescription, setStartTaskDescription] = useState('');
 
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -265,11 +266,13 @@ function TimeTrackerPage() {
             await assignmentsService.start({
                 worker_id: emp.employee_id,
                 employer_id: emp.employer_id,
-                description: startDescription || null
+                description: startDescription || null,
+                task_description: startTaskDescription || startDescription || null
             });
             setStartDialogOpen(false);
             setSelectedEmployment('');
             setStartDescription('');
+            setStartTaskDescription('');
             loadData();
             fetchActiveSession(); // Refresh active session in context
         } catch (error) {
@@ -876,10 +879,20 @@ function TimeTrackerPage() {
                             )}
                             <TextField
                                 fullWidth
-                                label="Комментарий"
+                                label="Комментарий смены"
                                 value={startDescription}
                                 onChange={(e) => setStartDescription(e.target.value)}
                                 placeholder="Опишите смену..."
+                                multiline
+                                rows={2}
+                                sx={{ mt: 2 }}
+                            />
+                            <TextField
+                                fullWidth
+                                label="Комментарий первого задания"
+                                value={startTaskDescription}
+                                onChange={(e) => setStartTaskDescription(e.target.value)}
+                                placeholder="Если отличается от смены..."
                                 multiline
                                 rows={2}
                                 sx={{ mt: 2 }}

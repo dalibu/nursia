@@ -27,6 +27,7 @@ class WorkSessionStart(BaseModel):
     worker_id: int
     employer_id: int
     description: Optional[str] = None
+    task_description: Optional[str] = None  # For first task, if different from assignment
 
 
 class WorkSessionResponse(BaseModel):
@@ -187,12 +188,12 @@ async def start_work_session(
     db.add(new_assignment)
     await db.flush()  # Получаем ID
     
-    # Создаём первый Task
+    # Создаём первый Task (use task_description if provided, else fallback to assignment description)
     new_task = Task(
         assignment_id=new_assignment.id,
         start_time=now.time(),
         task_type="work",
-        description=session_data.description
+        description=session_data.task_description or session_data.description
     )
     db.add(new_task)
     await db.commit()
