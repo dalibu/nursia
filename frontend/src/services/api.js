@@ -76,6 +76,7 @@ export const assignments = {
   stop: (id) => api.post(`/assignments/${id}/stop`),
   pause: (id) => api.post(`/assignments/${id}/pause`),
   resume: (id) => api.post(`/assignments/${id}/resume`),
+  switchTask: (id, data) => api.post(`/assignments/${id}/switch-task`, data),
   list: (params) => api.get('/assignments/', { params }),
   getGrouped: (params) => api.get('/assignments/grouped', { params }),
   getActive: () => api.get('/assignments/active'),

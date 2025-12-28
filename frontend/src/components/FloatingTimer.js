@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Paper, Box, Typography, IconButton } from '@mui/material';
-import { Pause, PlayArrow, Stop, AccessTime, Coffee, DragIndicator } from '@mui/icons-material';
+import { Paper, Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
+import { Pause, PlayArrow, Stop, AccessTime, Coffee, DragIndicator, Add } from '@mui/icons-material';
 import { useActiveSession } from '../context/ActiveSessionContext';
+import { assignments as assignmentsService } from '../services/api';
 
 function FloatingTimer() {
-    const { activeSession, stopSession, togglePause } = useActiveSession();
+    const { activeSession, stopSession, togglePause, fetchActiveSession } = useActiveSession();
     // Initial position: right of logo (approximately x=230, y=12 for inside header area)
     const [position, setPosition] = useState({ x: 230, y: 12 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [localTime, setLocalTime] = useState(new Date());
+    const [newTaskOpen, setNewTaskOpen] = useState(false);
+    const [newTaskDescription, setNewTaskDescription] = useState('');
     const timerRef = useRef(null);
 
     // Update local time every second for real-time display
@@ -17,6 +20,21 @@ function FloatingTimer() {
         const timer = setInterval(() => setLocalTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    // Handle new task creation (switch task)
+    const handleNewTask = async () => {
+        if (!activeSession) return;
+        try {
+            await assignmentsService.switchTask(activeSession.assignment_id, {
+                description: newTaskDescription || null
+            });
+            setNewTaskOpen(false);
+            setNewTaskDescription('');
+            fetchActiveSession();
+        } catch (error) {
+            console.error('Failed to switch task:', error);
+        }
+    };
 
     // Calculate elapsed times with REAL-TIME updates (every second)
     const getDisplayTimes = () => {
@@ -132,12 +150,42 @@ function FloatingTimer() {
                 </IconButton>
                 <IconButton
                     size="small"
+                    onClick={(e) => { e.stopPropagation(); setNewTaskOpen(true); }}
+                    sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
+                    title="Новое задание"
+                >
+                    <Add sx={{ fontSize: 22 }} />
+                </IconButton>
+                <IconButton
+                    size="small"
                     onClick={(e) => { e.stopPropagation(); stopSession(); }}
                     sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
                 >
                     <Stop sx={{ fontSize: 22 }} />
                 </IconButton>
             </Box>
+
+            {/* New Task Dialog */}
+            <Dialog open={newTaskOpen} onClose={() => setNewTaskOpen(false)}>
+                <DialogTitle>Новое задание</DialogTitle>
+                <DialogContent sx={{ minWidth: 350 }}>
+                    <TextField
+                        fullWidth
+                        label="Описание задания"
+                        value={newTaskDescription}
+                        onChange={(e) => setNewTaskDescription(e.target.value)}
+                        placeholder="Что вы будете делать?"
+                        multiline
+                        rows={2}
+                        sx={{ mt: 2 }}
+                        autoFocus
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setNewTaskOpen(false)}>Отмена</Button>
+                    <Button variant="contained" onClick={handleNewTask}>Начать</Button>
+                </DialogActions>
+            </Dialog>
         </Paper>
     );
 }

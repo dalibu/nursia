@@ -23,6 +23,7 @@ function Layout({ onLogout }) {
   const [userName, setUserName] = useState('');
   const [settingsAnchor, setSettingsAnchor] = useState(null);
   const [accountAnchor, setAccountAnchor] = useState(null);
+  const [zadaniyaAnchor, setZadaniyaAnchor] = useState(null);
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
   // Use shared context for active session (needed for FloatingTimer)
@@ -117,9 +118,47 @@ function Layout({ onLogout }) {
             <Button color="inherit" component={Link} to="/">
               Обозрение
             </Button>
-            <Button color="inherit" component={Link} to="/time-tracker">
-              ⏱️ Время
+            <Button
+              color="inherit"
+              onClick={(e) => setZadaniyaAnchor(e.currentTarget)}
+              endIcon={<ExpandMore />}
+            >
+              📋 Задания
             </Button>
+            <Menu
+              anchorEl={zadaniyaAnchor}
+              open={Boolean(zadaniyaAnchor)}
+              onClose={() => setZadaniyaAnchor(null)}
+              PaperProps={{
+                sx: {
+                  backgroundColor: '#1976d2',
+                  '& .MuiMenuItem-root': {
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }
+                }
+              }}
+            >
+              <MenuItem component={Link} to="/time-tracker" onClick={() => setZadaniyaAnchor(null)}>
+                📋 Учёт заданий
+              </MenuItem>
+              {!activeSession ? (
+                <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=start'); }}>
+                  ▶️ Начать смену
+                </MenuItem>
+              ) : (
+                <>
+                  <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=stop'); }}>
+                    ⏹️ Закончить смену
+                  </MenuItem>
+                  <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=newTask'); }}>
+                    ➕ Новое задание
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
             <Button color="inherit" component={Link} to="/payments">
               Платежи
             </Button>

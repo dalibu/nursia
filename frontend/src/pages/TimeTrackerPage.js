@@ -480,22 +480,8 @@ function TimeTrackerPage() {
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    ⏱️ Учёт времени
+                    📋 Учёт заданий
                 </Typography>
-                <Box display="flex" gap={2}>
-                    <IconButton onClick={loadData} color="primary">
-                        <Refresh />
-                    </IconButton>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        startIcon={<PlayArrow />}
-                        onClick={handleStartClick}
-                        disabled={employmentList.length === 0}
-                    >
-                        Начать работу
-                    </Button>
-                </Box>
             </Box>
 
 

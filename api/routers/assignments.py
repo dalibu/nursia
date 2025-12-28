@@ -278,6 +278,68 @@ async def stop_work_session(
     )
 
 
+class SwitchTaskRequest(BaseModel):
+    """Переключение на новое задание"""
+    description: Optional[str] = None
+
+
+@router.post("/{assignment_id}/switch-task", response_model=WorkSessionResponse)
+async def switch_task(
+    assignment_id: int,
+    request: SwitchTaskRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Завершить текущее задание и начать новое в той же смене"""
+    # Находим assignment
+    result = await db.execute(
+        select(Assignment)
+        .options(joinedload(Assignment.worker), joinedload(Assignment.employer))
+        .where(Assignment.id == assignment_id)
+    )
+    assignment = result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Смена не найдена")
+    
+    if not assignment.is_active:
+        raise HTTPException(status_code=400, detail="Смена уже завершена")
+    
+    # Проверка прав
+    if current_user.role != UserRole.ADMIN:
+        user_contributor = await get_user_contributor(current_user, db)
+        if not user_contributor or assignment.worker_id != user_contributor.id:
+            raise HTTPException(status_code=403, detail="Нет прав на эту смену")
+    
+    # Закрываем текущий активный task
+    result = await db.execute(
+        select(Task).where(
+            and_(Task.assignment_id == assignment_id, Task.end_time == None)
+        )
+    )
+    current_task = result.scalar_one_or_none()
+    
+    now = datetime.now()
+    if current_task:
+        current_task.end_time = now.time()
+    
+    # Создаём новый work task
+    new_task = Task(
+        assignment_id=assignment_id,
+        start_time=now.time(),
+        task_type="work",
+        description=request.description
+    )
+    db.add(new_task)
+    await db.commit()
+    await db.refresh(new_task)
+    
+    return _task_to_response(
+        new_task, assignment,
+        worker_name=assignment.worker.name if assignment.worker else None,
+        employer_name=assignment.employer.name if assignment.employer else None
+    )
+
 @router.put("/{session_id}", response_model=WorkSessionResponse)
 async def update_work_session(
     session_id: int,
