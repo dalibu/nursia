@@ -4,12 +4,43 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination, Chip, TableFooter
+  DialogContentText, TablePagination, Chip, TableFooter, Popover
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay, Search } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay, Search, DateRange } from '@mui/icons-material';
+import { DateRangePicker } from 'react-date-range';
+import { ru } from 'date-fns/locale';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, addMonths } from 'date-fns';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
 import ContributorForm from '../components/ContributorForm';
+
+// Russian localized static ranges for DateRangePicker
+const ruStaticRanges = [
+  { label: 'Сегодня', range: () => ({ startDate: new Date(), endDate: new Date() }), isSelected: () => false },
+  { label: 'Вчера', range: () => ({ startDate: addDays(new Date(), -1), endDate: addDays(new Date(), -1) }), isSelected: () => false },
+  { label: 'Эта неделя', range: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }), isSelected: () => false },
+  { label: 'Прошлая неделя', range: () => ({ startDate: startOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }), endDate: endOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }) }), isSelected: () => false },
+  { label: 'Этот месяц', range: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }), isSelected: () => false },
+  { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false },
+  { label: 'Этот год', range: () => ({ startDate: startOfYear(new Date()), endDate: endOfYear(new Date()) }), isSelected: () => false }
+];
+
+// Helper to format Date to YYYY-MM-DD without timezone issues
+const toLocalDateString = (date) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}.${month}.${year}`;
+};
 
 function PaymentsPage() {
   const navigate = useNavigate();
@@ -24,10 +55,14 @@ function PaymentsPage() {
   const [filters, setFilters] = useState({
     search: '',
     category: '',
-    dateFrom: '',
-    dateTo: '',
     paymentStatus: 'all'
   });
+  const [dateRange, setDateRange] = useState([{
+    startDate: startOfMonth(new Date()),
+    endDate: endOfMonth(new Date()),
+    key: 'selection'
+  }]);
+  const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -43,7 +78,7 @@ function PaymentsPage() {
 
   useEffect(() => {
     applyFiltersAndSort();
-  }, [paymentList, filters, sortField, sortDirection]);
+  }, [paymentList, filters, dateRange, sortField, sortDirection]);
 
   const loadPayments = async () => {
     try {
@@ -107,15 +142,16 @@ function PaymentsPage() {
       );
 
     }
-    if (filters.dateFrom) {
+    if (dateRange[0].startDate) {
+      const startStr = toLocalDateString(dateRange[0].startDate);
       filtered = filtered.filter(payment =>
-        new Date(payment.payment_date) >= new Date(filters.dateFrom)
+        toLocalDateString(new Date(payment.payment_date)) >= startStr
       );
-
     }
-    if (filters.dateTo) {
+    if (dateRange[0].endDate) {
+      const endStr = toLocalDateString(dateRange[0].endDate);
       filtered = filtered.filter(payment =>
-        new Date(payment.payment_date) <= new Date(filters.dateTo + 'T23:59:59')
+        toLocalDateString(new Date(payment.payment_date)) <= endStr
       );
     }
     if (filters.paymentStatus !== 'all') {
@@ -294,10 +330,9 @@ function PaymentsPage() {
     setFilters({
       search: '',
       category: '',
-      dateFrom: '',
-      dateTo: '',
       paymentStatus: 'all'
     });
+    setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
   };
 
   const handleContributorClick = (contributor) => {
@@ -378,22 +413,44 @@ function PaymentsPage() {
               <MenuItem value="unpaid">Не оплачено</MenuItem>
             </TextField>
           )}
-          <TextField
-            label="Дата от"
-            type="date"
+          <Button
+            variant="outlined"
             size="small"
-            value={filters.dateFrom}
-            onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Дата до"
-            type="date"
-            size="small"
-            value={filters.dateTo}
-            onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
+            startIcon={<DateRange />}
+            onClick={(e) => setDateRangeAnchor(e.currentTarget)}
+            sx={{ minWidth: 200 }}
+          >
+            {dateRange[0].startDate && dateRange[0].endDate
+              ? `${formatDate(toLocalDateString(dateRange[0].startDate))} — ${formatDate(toLocalDateString(dateRange[0].endDate))}`
+              : 'Выберите период'}
+          </Button>
+          <Popover
+            open={Boolean(dateRangeAnchor)}
+            anchorEl={dateRangeAnchor}
+            onClose={() => setDateRangeAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          >
+            <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <DateRangePicker
+                onChange={(item) => setDateRange([item.selection])}
+                ranges={dateRange}
+                locale={ru}
+                months={1}
+                direction="horizontal"
+                rangeColors={['#1976d2']}
+                staticRanges={ruStaticRanges}
+                inputRanges={[]}
+              />
+              <Button
+                onClick={() => setDateRangeAnchor(null)}
+                sx={{ mr: 2, mb: 1 }}
+                variant="contained"
+                size="small"
+              >
+                ОК
+              </Button>
+            </Box>
+          </Popover>
           <Button variant="outlined" onClick={clearFilters}>
             Очистить
           </Button>

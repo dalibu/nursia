@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, addMonths } from 'date-fns';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import {
@@ -27,7 +27,8 @@ const ruStaticRanges = [
     { label: 'Эта неделя', range: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }), isSelected: () => false },
     { label: 'Прошлая неделя', range: () => ({ startDate: startOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }), endDate: endOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }) }), isSelected: () => false },
     { label: 'Этот месяц', range: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }), isSelected: () => false },
-    { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false }
+    { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false },
+    { label: 'Этот год', range: () => ({ startDate: startOfYear(new Date()), endDate: endOfYear(new Date()) }), isSelected: () => false }
 ];
 
 // Helper to format Date to YYYY-MM-DD without timezone issues
@@ -66,8 +67,8 @@ function TimeTrackerPage() {
         status: 'all'
     });
     const [dateRange, setDateRange] = useState([{
-        startDate: null,
-        endDate: null,
+        startDate: startOfMonth(new Date()),
+        endDate: endOfMonth(new Date()),
         key: 'selection'
     }]);
     const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
@@ -692,16 +693,26 @@ function TimeTrackerPage() {
                         onClose={() => setDateRangeAnchor(null)}
                         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
                     >
-                        <DateRangePicker
-                            onChange={(item) => setDateRange([item.selection])}
-                            ranges={dateRange}
-                            locale={ru}
-                            months={1}
-                            direction="horizontal"
-                            rangeColors={['#1976d2']}
-                            staticRanges={ruStaticRanges}
-                            inputRanges={[]}
-                        />
+                        <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <DateRangePicker
+                                onChange={(item) => setDateRange([item.selection])}
+                                ranges={dateRange}
+                                locale={ru}
+                                months={1}
+                                direction="horizontal"
+                                rangeColors={['#1976d2']}
+                                staticRanges={ruStaticRanges}
+                                inputRanges={[]}
+                            />
+                            <Button
+                                onClick={() => setDateRangeAnchor(null)}
+                                sx={{ mr: 2, mb: 1 }}
+                                variant="contained"
+                                size="small"
+                            >
+                                ОК
+                            </Button>
+                        </Box>
                     </Popover>
                     <Button
                         variant="outlined"
