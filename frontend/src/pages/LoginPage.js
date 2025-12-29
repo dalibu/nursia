@@ -68,9 +68,12 @@ function LoginPage({ onLogin }) {
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
-          Nursia
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+          <img src="/favicon.svg" alt="NURSIA" style={{ width: 40, height: 40 }} />
+          <Typography variant="h4">
+            NURSIA
+          </Typography>
+        </Box>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}

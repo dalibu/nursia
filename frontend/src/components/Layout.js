@@ -115,11 +115,11 @@ function Layout({ onLogout }) {
             <Button color="inherit" component={Link} to="/">
               Обозрение
             </Button>
-            <Button color="inherit" component={Link} to="/time-tracker">
-              Задания
-            </Button>
             <Button color="inherit" component={Link} to="/payments">
               Платежи
+            </Button>
+            <Button color="inherit" component={Link} to="/time-tracker">
+              Задания
             </Button>
             {isAdmin && (
               <>
