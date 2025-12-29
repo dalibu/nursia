@@ -120,6 +120,7 @@ function PaymentsPage() {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(payment => {
         const searchFields = [
+          payment.tracking_nr,
           payment.amount?.toString(),
           payment.currency,
           payment.category?.name,

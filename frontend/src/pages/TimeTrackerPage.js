@@ -222,6 +222,7 @@ function TimeTrackerPage() {
             filtered = filtered.filter(a => {
                 // Search in assignment fields
                 const assignmentFields = [
+                    a.tracking_nr,
                     a.worker_name,
                     a.description,
                     a.assignment_date,
