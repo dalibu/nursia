@@ -4,7 +4,7 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination, Chip, TableFooter, Popover, Tooltip,
+  DialogContentText, Chip, Popover, Tooltip,
   Grid, Card, CardContent
 } from '@mui/material';
 import { Add, Edit, Delete, Payment, Replay, Search, DateRange } from '@mui/icons-material';
@@ -71,8 +71,6 @@ function PaymentsPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, paymentId: null, paymentName: '' });
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   // Handle URL search parameter
   useEffect(() => {
@@ -222,6 +220,14 @@ function PaymentsPage() {
         case 'is_paid':
           aVal = a.is_paid ? 1 : 0;
           bVal = b.is_paid ? 1 : 0;
+          break;
+        case 'description':
+          aVal = a.description || '';
+          bVal = b.description || '';
+          break;
+        case 'assignment_tracking_nr':
+          aVal = a.assignment_tracking_nr || '';
+          bVal = b.assignment_tracking_nr || '';
           break;
         default:
           return 0;
@@ -546,17 +552,17 @@ function PaymentsPage() {
         </Box>
       </Paper>
 
-      <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
-        <Table size="small" stickyHeader sx={{ tableLayout: 'fixed' }}>
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-            <TableRow>
+      <TableContainer component={Paper}>
+        <Table size="small" sx={{ tableLayout: 'fixed' }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
               <TableCell sx={{ width: 55, minWidth: 55, px: 0.5 }}>
                 <TableSortLabel
                   active={sortField === 'tracking_nr'}
                   direction={sortField === 'tracking_nr' ? sortDirection : 'asc'}
                   onClick={() => handleSort('tracking_nr')}
                 >
-                  Номер
+                  <strong>Номер</strong>
                 </TableSortLabel>
               </TableCell>
               <TableCell>
@@ -565,25 +571,25 @@ function PaymentsPage() {
                   direction={sortField === 'payment_date' ? sortDirection : 'asc'}
                   onClick={() => handleSort('payment_date')}
                 >
-                  Когда
+                  <strong>Когда</strong>
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 120 }}>
                 <TableSortLabel
                   active={sortField === 'payer'}
                   direction={sortField === 'payer' ? sortDirection : 'asc'}
                   onClick={() => handleSort('payer')}
                 >
-                  Плательщик
+                  <strong>От кого</strong>
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 100 }}>
                 <TableSortLabel
                   active={sortField === 'recipient'}
                   direction={sortField === 'recipient' ? sortDirection : 'asc'}
                   onClick={() => handleSort('recipient')}
                 >
-                  Получатель
+                  <strong>Кому</strong>
                 </TableSortLabel>
               </TableCell>
               <TableCell>
@@ -592,21 +598,36 @@ function PaymentsPage() {
                   direction={sortField === 'amount' ? sortDirection : 'asc'}
                   onClick={() => handleSort('amount')}
                 >
-                  Сумма
+                  <strong>Сумма</strong>
                 </TableSortLabel>
               </TableCell>
-
-              <TableCell>
+              <TableCell sx={{ width: 100 }}>
                 <TableSortLabel
                   active={sortField === 'category'}
                   direction={sortField === 'category' ? sortDirection : 'asc'}
                   onClick={() => handleSort('category')}
                 >
-                  Категория
+                  <strong>Категория</strong>
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ width: 250 }}>Комментарий</TableCell>
-              <TableCell align="center">Смена</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'description'}
+                  direction={sortField === 'description' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('description')}
+                >
+                  <strong>Комментарий</strong>
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="center">
+                <TableSortLabel
+                  active={sortField === 'assignment_tracking_nr'}
+                  direction={sortField === 'assignment_tracking_nr' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('assignment_tracking_nr')}
+                >
+                  <strong>Смена</strong>
+                </TableSortLabel>
+              </TableCell>
               {isAdmin && (
                 <TableCell sx={{ width: 130 }}>
                   <TableSortLabel
@@ -614,11 +635,11 @@ function PaymentsPage() {
                     direction={sortField === 'is_paid' ? sortDirection : 'asc'}
                     onClick={() => handleSort('is_paid')}
                   >
-                    Оплачено
+                    <strong>Оплачено</strong>
                   </TableSortLabel>
                 </TableCell>
               )}
-              <TableCell sx={{ width: 130, minWidth: 130 }}>Действия</TableCell>
+              <TableCell sx={{ width: 130, minWidth: 130 }}><strong>Действия</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -630,116 +651,114 @@ function PaymentsPage() {
                 </TableCell>
               </TableRow>
             )}
-            {filteredList
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((payment, index) => (
-                <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
-                  <TableCell sx={{ width: 55, minWidth: 55, px: 0.5, fontSize: '0.75rem' }}>{payment.tracking_nr || '-'}</TableCell>
-                  <TableCell>
-                    <div style={{ lineHeight: 1 }}>
-                      <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
-                      <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      cursor: payment.payer?.name && isAdmin ? 'pointer' : 'default'
+            {filteredList.map((payment, index) => (
+              <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
+                <TableCell sx={{ width: 55, minWidth: 55, px: 0.5, fontSize: '0.75rem' }}>{payment.tracking_nr || '-'}</TableCell>
+                <TableCell>
+                  <div style={{ lineHeight: 1 }}>
+                    <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
+                    <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
+                  </div>
+                </TableCell>
+                <TableCell
+                  sx={{
+                    cursor: payment.payer?.name && isAdmin ? 'pointer' : 'default'
+                  }}
+                  onClick={() => isAdmin && handleContributorClick(payment.payer)}
+                >
+                  <span
+                    style={{
+                      textDecoration: payment.payer?.name && isAdmin ? 'underline' : 'none',
+                      textDecorationStyle: 'dotted',
+                      textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
-                    onClick={() => isAdmin && handleContributorClick(payment.payer)}
                   >
-                    <span
-                      style={{
-                        textDecoration: payment.payer?.name && isAdmin ? 'underline' : 'none',
-                        textDecorationStyle: 'dotted',
-                        textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                      }}
-                    >
-                      {payment.payer?.name || '-'}
-                    </span>
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                    {payment.payer?.name || '-'}
+                  </span>
+                </TableCell>
+                <TableCell
+                  sx={{
+                    cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                  }}
+                  onClick={() => handleContributorClick(payment.recipient)}
+                >
+                  <span
+                    style={{
+                      textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                      textDecorationStyle: 'dotted',
+                      textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
-                    onClick={() => handleContributorClick(payment.recipient)}
                   >
-                    <span
-                      style={{
-                        textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
-                        textDecorationStyle: 'dotted',
-                        textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                      }}
-                    >
-                      {payment.recipient?.name || '-'}
-                    </span>
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
-                  <TableCell>
-                    {['Аванс', 'Долг'].includes(payment.category?.name)
-                      ? (
-                        <Chip
-                          label={payment.category.name}
-                          size="small"
-                          sx={{
-                            backgroundColor: '#FFEB3B',
-                            color: '#000',
-                          }}
-                        />
-                      )
-                      : (payment.category?.name || '-')}
-                  </TableCell>
-                  <Tooltip title={payment.description || ''} arrow placement="top">
-                    <TableCell sx={{ maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.description || '-'}</TableCell>
-                  </Tooltip>
-                  <TableCell align="center">
-                    {payment.assignment_tracking_nr ? (
+                    {payment.recipient?.name || '-'}
+                  </span>
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
+                <TableCell>
+                  {['Аванс', 'Долг'].includes(payment.category?.name)
+                    ? (
                       <Chip
-                        label={payment.assignment_tracking_nr}
+                        label={payment.category.name}
                         size="small"
-                        color="primary"
-                        clickable
-                        onClick={() => navigate(`/time-tracker?search=${payment.assignment_tracking_nr}`)}
-                        sx={{ cursor: 'pointer' }}
-                      />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">—</Typography>
-                    )}
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell>
-                      <Chip
-                        label={payment.is_paid ? 'Оплачено' : 'К оплате'}
-                        color={payment.is_paid ? 'success' : 'warning'}
-                        size="small"
-                        clickable
-                        onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
-                        icon={<Payment />}
                         sx={{
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
-                            color: 'white'
-                          }
+                          backgroundColor: '#FFEB3B',
+                          color: '#000',
                         }}
                       />
-                    </TableCell>
+                    )
+                    : (payment.category?.name || '-')}
+                </TableCell>
+                <Tooltip title={payment.description || ''} arrow placement="top">
+                  <TableCell sx={{ width: 200, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.description || '-'}</TableCell>
+                </Tooltip>
+                <TableCell align="center">
+                  {payment.assignment_tracking_nr ? (
+                    <Chip
+                      label={payment.assignment_tracking_nr}
+                      size="small"
+                      color="primary"
+                      clickable
+                      onClick={() => navigate(`/time-tracker?search=${payment.assignment_tracking_nr}`)}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">—</Typography>
                   )}
+                </TableCell>
+                {isAdmin && (
                   <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
-                      <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
-                        <Replay fontSize="small" />
-                      </IconButton>
-                      <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
-                        <Edit fontSize="small" />
-                      </IconButton>
-                      <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Box>
+                    <Chip
+                      label={payment.is_paid ? 'Оплачено' : 'К оплате'}
+                      color={payment.is_paid ? 'success' : 'warning'}
+                      size="small"
+                      clickable
+                      onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
+                      icon={<Payment />}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
+                          color: 'white'
+                        }
+                      }}
+                    />
                   </TableCell>
-                </TableRow>
-              )
-              )}
+                )}
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
+                    <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
+                      <Replay fontSize="small" />
+                    </IconButton>
+                    <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
+                      <Edit fontSize="small" />
+                    </IconButton>
+                    <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            )
+            )}
 
           </TableBody>
 
@@ -747,23 +766,7 @@ function PaymentsPage() {
       </TableContainer>
 
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mt: 1 }}>
-        <TablePagination
-          component="div"
-          count={filteredList.length}
-          page={page}
-          onPageChange={(event, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(event) => {
-            setRowsPerPage(parseInt(event.target.value, 10));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          labelRowsPerPage="Строк на странице:"
-          labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
-          sx={{ border: 'none' }}
-        />
-      </Box>
+
 
       <PaymentForm
         open={showForm}

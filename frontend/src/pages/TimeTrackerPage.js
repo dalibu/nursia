@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
     Popover, Tooltip
@@ -73,6 +73,8 @@ function TimeTrackerPage() {
     }]);
     const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
     const [filteredAssignments, setFilteredAssignments] = useState([]);
+    const [sortField, setSortField] = useState('assignment_date');
+    const [sortDirection, setSortDirection] = useState('desc');
 
     // Use shared context for active session - provides synchronized timer and optimistic updates
     const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange, stopSession, togglePause } = useActiveSession();
@@ -269,8 +271,57 @@ function TimeTrackerPage() {
             filtered = filtered.filter(a => a.assignment_date <= endStr);
         }
 
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortField) {
+                case 'assignment_date':
+                    aVal = a.assignment_date;
+                    bVal = b.assignment_date;
+                    break;
+                case 'worker_name':
+                    aVal = a.worker_name || '';
+                    bVal = b.worker_name || '';
+                    break;
+                case 'total_work_seconds':
+                    aVal = a.total_work_seconds || 0;
+                    bVal = b.total_work_seconds || 0;
+                    break;
+                case 'total_amount':
+                    aVal = a.total_amount || 0;
+                    bVal = b.total_amount || 0;
+                    break;
+                case 'description':
+                    aVal = a.description || '';
+                    bVal = b.description || '';
+                    break;
+                case 'is_active':
+                    aVal = a.is_active ? 1 : 0;
+                    bVal = b.is_active ? 1 : 0;
+                    break;
+                case 'payment_tracking_nr':
+                    aVal = a.payment_tracking_nr || '';
+                    bVal = b.payment_tracking_nr || '';
+                    break;
+                default:
+                    return 0;
+            }
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+
         setFilteredAssignments(filtered);
-    }, [groupedAssignments, filters, dateRange]);
+    }, [groupedAssignments, filters, dateRange, sortField, sortDirection]);
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
 
     const loadSummary = async () => {
         try {
@@ -834,13 +885,69 @@ function TimeTrackerPage() {
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                                 <TableCell width={40}></TableCell>
-                                <TableCell><strong>Дата</strong></TableCell>
-                                <TableCell><strong>Работник</strong></TableCell>
-                                <TableCell align="center"><strong>Время</strong></TableCell>
-                                <TableCell align="right"><strong>Работа</strong></TableCell>
-                                <TableCell><strong>Описание</strong></TableCell>
-                                <TableCell align="center"><strong>Статус</strong></TableCell>
-                                <TableCell align="center"><strong>Платёж</strong></TableCell>
+                                <TableCell>
+                                    <TableSortLabel
+                                        active={sortField === 'assignment_date'}
+                                        direction={sortField === 'assignment_date' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('assignment_date')}
+                                    >
+                                        <strong>Дата</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell>
+                                    <TableSortLabel
+                                        active={sortField === 'worker_name'}
+                                        direction={sortField === 'worker_name' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('worker_name')}
+                                    >
+                                        <strong>Работник</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell align="center">
+                                    <TableSortLabel
+                                        active={sortField === 'total_work_seconds'}
+                                        direction={sortField === 'total_work_seconds' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('total_work_seconds')}
+                                    >
+                                        <strong>Время</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell align="right">
+                                    <TableSortLabel
+                                        active={sortField === 'total_amount'}
+                                        direction={sortField === 'total_amount' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('total_amount')}
+                                    >
+                                        <strong>Работа</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell>
+                                    <TableSortLabel
+                                        active={sortField === 'description'}
+                                        direction={sortField === 'description' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('description')}
+                                    >
+                                        <strong>Описание</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell align="center">
+                                    <TableSortLabel
+                                        active={sortField === 'is_active'}
+                                        direction={sortField === 'is_active' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('is_active')}
+                                    >
+                                        <strong>Статус</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell align="center">
+                                    <TableSortLabel
+                                        active={sortField === 'payment_tracking_nr'}
+                                        direction={sortField === 'payment_tracking_nr' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('payment_tracking_nr')}
+                                    >
+                                        <strong>Платёж</strong>
+                                    </TableSortLabel>
+                                </TableCell>
                                 <TableCell align="center" width={80}></TableCell>
                             </TableRow>
                         </TableHead>
@@ -916,7 +1023,6 @@ function TimeTrackerPage() {
                                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
                                                 <IconButton
                                                     size="small"
-                                                    color="primary"
                                                     onClick={(e) => handleEditAssignment(assignment, e)}
                                                     title="Редактировать"
                                                 >
@@ -925,7 +1031,6 @@ function TimeTrackerPage() {
                                                 {!assignment.is_active && (
                                                     <IconButton
                                                         size="small"
-                                                        color="error"
                                                         onClick={(e) => handleDeleteAssignment(assignment, e)}
                                                         title="Удалить"
                                                     >
@@ -976,7 +1081,7 @@ function TimeTrackerPage() {
                                                                         <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(seg); }}>
                                                                             <Edit fontSize="small" />
                                                                         </IconButton>
-                                                                        <IconButton size="small" color="error" onClick={(e) => handleDeleteClick(seg.id, e)}>
+                                                                        <IconButton size="small" onClick={(e) => handleDeleteClick(seg.id, e)}>
                                                                             <Delete fontSize="small" />
                                                                         </IconButton>
                                                                     </TableCell>
