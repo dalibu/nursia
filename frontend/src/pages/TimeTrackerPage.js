@@ -5,7 +5,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
-    Popover
+    Popover, Tooltip
 } from '@mui/material';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -789,9 +789,11 @@ function TimeTrackerPage() {
                                                 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
                                             })()}
                                         </TableCell>
-                                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {assignment.description || '—'}
-                                        </TableCell>
+                                        <Tooltip title={assignment.description || ''} arrow placement="top">
+                                            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {assignment.description || '—'}
+                                            </TableCell>
+                                        </Tooltip>
                                         <TableCell align="center">
                                             {assignment.is_active ? (
                                                 <Chip label="В работе" color="warning" size="small" />

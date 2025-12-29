@@ -4,7 +4,7 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination, Chip, TableFooter, Popover
+  DialogContentText, TablePagination, Chip, TableFooter, Popover, Tooltip
 } from '@mui/material';
 import { Add, Edit, Delete, Payment, Replay, Search, DateRange } from '@mui/icons-material';
 import { DateRangePicker } from 'react-date-range';
@@ -532,10 +532,10 @@ function PaymentsPage() {
                   Категория
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Комментарий</TableCell>
+              <TableCell sx={{ width: 250 }}>Комментарий</TableCell>
               <TableCell align="center">Смена</TableCell>
               {isAdmin && (
-                <TableCell>
+                <TableCell sx={{ width: 130 }}>
                   <TableSortLabel
                     active={sortField === 'is_paid'}
                     direction={sortField === 'is_paid' ? sortDirection : 'asc'}
@@ -615,7 +615,9 @@ function PaymentsPage() {
                       )
                       : (payment.category?.name || '-')}
                   </TableCell>
-                  <TableCell>{payment.description || '-'}</TableCell>
+                  <Tooltip title={payment.description || ''} arrow placement="top">
+                    <TableCell sx={{ maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.description || '-'}</TableCell>
+                  </Tooltip>
                   <TableCell align="center">
                     {payment.assignment_tracking_nr ? (
                       <Chip
