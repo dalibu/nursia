@@ -4,7 +4,6 @@ import { AppBar, Toolbar, Typography, Button, Container, Box, Menu, MenuItem } f
 import { ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
-import { useActiveSession } from '../context/ActiveSessionContext';
 import FloatingTimer from './FloatingTimer';
 
 const NotificationContext = createContext();
@@ -23,11 +22,9 @@ function Layout({ onLogout }) {
   const [userName, setUserName] = useState('');
   const [settingsAnchor, setSettingsAnchor] = useState(null);
   const [accountAnchor, setAccountAnchor] = useState(null);
-  const [zadaniyaAnchor, setZadaniyaAnchor] = useState(null);
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
-  // Use shared context for active session (needed for FloatingTimer)
-  const { activeSession, togglePause } = useActiveSession();
+  // ActiveSession context is still used by FloatingTimer child component
 
   useEffect(() => {
     checkUserRole();
@@ -118,47 +115,9 @@ function Layout({ onLogout }) {
             <Button color="inherit" component={Link} to="/">
               Обозрение
             </Button>
-            <Button
-              color="inherit"
-              onClick={(e) => { navigate('/time-tracker'); setZadaniyaAnchor(e.currentTarget); }}
-              endIcon={<ExpandMore />}
-            >
+            <Button color="inherit" component={Link} to="/time-tracker">
               Задания
             </Button>
-            <Menu
-              anchorEl={zadaniyaAnchor}
-              open={Boolean(zadaniyaAnchor)}
-              onClose={() => setZadaniyaAnchor(null)}
-              PaperProps={{
-                sx: {
-                  backgroundColor: '#1976d2',
-                  '& .MuiMenuItem-root': {
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                    }
-                  }
-                }
-              }}
-            >
-              {!activeSession ? (
-                <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=start'); }}>
-                  ▶️ Начать смену
-                </MenuItem>
-              ) : (
-                <>
-                  <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=stop'); }}>
-                    ⏹️ Закончить смену
-                  </MenuItem>
-                  <MenuItem onClick={() => { setZadaniyaAnchor(null); navigate('/time-tracker?action=newTask'); }}>
-                    ➕ Новое задание
-                  </MenuItem>
-                  <MenuItem onClick={() => { setZadaniyaAnchor(null); togglePause(); }}>
-                    {activeSession?.session_type === 'pause' ? '▶️ Продолжить' : '⏸ Пауза'}
-                  </MenuItem>
-                </>
-              )}
-            </Menu>
             <Button color="inherit" component={Link} to="/payments">
               Платежи
             </Button>

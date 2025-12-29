@@ -13,7 +13,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYea
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import {
-    PlayArrow, Stop, AccessTime, Person, Work,
+    PlayArrow, Stop, AccessTime, Person, Work, Add,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange
 } from '@mui/icons-material';
@@ -74,13 +74,13 @@ function TimeTrackerPage() {
     const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
     const [filteredAssignments, setFilteredAssignments] = useState([]);
 
-    // Use shared context for active session - provides synchronized timer
-    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange } = useActiveSession();
+    // Use shared context for active session - provides synchronized timer and optimistic updates
+    const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange, stopSession, togglePause } = useActiveSession();
 
     // Register callback to refresh table when session actions happen (pause/resume/stop)
     useEffect(() => {
         setOnSessionChange(() => {
-            loadData();
+            loadData(true); // Silent refresh - no loading spinner
             loadSummary();
         });
         return () => setOnSessionChange(null);
@@ -189,14 +189,14 @@ function TimeTrackerPage() {
 
             // Reload data when session state changes (but not on initial render)
             if (!isInitialRender) {
-                loadData();
+                loadData(true); // Silent refresh - no loading spinner
                 loadSummary();
             }
         }
     }, [activeSession?.id]);
 
-    const loadData = async () => {
-        setLoading(true);
+    const loadData = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const [groupedRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
                 assignmentsService.getGrouped({ period }),
@@ -214,7 +214,7 @@ function TimeTrackerPage() {
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -594,6 +594,43 @@ function TimeTrackerPage() {
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     Учёт заданий
                 </Typography>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        startIcon={<PlayArrow />}
+                        onClick={handleStartClick}
+                        disabled={!!activeSession}
+                    >
+                        Начать смену
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color={activeSession?.session_type === 'pause' ? 'success' : 'warning'}
+                        startIcon={activeSession?.session_type === 'pause' ? <PlayArrow /> : <Pause />}
+                        onClick={() => activeSession && togglePause()}
+                        disabled={!activeSession}
+                    >
+                        {activeSession?.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<Stop />}
+                        onClick={() => activeSession && stopSession()}
+                        disabled={!activeSession}
+                    >
+                        Завершить
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => setNewTaskOpen(true)}
+                        disabled={!activeSession}
+                    >
+                        Новое задание
+                    </Button>
+                </Box>
             </Box>
 
 

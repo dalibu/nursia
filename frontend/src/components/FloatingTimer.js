@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Paper, Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
+import { Paper, Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Tooltip } from '@mui/material';
 import { Pause, PlayArrow, Stop, AccessTime, Coffee, DragIndicator, Add } from '@mui/icons-material';
 import { useActiveSession } from '../context/ActiveSessionContext';
 import { assignments as assignmentsService } from '../services/api';
@@ -142,28 +142,33 @@ function FloatingTimer() {
                     {times.pause}
                 </Typography>
 
-                <IconButton
-                    size="small"
-                    onClick={(e) => { e.stopPropagation(); togglePause(); }}
-                    sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
-                >
-                    {isPaused ? <PlayArrow sx={{ fontSize: 22 }} /> : <Pause sx={{ fontSize: 22 }} />}
-                </IconButton>
-                <IconButton
-                    size="small"
-                    onClick={(e) => { e.stopPropagation(); setNewTaskOpen(true); }}
-                    sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
-                    title="Новое задание"
-                >
-                    <Add sx={{ fontSize: 22 }} />
-                </IconButton>
-                <IconButton
-                    size="small"
-                    onClick={(e) => { e.stopPropagation(); stopSession(); }}
-                    sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
-                >
-                    <Stop sx={{ fontSize: 22 }} />
-                </IconButton>
+                <Tooltip title={isPaused ? 'Продолжить' : 'Пауза'}>
+                    <IconButton
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); togglePause(); }}
+                        sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
+                    >
+                        {isPaused ? <PlayArrow sx={{ fontSize: 22 }} /> : <Pause sx={{ fontSize: 22 }} />}
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="Завершить смену">
+                    <IconButton
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); stopSession(); }}
+                        sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
+                    >
+                        <Stop sx={{ fontSize: 22 }} />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="Новое задание">
+                    <IconButton
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); setNewTaskOpen(true); }}
+                        sx={{ p: 0.5, color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
+                    >
+                        <Add sx={{ fontSize: 22 }} />
+                    </IconButton>
+                </Tooltip>
             </Box>
 
             {/* New Task Dialog */}

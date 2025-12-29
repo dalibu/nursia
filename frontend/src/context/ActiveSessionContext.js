@@ -118,34 +118,48 @@ export function ActiveSessionProvider({ children }) {
         };
     }, [activeSession, currentTime]);
 
-    // Session control actions
+    // Session control actions with OPTIMISTIC UI updates
     const stopSession = async () => {
         if (!activeSession) return;
+
+        // Optimistic update: immediately hide timer
+        const previousSession = activeSession;
+        setActiveSession(null);
+
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`/api/assignments/${activeSession.id}/stop`, {}, {
+            await axios.post(`/api/assignments/${previousSession.id}/stop`, {}, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            await fetchActiveSession();
             notifySessionChange(); // Notify subscribers to refresh
         } catch (error) {
             console.error('Failed to stop session:', error);
+            // Rollback on error
+            setActiveSession(previousSession);
             throw error;
         }
     };
 
     const togglePause = async () => {
         if (!activeSession) return;
+
+        // Optimistic update: immediately toggle pause state
+        const previousSession = activeSession;
+        const newSessionType = activeSession.session_type === 'pause' ? 'work' : 'pause';
+        setActiveSession({ ...activeSession, session_type: newSessionType });
+
         try {
             const token = localStorage.getItem('token');
-            const endpoint = activeSession.session_type === 'pause' ? 'resume' : 'pause';
-            await axios.post(`/api/assignments/${activeSession.id}/${endpoint}`, {}, {
+            const endpoint = previousSession.session_type === 'pause' ? 'resume' : 'pause';
+            await axios.post(`/api/assignments/${previousSession.id}/${endpoint}`, {}, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            await fetchActiveSession();
+            await fetchActiveSession(); // Refresh with server data
             notifySessionChange(); // Notify subscribers to refresh
         } catch (error) {
             console.error('Failed to toggle pause:', error);
+            // Rollback on error
+            setActiveSession(previousSession);
             throw error;
         }
     };
