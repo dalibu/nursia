@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
@@ -44,6 +44,7 @@ const formatDate = (dateStr) => {
 
 function PaymentsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [paymentList, setPaymentList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -71,6 +72,19 @@ function PaymentsPage() {
   const [totals, setTotals] = useState({});
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // Handle URL search parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchParam = params.get('search');
+    if (searchParam) {
+      setFilters(prev => ({ ...prev, search: searchParam }));
+      // Clear date range to show all results
+      setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
+      // Clear URL parameter
+      navigate('/payments', { replace: true });
+    }
+  }, [location.search]);
 
   useEffect(() => {
     loadPayments();
@@ -519,6 +533,7 @@ function PaymentsPage() {
                 </TableSortLabel>
               </TableCell>
               <TableCell>Комментарий</TableCell>
+              <TableCell align="center">Смена</TableCell>
               {isAdmin && (
                 <TableCell>
                   <TableSortLabel
@@ -537,7 +552,7 @@ function PaymentsPage() {
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 10 : 8} align="center">
+                <TableCell colSpan={isAdmin ? 11 : 9} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -601,6 +616,20 @@ function PaymentsPage() {
                       : (payment.category?.name || '-')}
                   </TableCell>
                   <TableCell>{payment.description || '-'}</TableCell>
+                  <TableCell align="center">
+                    {payment.assignment_tracking_nr ? (
+                      <Chip
+                        label={payment.assignment_tracking_nr}
+                        size="small"
+                        color="primary"
+                        clickable
+                        onClick={() => navigate(`/time-tracker?search=${payment.assignment_tracking_nr}`)}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
                   {isAdmin && (
                     <TableCell>
                       <Chip

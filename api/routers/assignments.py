@@ -81,6 +81,9 @@ class AssignmentResponse(BaseModel):
     currency: str
     description: Optional[str] = None
     is_active: bool
+    payment_id: Optional[int] = None  # Linked payment ID
+    payment_tracking_nr: Optional[str] = None  # Linked payment tracking number
+    payment_is_paid: Optional[bool] = None  # Payment status
     segments: List[WorkSessionResponse] = []  # Все сегменты (work + pause)
 
 
@@ -761,7 +764,8 @@ async def get_grouped_sessions(
     query = select(Assignment).options(
         joinedload(Assignment.worker), 
         joinedload(Assignment.employer),
-        joinedload(Assignment.tasks)
+        joinedload(Assignment.tasks),
+        joinedload(Assignment.payment)
     ).where(
         Assignment.assignment_date >= start_date
     ).order_by(Assignment.assignment_date.desc(), Assignment.id.desc())
@@ -840,6 +844,9 @@ async def get_grouped_sessions(
             currency=assignment.currency,
             description=assignment.description,
             is_active=is_active,
+            payment_id=assignment.payment.id if assignment.payment else None,
+            payment_tracking_nr=assignment.payment.tracking_nr if assignment.payment else None,
+            payment_is_paid=assignment.payment.is_paid if assignment.payment else None,
             segments=segment_responses
         ))
     

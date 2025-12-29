@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency, Assignment
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -188,7 +188,8 @@ async def get_payments(
     query = select(Payment).options(
         joinedload(Payment.category).joinedload(PaymentCategory.category_group),
         joinedload(Payment.recipient),
-        joinedload(Payment.payer)
+        joinedload(Payment.payer),
+        joinedload(Payment.assignment)
     )
     
     # TODO: Обновить логику прав доступа. Пока показываем все платежи.
@@ -222,6 +223,8 @@ async def get_payments(
             "created_at": payment.created_at.isoformat(),
             "is_paid": payment.is_paid,
             "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+            "assignment_id": payment.assignment_id,
+            "assignment_tracking_nr": payment.assignment.tracking_nr if payment.assignment else None,
             "category": {
                 "id": payment.category.id,
                 "name": payment.category.name,

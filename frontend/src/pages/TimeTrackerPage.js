@@ -135,11 +135,17 @@ function TimeTrackerPage() {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const action = params.get('action');
-        if (action) {
+        const searchParam = params.get('search');
+
+        if (action || searchParam) {
             // Clear the URL parameter
             navigate('/time-tracker', { replace: true });
 
-            if (action === 'start') {
+            if (searchParam) {
+                setFilters(prev => ({ ...prev, search: searchParam }));
+                // Clear date range to show all results
+                setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
+            } else if (action === 'start') {
                 // Pre-select employment if user has only one
                 if (employmentList.length === 1) {
                     setSelectedEmployment(employmentList[0].id);
@@ -740,6 +746,7 @@ function TimeTrackerPage() {
                                 <TableCell align="right"><strong>Работа</strong></TableCell>
                                 <TableCell><strong>Описание</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
+                                <TableCell align="center"><strong>Платёж</strong></TableCell>
                                 <TableCell align="center" width={80}></TableCell>
                             </TableRow>
                         </TableHead>
@@ -790,6 +797,23 @@ function TimeTrackerPage() {
                                                 <Chip label="В работе" color="warning" size="small" />
                                             ) : (
                                                 <Chip label="Готово" color="success" size="small" />
+                                            )}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {assignment.payment_tracking_nr ? (
+                                                <Chip
+                                                    label={assignment.payment_tracking_nr}
+                                                    size="small"
+                                                    color={assignment.payment_is_paid ? "success" : "warning"}
+                                                    clickable
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigate(`/payments?search=${assignment.payment_tracking_nr}`);
+                                                    }}
+                                                    sx={{ cursor: 'pointer' }}
+                                                />
+                                            ) : (
+                                                <Typography variant="caption" color="text.secondary">—</Typography>
                                             )}
                                         </TableCell>
                                         <TableCell align="center">

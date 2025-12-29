@@ -82,6 +82,8 @@ class Payment(PaymentBase):
     tracking_nr: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
+    assignment_id: Optional[int] = None
+    assignment_tracking_nr: Optional[str] = None
     category: Optional[PaymentCategory] = None
     recipient: Optional[RecipientInfo] = None
     payer: Optional[RecipientInfo] = None
