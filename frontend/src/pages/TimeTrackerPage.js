@@ -592,49 +592,106 @@ function TimeTrackerPage() {
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    📋 Учёт заданий
+                    Учёт заданий
                 </Typography>
             </Box>
 
 
             {/* Active session is now shown in FloatingTimer */}
 
-            {/* Summary Card - calculated from filtered data */}
+            {/* Summary Cards - calculated from filtered data */}
             {(() => {
                 // Calculate dynamic summary from filtered assignments
                 const totalSessions = filteredAssignments.length;
+                const totalTasks = filteredAssignments.reduce((sum, a) => sum + (a.segments?.filter(s => s.session_type === 'work').length || 0), 0);
                 const totalHours = filteredAssignments.reduce((sum, a) => sum + (a.total_work_seconds || 0), 0) / 3600;
-
-                // Format period label dynamically based on filters
-                const getPeriodLabel = () => {
-                    if (dateRange[0].startDate || dateRange[0].endDate) {
-                        // Date range filter - format as DD.MM.YYYY
-                        const from = dateRange[0].startDate ? formatDate(toLocalDateString(dateRange[0].startDate)) : '...';
-                        const to = dateRange[0].endDate ? formatDate(toLocalDateString(dateRange[0].endDate)) : '...';
-                        return `${from} — ${to}`;
-                    }
-                    return 'Все время';
-                };
+                const activeSessions = filteredAssignments.filter(a => a.is_active).length;
+                const completedSessions = filteredAssignments.filter(a => !a.is_active).length;
+                const paidSessions = filteredAssignments.filter(a => a.payment_is_paid === true).length;
+                const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_is_paid === false).length;
 
                 return (
-                    <Grid container spacing={3} sx={{ mb: 4 }}>
-                        <Grid item xs={12}>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        {/* Смены / Задания */}
+                        <Grid item xs={6} sm={4} md={2}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: 'white',
+                                height: '100%'
+                            }}>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">Смены / Задания</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalSessions} / {totalTasks}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Часы */}
+                        <Grid item xs={6} sm={4} md={2}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                color: 'white',
+                                height: '100%'
+                            }}>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">Часы</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalHours.toFixed(1)}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* В работе */}
+                        <Grid item xs={6} sm={4} md={2}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                                color: 'white',
+                                height: '100%'
+                            }}>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">В работе</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{activeSessions}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Готово */}
+                        <Grid item xs={6} sm={4} md={2}>
                             <Card sx={{
                                 background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                                color: 'white'
+                                color: 'white',
+                                height: '100%'
                             }}>
-                                <CardContent>
-                                    <Typography variant="subtitle2">{getPeriodLabel()}</Typography>
-                                    <Box display="flex" justifyContent="flex-start" gap={6} mt={1}>
-                                        <Box>
-                                            <Typography variant="h4">{totalSessions}</Typography>
-                                            <Typography variant="caption">смен</Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="h4">{totalHours.toFixed(1)}</Typography>
-                                            <Typography variant="caption">часов</Typography>
-                                        </Box>
-                                    </Box>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">Готово</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{completedSessions}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Оплачено */}
+                        <Grid item xs={6} sm={4} md={2}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #56ab2f 0%, #a8e063 100%)',
+                                color: 'white',
+                                height: '100%'
+                            }}>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">Оплачено</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{paidSessions}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* К оплате */}
+                        <Grid item xs={6} sm={4} md={2}>
+                            <Card sx={{
+                                background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+                                color: 'white',
+                                height: '100%'
+                            }}>
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                    <Typography variant="caption">К оплате</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{unpaidSessions}</Typography>
                                 </CardContent>
                             </Card>
                         </Grid>

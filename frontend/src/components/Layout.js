@@ -123,7 +123,7 @@ function Layout({ onLogout }) {
               onClick={(e) => { navigate('/time-tracker'); setZadaniyaAnchor(e.currentTarget); }}
               endIcon={<ExpandMore />}
             >
-              📋 Задания
+              Задания
             </Button>
             <Menu
               anchorEl={zadaniyaAnchor}

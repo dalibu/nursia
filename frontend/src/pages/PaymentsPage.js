@@ -4,7 +4,8 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  DialogContentText, TablePagination, Chip, TableFooter, Popover, Tooltip
+  DialogContentText, TablePagination, Chip, TableFooter, Popover, Tooltip,
+  Grid, Card, CardContent
 } from '@mui/material';
 import { Add, Edit, Delete, Payment, Replay, Search, DateRange } from '@mui/icons-material';
 import { DateRangePicker } from 'react-date-range';
@@ -365,7 +366,7 @@ function PaymentsPage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Платежи</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>Платежи</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}
@@ -374,6 +375,78 @@ function PaymentsPage() {
           Добавить платёж
         </Button>
       </Box>
+
+      {/* Summary Cards */}
+      {(() => {
+        const totalCount = filteredList.length;
+        const paidPayments = filteredList.filter(p => p.is_paid);
+        const unpaidPayments = filteredList.filter(p => !p.is_paid);
+        const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const totalAmount = paidAmount + unpaidAmount;
+
+        const formatAmount = (amount) => `₴${amount.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+        return (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {/* Всего */}
+            <Grid item xs={6} sm={3}>
+              <Card sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                  <Typography variant="caption">Всего</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalCount}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Оплачено */}
+            <Grid item xs={6} sm={3}>
+              <Card sx={{
+                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                  <Typography variant="caption">Оплачено ({paidPayments.length})</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(paidAmount)}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* К оплате */}
+            <Grid item xs={6} sm={3}>
+              <Card sx={{
+                background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                  <Typography variant="caption">К оплате ({unpaidPayments.length})</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(unpaidAmount)}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Итого */}
+            <Grid item xs={6} sm={3}>
+              <Card sx={{
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                color: 'white',
+                height: '100%'
+              }}>
+                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                  <Typography variant="caption">Итого</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(totalAmount)}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        );
+      })()}
 
       <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
         <Typography variant="h6" gutterBottom>Фильтры</Typography>
@@ -673,46 +746,8 @@ function PaymentsPage() {
         </Table>
       </TableContainer>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mt: 1 }}>
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          <Box>
-            <Typography variant="body2" component="span" sx={{ fontWeight: 'bold' }}>
-              Итого:
-            </Typography>
-            <Typography variant="body2" component="span" sx={{ ml: 1 }}>
-              {Object.entries(totals.all || {}).map(([currency, amount]) =>
-                `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-              ).join(', ') || '0.00'}
-            </Typography>
-          </Box>
 
-          {isAdmin && (
-            <>
-              <Box>
-                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                  Оплачено:
-                </Typography>
-                <Typography variant="body2" component="span" sx={{ ml: 1 }}>
-                  {Object.entries(totals.paid || {}).map(([currency, amount]) =>
-                    `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-                  ).join(', ') || '0.00'}
-                </Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                  Не оплачено:
-                </Typography>
-                <Typography variant="body2" component="span" sx={{ ml: 1 }}>
-                  {Object.entries(totals.unpaid || {}).map(([currency, amount]) =>
-                    `${amount.toFixed(2)} ${currencies.find(c => c.code === currency)?.symbol || currency}`
-                  ).join(', ') || '0.00'}
-                </Typography>
-              </Box>
-            </>
-          )}
-        </Box>
-
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mt: 1 }}>
         <TablePagination
           component="div"
           count={filteredList.length}

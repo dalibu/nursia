@@ -62,23 +62,21 @@ function DashboardPage() {
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: '#1a237e' }}>
-                🧮 Обозрение
+                Обозрение
             </Typography>
 
             {/* Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
                 {/* Зарплата */}
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <Payment />
-                                <Typography variant="subtitle2">Зарплата</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Зарплата</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_salary || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
@@ -89,14 +87,12 @@ function DashboardPage() {
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <ShoppingCart />
-                                <Typography variant="subtitle2">Расходы</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Расходы</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_expenses || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
@@ -107,14 +103,12 @@ function DashboardPage() {
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <AccountBalance />
-                                <Typography variant="subtitle2">Кредиты</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Кредиты</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_credits || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
@@ -125,14 +119,12 @@ function DashboardPage() {
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <AttachMoney />
-                                <Typography variant="subtitle2">К оплате</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">К оплате</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_unpaid || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
@@ -143,14 +135,12 @@ function DashboardPage() {
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <CardGiftcard />
-                                <Typography variant="subtitle2">Премии</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Премии</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_bonus || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
@@ -161,14 +151,12 @@ function DashboardPage() {
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                        color: 'white'
+                        color: 'white',
+                        height: '100%'
                     }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <TrendingUp />
-                                <Typography variant="subtitle2">Всего</Typography>
-                            </Box>
-                            <Typography variant="h4" sx={{ mt: 1, fontWeight: 700 }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Всего</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
