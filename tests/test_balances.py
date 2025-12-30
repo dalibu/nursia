@@ -414,7 +414,8 @@ async def test_balance_summary_credits_calculation(db, setup_categories, setup_u
     )
     
     # credits_given = 1000, credits_offset = 500 (300 + 200)
-    assert result.total_credits == 500
+    # total_credits shows total given (not net)
+    assert result.total_credits == 1000
     assert result.total_salary == 200 # offset salary counts as salary
 
 

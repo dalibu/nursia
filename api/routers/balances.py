@@ -122,8 +122,7 @@ async def get_balance_summary(
     result = await db.execute(expenses_query)
     total_expenses = float(result.one().total or 0)
     
-    # 3. Кредиты — выданные минус зачтённые (чистый долг)
-    # Выданные кредиты (авансы) из группы "debt" со статусом 'paid'
+    # 3. Кредиты — всего выданных (без вычитания offset)
     credits_given_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -137,7 +136,6 @@ async def get_balance_summary(
     credits_given = float(result.one().total or 0)
     
     # Зачтённые в счёт долга (все платежи со статусом 'offset')
-    # Пользователь может быть recipient (зачёт зарплаты) ИЛИ payer (возврат долга)
     credits_offset_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'offset')
     if user_contributor_id:
         credits_offset_query = credits_offset_query.where(
@@ -150,17 +148,23 @@ async def get_balance_summary(
     result = await db.execute(credits_offset_query)
     credits_offset = float(result.one().total or 0)
     
-    # Чистый кредит: выдано - погашено
-    total_credits = credits_given - credits_offset
+    # Кредиты = выданные (сумма кредитов)
+    total_credits = credits_given
     
-    # 4. К оплате — неоплаченные платежи
+    # 4. К оплате — чистый остаток к оплате (кредиты - offset + unpaid)
+    # Неоплаченные платежи
     unpaid_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'unpaid')
     if user_contributor_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == user_contributor_id)
     elif worker_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(unpaid_query)
-    total_unpaid = float(result.one().total or 0)
+    unpaid_amount = float(result.one().total or 0)
+    
+    # Чистый остаток: (кредиты - offset) + unpaid
+    # Если offset > credit, разница показывается как положительный остаток (нам должны)
+    net_debt = credits_given - credits_offset  # может быть отрицательным
+    total_unpaid = unpaid_amount + max(0, -net_debt)  # добавляем переплату как "к оплате"
     
     # 5. Премии — оплаченные платежи из группы "bonus"
     bonus_query = select(func.sum(Payment.amount).label("total")).join(
@@ -350,6 +354,7 @@ async def get_monthly_summary(
         salary = float(salary_row.salary) if salary_row and salary_row.salary else 0
         
         # Кредит — выданные кредиты ('paid') из группы "debt"
+        # Показываем за период (для таблицы)
         credits_given_query = select(
             func.sum(Payment.amount).label("total")
         ).join(
@@ -373,8 +378,7 @@ async def get_monthly_summary(
         result = await db.execute(credits_given_query)
         credits_given = float(result.one().total or 0)
         
-        # Зачтённые в счёт долга (offset)
-        # Для worker: он может быть recipient (зачёт зарплаты) ИЛИ payer (возврат долга)
+        # Зачтённые в счёт долга (offset) — тоже за период
         credits_offset_query = select(
             func.sum(Payment.amount).label("total")
         ).where(
@@ -396,6 +400,50 @@ async def get_monthly_summary(
         
         result = await db.execute(credits_offset_query)
         credits_offset = float(result.one().total or 0)
+        
+        # НАКОПИТЕЛЬНЫЕ значения для to_pay (с начала времён до end_date)
+        cumulative_credits_query = select(
+            func.sum(Payment.amount).label("total")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payment_date <= end_date,
+                Payment.payment_status == 'paid',
+                PaymentCategoryGroup.code == 'debt'
+            )
+        )
+        
+        if worker_id:
+            cumulative_credits_query = cumulative_credits_query.where(Payment.recipient_id == worker_id)
+        elif employer_id:
+            cumulative_credits_query = cumulative_credits_query.where(Payment.payer_id == employer_id)
+        
+        result = await db.execute(cumulative_credits_query)
+        cumulative_credits = float(result.one().total or 0)
+        
+        cumulative_offset_query = select(
+            func.sum(Payment.amount).label("total")
+        ).where(
+            and_(
+                Payment.payment_date <= end_date,
+                Payment.payment_status == 'offset'
+            )
+        )
+        
+        if worker_id:
+            cumulative_offset_query = cumulative_offset_query.where(
+                (Payment.recipient_id == worker_id) | (Payment.payer_id == worker_id)
+            )
+        elif employer_id:
+            cumulative_offset_query = cumulative_offset_query.where(
+                (Payment.payer_id == employer_id) | (Payment.recipient_id == employer_id)
+            )
+        
+        result = await db.execute(cumulative_offset_query)
+        cumulative_offset = float(result.one().total or 0)
         
         # Итого — только реально оплаченные платежи (без offset)
         total_paid_query = select(
@@ -500,7 +548,12 @@ async def get_monthly_summary(
             unpaid_query = unpaid_query.where(Payment.payer_id == employer_id)
         
         result = await db.execute(unpaid_query)
-        to_pay = float(result.one().total or 0)
+        unpaid_amount = float(result.one().total or 0)
+        
+        # Чистый накопительный остаток к оплате: unpaid + переплата (если offset > credits)
+        net_debt = cumulative_credits - cumulative_offset
+        overcredit = max(0, -net_debt)  # переплата, если offset > credit
+        to_pay = unpaid_amount + overcredit
         
         remaining = expenses - expenses_paid
         total = total_paid  # Итого = все оплаченные платежи за период
@@ -673,45 +726,78 @@ async def get_mutual_balances(
         result = await db.execute(credit_b_to_a_query)
         credit_b_to_a = float(result.scalar() or 0)
         
-        # Погашено (offset) между парой
-        offset_query = select(func.sum(Payment.amount)).where(
+        # Погашено A→B (A платит B → уменьшает долг A перед B, т.е. credit_b_to_a)
+        offset_a_to_b_query = select(func.sum(Payment.amount)).where(
             and_(
+                Payment.payer_id == a_id,
+                Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'offset',
-                ((Payment.payer_id == a_id) & (Payment.recipient_id == b_id)) |
-                ((Payment.payer_id == b_id) & (Payment.recipient_id == a_id))
+                Payment.payment_status == 'offset'
             )
         )
-        result = await db.execute(offset_query)
-        offset_amount = float(result.scalar() or 0)
+        result = await db.execute(offset_a_to_b_query)
+        offset_a_to_b = float(result.scalar() or 0)
         
-        # Для A→B: remaining = credit_a_to_b - offset
-        if credit_a_to_b > 0:
-            remaining_b = credit_a_to_b - offset_amount
-            if remaining_b > 0.01:
+        # Погашено B→A (B платит A → уменьшает долг B перед A, т.е. credit_a_to_b)
+        offset_b_to_a_query = select(func.sum(Payment.amount)).where(
+            and_(
+                Payment.payer_id == b_id,
+                Payment.recipient_id == a_id,
+                Payment.currency == currency,
+                Payment.payment_status == 'offset'
+            )
+        )
+        result = await db.execute(offset_b_to_a_query)
+        offset_b_to_a = float(result.scalar() or 0)
+        
+        # Общий offset для отображения
+        offset_amount = offset_a_to_b + offset_b_to_a
+        
+        # Чистый баланс:
+        # - credit_a_to_b: A дал B кредит → B должен A
+        # - credit_b_to_a: B дал A кредит → A должен B
+        # - Все offset-ы (в любом направлении) уменьшают долг получателя кредита
+        #   (зачёт зарплаты от employer→worker также уменьшает долг worker)
+        #
+        # net_balance = (credit_a_to_b - total_offset) - credit_b_to_a
+        #
+        # Но если оба дали друг другу кредиты, нужно вычислить кто основной кредитор:
+        # Если credit_a_to_b > credit_b_to_a, основной долг у B перед A
+        # Offset уменьшает основной долг
+        
+        if credit_a_to_b >= credit_b_to_a:
+            # B основной должник → offset уменьшает его долг
+            net_balance = credit_a_to_b - credit_b_to_a - offset_amount
+        else:
+            # A основной должник → offset уменьшает его долг  
+            net_balance = credit_a_to_b - credit_b_to_a + offset_amount
+        
+        # Показываем кредит как максимальный из двух направлений (основной кредит)
+        main_credit = max(credit_a_to_b, credit_b_to_a)
+        
+        if abs(net_balance) > 0.01:
+            if net_balance > 0:
+                # net_balance > 0: B должен A
                 balances.append(MutualBalance(
                     creditor_id=a_id,
                     creditor_name=contributor_names.get(a_id, f"ID:{a_id}"),
                     debtor_id=b_id,
                     debtor_name=contributor_names.get(b_id, f"ID:{b_id}"),
-                    credit=round(credit_a_to_b, 2),
+                    credit=round(main_credit, 2),
                     offset=round(offset_amount, 2),
-                    remaining=round(remaining_b, 2),
+                    remaining=round(net_balance, 2),
                     currency=currency
                 ))
-        
-        # Для B→A: remaining = credit_b_to_a - offset (если есть взаимный долг)
-        if credit_b_to_a > 0:
-            remaining_a = credit_b_to_a - offset_amount
-            if remaining_a > 0.01:
+            else:
+                # net_balance < 0: A должен B
                 balances.append(MutualBalance(
                     creditor_id=b_id,
                     creditor_name=contributor_names.get(b_id, f"ID:{b_id}"),
                     debtor_id=a_id,
                     debtor_name=contributor_names.get(a_id, f"ID:{a_id}"),
-                    credit=round(credit_b_to_a, 2),
+                    credit=round(main_credit, 2),
                     offset=round(offset_amount, 2),
-                    remaining=round(remaining_a, 2),
+                    remaining=round(-net_balance, 2),
                     currency=currency
                 ))
     
