@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
@@ -43,9 +43,19 @@ const formatDate = (dateStr) => {
   return `${day}.${month}.${year}`;
 };
 
+// Helper to parse date from URL string
+const parseDateFromUrl = (dateStr) => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Storage key for persisting filters
+const FILTERS_STORAGE_KEY = 'payments_filters';
+
 function PaymentsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [paymentList, setPaymentList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -54,16 +64,71 @@ function PaymentsPage() {
   const [editingContributor, setEditingContributor] = useState(null);
   const [sortField, setSortField] = useState('tracking_nr');
   const [sortDirection, setSortDirection] = useState('desc');
-  const [filters, setFilters] = useState({
-    search: '',
-    category: '',
-    paymentStatus: 'all'
+
+  // Initialize filters from URL params or localStorage
+  const [filters, setFilters] = useState(() => {
+    // First try URL params
+    const urlSearch = searchParams.get('search');
+    const urlCategory = searchParams.get('category');
+    const urlStatus = searchParams.get('status');
+
+    if (urlSearch || urlCategory || urlStatus) {
+      return {
+        search: urlSearch || '',
+        category: urlCategory || '',
+        paymentStatus: urlStatus || 'all'
+      };
+    }
+
+    // Fallback to localStorage
+    try {
+      const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          search: parsed.search || '',
+          category: parsed.category || '',
+          paymentStatus: parsed.paymentStatus || 'all'
+        };
+      }
+    } catch (e) { }
+
+    return { search: '', category: '', paymentStatus: 'all' };
   });
-  const [dateRange, setDateRange] = useState([{
-    startDate: startOfMonth(new Date()),
-    endDate: endOfMonth(new Date()),
-    key: 'selection'
-  }]);
+
+  const [dateRange, setDateRange] = useState(() => {
+    // First try URL params
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+    if (fromParam || toParam) {
+      return [{
+        startDate: parseDateFromUrl(fromParam),
+        endDate: parseDateFromUrl(toParam),
+        key: 'selection'
+      }];
+    }
+
+    // Fallback to localStorage
+    try {
+      const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.from || parsed.to) {
+          return [{
+            startDate: parseDateFromUrl(parsed.from),
+            endDate: parseDateFromUrl(parsed.to),
+            key: 'selection'
+          }];
+        }
+      }
+    } catch (e) { }
+
+    return [{
+      startDate: startOfMonth(new Date()),
+      endDate: endOfMonth(new Date()),
+      key: 'selection'
+    }];
+  });
   const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -72,18 +137,37 @@ function PaymentsPage() {
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
 
-  // Handle URL search parameter
+  // Sync filters to URL params AND localStorage
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const searchParam = params.get('search');
-    if (searchParam) {
-      setFilters(prev => ({ ...prev, search: searchParam }));
-      // Clear date range to show all results
-      setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
-      // Clear URL parameter
-      navigate('/payments', { replace: true });
+    const params = new URLSearchParams();
+    const storageData = {};
+
+    if (filters.search) {
+      params.set('search', filters.search);
+      storageData.search = filters.search;
     }
-  }, [location.search]);
+    if (filters.category) {
+      params.set('category', filters.category);
+      storageData.category = filters.category;
+    }
+    if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+      params.set('status', filters.paymentStatus);
+      storageData.paymentStatus = filters.paymentStatus;
+    }
+    if (dateRange[0].startDate) {
+      const fromStr = toLocalDateString(dateRange[0].startDate);
+      params.set('from', fromStr);
+      storageData.from = fromStr;
+    }
+    if (dateRange[0].endDate) {
+      const toStr = toLocalDateString(dateRange[0].endDate);
+      params.set('to', toStr);
+      storageData.to = toStr;
+    }
+
+    setSearchParams(params, { replace: true });
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(storageData));
+  }, [filters, dateRange, setSearchParams]);
 
   useEffect(() => {
     loadPayments();
@@ -360,6 +444,9 @@ function PaymentsPage() {
       paymentStatus: 'all'
     });
     setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
+    // Clear URL params and localStorage
+    setSearchParams({}, { replace: true });
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
   const handleContributorClick = (contributor) => {

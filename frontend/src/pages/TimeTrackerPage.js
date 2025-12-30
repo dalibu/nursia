@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
@@ -47,8 +47,18 @@ const currencySymbols = {
     'USD': '$'
 };
 
+// Helper to parse date from URL string
+const parseDateFromUrl = (dateStr) => {
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
+
+// Storage key for persisting filters
+const FILTERS_STORAGE_KEY = 'timetracker_filters';
+
 function TimeTrackerPage() {
-    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [groupedAssignments, setGroupedAssignments] = useState([]);
@@ -59,17 +69,70 @@ function TimeTrackerPage() {
     const [period, setPeriod] = useState('month');
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Filters
-    const [filters, setFilters] = useState({
-        search: '',
-        worker: '',
-        status: 'all'
+    // Initialize filters from URL params or localStorage
+    const [filters, setFilters] = useState(() => {
+        // First try URL params
+        const urlSearch = searchParams.get('search');
+        const urlWorker = searchParams.get('worker');
+        const urlStatus = searchParams.get('status');
+
+        if (urlSearch || urlWorker || urlStatus) {
+            return {
+                search: urlSearch || '',
+                worker: urlWorker || '',
+                status: urlStatus || 'all'
+            };
+        }
+
+        // Fallback to localStorage
+        try {
+            const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                return {
+                    search: parsed.search || '',
+                    worker: parsed.worker || '',
+                    status: parsed.status || 'all'
+                };
+            }
+        } catch (e) { }
+
+        return { search: '', worker: '', status: 'all' };
     });
-    const [dateRange, setDateRange] = useState([{
-        startDate: startOfMonth(new Date()),
-        endDate: endOfMonth(new Date()),
-        key: 'selection'
-    }]);
+
+    const [dateRange, setDateRange] = useState(() => {
+        // First try URL params
+        const fromParam = searchParams.get('from');
+        const toParam = searchParams.get('to');
+        if (fromParam || toParam) {
+            return [{
+                startDate: parseDateFromUrl(fromParam),
+                endDate: parseDateFromUrl(toParam),
+                key: 'selection'
+            }];
+        }
+
+        // Fallback to localStorage
+        try {
+            const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.from || parsed.to) {
+                    return [{
+                        startDate: parseDateFromUrl(parsed.from),
+                        endDate: parseDateFromUrl(parsed.to),
+                        key: 'selection'
+                    }];
+                }
+            }
+        } catch (e) { }
+
+        return [{
+            startDate: startOfMonth(new Date()),
+            endDate: endOfMonth(new Date()),
+            key: 'selection'
+        }];
+    });
     const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
     const [filteredAssignments, setFilteredAssignments] = useState([]);
     const [sortField, setSortField] = useState('assignment_date');
@@ -132,37 +195,37 @@ function TimeTrackerPage() {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
 
-    // Handle URL actions from menu navigation
+    // Sync filters to URL params AND localStorage
     useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const action = params.get('action');
-        const searchParam = params.get('search');
+        const params = new URLSearchParams();
+        const storageData = {};
 
-        if (action || searchParam) {
-            // Clear the URL parameter
-            navigate('/time-tracker', { replace: true });
-
-            if (searchParam) {
-                setFilters(prev => ({ ...prev, search: searchParam }));
-                // Clear date range to show all results
-                setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
-            } else if (action === 'start') {
-                // Pre-select employment if user has only one
-                if (employmentList.length === 1) {
-                    setSelectedEmployment(employmentList[0].id);
-                }
-                setStartDialogOpen(true);
-            } else if (action === 'stop' && activeSession) {
-                // Stop current session
-                assignmentsService.stop(activeSession.id).then(() => {
-                    fetchActiveSession();
-                    notifySessionChange();
-                }).catch(err => showError('Ошибка при остановке смены'));
-            } else if (action === 'newTask' && activeSession) {
-                setNewTaskOpen(true);
-            }
+        if (filters.search) {
+            params.set('search', filters.search);
+            storageData.search = filters.search;
         }
-    }, [location.search, activeSession]);
+        if (filters.worker) {
+            params.set('worker', filters.worker);
+            storageData.worker = filters.worker;
+        }
+        if (filters.status && filters.status !== 'all') {
+            params.set('status', filters.status);
+            storageData.status = filters.status;
+        }
+        if (dateRange[0].startDate) {
+            const fromStr = toLocalDateString(dateRange[0].startDate);
+            params.set('from', fromStr);
+            storageData.from = fromStr;
+        }
+        if (dateRange[0].endDate) {
+            const toStr = toLocalDateString(dateRange[0].endDate);
+            params.set('to', toStr);
+            storageData.to = toStr;
+        }
+
+        setSearchParams(params, { replace: true });
+        localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(storageData));
+    }, [filters, dateRange, setSearchParams]);
     const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
     const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
