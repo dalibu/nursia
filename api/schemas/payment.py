@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # Payment Category Group schemas
@@ -20,8 +20,7 @@ class PaymentCategoryGroupResponse(PaymentCategoryGroupBase):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Payment Category schemas
@@ -40,8 +39,7 @@ class PaymentCategory(PaymentCategoryBase):
     created_at: datetime
     category_group: Optional[PaymentCategoryGroupResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentBase(BaseModel):
@@ -63,8 +61,7 @@ class RecipientInfo(BaseModel):
     name: str
     type: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserInfo(BaseModel):
@@ -72,8 +69,7 @@ class UserInfo(BaseModel):
     full_name: str
     username: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Payment(PaymentBase):
@@ -88,8 +84,7 @@ class Payment(PaymentBase):
     recipient: Optional[RecipientInfo] = None
     payer: Optional[RecipientInfo] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentReport(BaseModel):

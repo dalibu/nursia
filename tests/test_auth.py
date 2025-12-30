@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from api.auth.oauth import create_access_token
 from config.settings import settings
 from jose import jwt
@@ -30,8 +30,8 @@ def test_create_access_token_with_expiry():
     assert isinstance(payload["exp"], (int, float))
     
     # Проверяем, что время истечения в будущем
-    exp_time = datetime.fromtimestamp(payload["exp"])
-    now = datetime.utcnow()
+    exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    now = datetime.now(timezone.utc)
     assert exp_time > now  # Токен должен истекать в будущем
 
 def test_token_expiry():

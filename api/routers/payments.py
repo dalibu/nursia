@@ -249,7 +249,7 @@ async def get_payments(
 
 @router.get("/reports")
 async def get_payment_reports(
-    period: str = Query("month", regex="^(day|week|month|year)$"),
+    period: str = Query("month", pattern="^(day|week|month|year)$"),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_db),

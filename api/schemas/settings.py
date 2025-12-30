@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SystemSettingBase(BaseModel):
@@ -18,5 +18,4 @@ class SystemSettingUpdate(BaseModel):
 
 
 class SystemSetting(SystemSettingBase):
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
