@@ -278,7 +278,7 @@ async def test_mutual_balance_mixed_offset_types(db, setup_categories, setup_use
 async def test_mutual_balance_fully_paid(db, setup_categories, setup_users):
     """
     Scenario: Debt fully paid off
-    Expected: Credit=1000, Offset=1000, Remaining=0
+    Expected: No balance shown (zero remaining is hidden)
     """
     cats = setup_categories
     users = setup_users
@@ -296,9 +296,8 @@ async def test_mutual_balance_fully_paid(db, setup_categories, setup_users):
     
     result = await get_mutual_balances(db=db, current_user=users["admin"])
     
-    assert len(result) == 1
-    balance = result[0]
-    assert balance.remaining == 0
+    # Fully paid debts are not shown (remaining == 0)
+    assert len(result) == 0
 
 
 @pytest.mark.asyncio

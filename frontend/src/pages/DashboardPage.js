@@ -166,40 +166,6 @@ function DashboardPage() {
                 </Grid>
             </Grid>
 
-            {/* Balances between contributors */}
-            {summary?.balances?.length > 0 && (
-                <Paper sx={{ p: 3, mb: 4 }}>
-                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AccountBalance color="primary" /> Задолженности
-                    </Typography>
-                    <TableContainer>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Должник</TableCell>
-                                    <TableCell>Кредитор</TableCell>
-                                    <TableCell align="right">Сумма</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {summary.balances.map((balance, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{balance.debtor_name}</TableCell>
-                                        <TableCell>{balance.creditor_name}</TableCell>
-                                        <TableCell align="right">
-                                            <Chip
-                                                label={formatCurrency(balance.amount, balance.currency)}
-                                                color="error"
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
-            )}
 
             {/* Mutual Balances - Взаимные расчёты */}
             {mutual?.length > 0 && (
@@ -210,12 +176,12 @@ function DashboardPage() {
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
-                                <TableRow>
-                                    <TableCell>Кредитор</TableCell>
-                                    <TableCell>Должник</TableCell>
-                                    <TableCell align="right">Кредит/Аванс</TableCell>
-                                    <TableCell align="right">Погашено</TableCell>
-                                    <TableCell align="right">Остаток</TableCell>
+                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                    <TableCell><strong>Кредитор</strong></TableCell>
+                                    <TableCell><strong>Должник</strong></TableCell>
+                                    <TableCell align="right"><strong>Кредит/Аванс</strong></TableCell>
+                                    <TableCell align="right"><strong>Погашено</strong></TableCell>
+                                    <TableCell align="right"><strong>К оплате</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -223,25 +189,35 @@ function DashboardPage() {
                                     <TableRow key={index}>
                                         <TableCell>{row.creditor_name}</TableCell>
                                         <TableCell>{row.debtor_name}</TableCell>
+                                        {/* Кредит/Аванс - фиолетовый */}
                                         <TableCell align="right">
-                                            {formatCurrency(row.credit, row.currency)}
+                                            {row.credit > 0 && (
+                                                <Chip
+                                                    label={formatCurrency(row.credit, row.currency)}
+                                                    sx={{ backgroundColor: '#764ba2', color: 'white' }}
+                                                    size="small"
+                                                />
+                                            )}
                                         </TableCell>
+                                        {/* Погашено - зелёный */}
                                         <TableCell align="right">
-                                            {formatCurrency(row.offset, row.currency)}
+                                            {row.offset > 0 && (
+                                                <Chip
+                                                    label={formatCurrency(row.offset, row.currency)}
+                                                    sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                    size="small"
+                                                />
+                                            )}
                                         </TableCell>
+                                        {/* К оплате - красный */}
                                         <TableCell align="right">
-                                            <Chip
-                                                label={formatCurrency(row.remaining, row.currency)}
-                                                size="small"
-                                                sx={{
-                                                    backgroundColor: row.remaining === 0
-                                                        ? '#4caf50'  // green - balanced
-                                                        : row.remaining > 0
-                                                            ? '#ff9800'  // orange - debt remains
-                                                            : '#4caf50', // green - overpaid
-                                                    color: 'white'
-                                                }}
-                                            />
+                                            {row.remaining > 0 && (
+                                                <Chip
+                                                    label={formatCurrency(row.remaining, row.currency)}
+                                                    size="small"
+                                                    sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -275,14 +251,14 @@ function DashboardPage() {
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                                 <TableCell><strong>Период</strong></TableCell>
-                                <TableCell align="center"><strong>Посещ.</strong></TableCell>
+                                <TableCell align="center"><strong>Смены</strong></TableCell>
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
                                 <TableCell align="right"><strong>Зарплата</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
-                                <TableCell align="right"><strong>Кредит</strong></TableCell>
-                                <TableCell align="right"><strong>Погашение</strong></TableCell>
-                                <TableCell align="right"><strong>Не выплачено</strong></TableCell>
-                                <TableCell align="right"><strong>Премия</strong></TableCell>
+                                <TableCell align="right"><strong>Кредиты</strong></TableCell>
+                                <TableCell align="right"><strong>Погашено</strong></TableCell>
+                                <TableCell align="right"><strong>К оплате</strong></TableCell>
+                                <TableCell align="right"><strong>Премии</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
                             </TableRow>
                         </TableHead>
@@ -327,11 +303,11 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    {/* Погашение - зелёный с минусом */}
+                                    {/* Погашено - зелёный */}
                                     <TableCell align="right">
                                         {row.offset > 0 && (
                                             <Chip
-                                                label={formatCurrency(-row.offset, row.currency)}
+                                                label={formatCurrency(row.offset, row.currency)}
                                                 sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
                                                 size="small"
                                             />

@@ -213,11 +213,12 @@ async def get_balance_summary(
     
     for row in debt_rows:
         currency = row.currency
+        # Для неоплаченных платежей: payer — должник (должен заплатить), recipient — кредитор (ему должны)
         balances.append(BalanceItem(
-            debtor_id=row.recipient_id or 0,
-            debtor_name=contributor_names.get(row.recipient_id, "—") if row.recipient_id else "—",
-            creditor_id=row.payer_id,
-            creditor_name=contributor_names.get(row.payer_id, f"ID:{row.payer_id}"),
+            debtor_id=row.payer_id,
+            debtor_name=contributor_names.get(row.payer_id, f"ID:{row.payer_id}"),
+            creditor_id=row.recipient_id or 0,
+            creditor_name=contributor_names.get(row.recipient_id, "—") if row.recipient_id else "—",
             amount=float(row.total),
             currency=row.currency
         ))
@@ -528,7 +529,12 @@ async def get_mutual_balances(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить взаимные балансы долгов между парами контрибуторов"""
+    """Получить взаимные балансы долгов между парами контрибуторов.
+    
+    Показывает ОТДЕЛЬНЫЕ строки для:
+    1. Долговых отношений (кредиты/авансы из категории 'debt')
+    2. Неоплаченных платежей (зарплаты, бонусы и т.д.)
+    """
     
     # Автофильтрация для не-админов
     user_contributor_id = None
@@ -537,8 +543,11 @@ async def get_mutual_balances(
         if user_contributor:
             user_contributor_id = user_contributor.id
     
-    # Получаем все уникальные пары (payer, recipient, currency) из группы "debt"
-    pairs_query = select(
+    balances = []
+    
+    # === ЧАСТЬ 1: Долговые отношения (категория 'debt') ===
+    # Получаем все уникальные пары из debt-платежей
+    debt_pairs_query = select(
         Payment.payer_id,
         Payment.recipient_id,
         Payment.currency
@@ -549,23 +558,54 @@ async def get_mutual_balances(
     ).where(
         and_(
             Payment.recipient_id != None,
-            PaymentCategoryGroup.code == 'debt'
+            PaymentCategoryGroup.code == 'debt',
+            Payment.payment_status == 'paid'  # Только выданные кредиты
         )
     ).distinct()
     
     if user_contributor_id:
-        # Не-админ видит только свои балансы
-        pairs_query = pairs_query.where(
+        debt_pairs_query = debt_pairs_query.where(
             (Payment.payer_id == user_contributor_id) | 
             (Payment.recipient_id == user_contributor_id)
         )
     
-    result = await db.execute(pairs_query)
-    pairs = result.all()
+    result = await db.execute(debt_pairs_query)
+    debt_pairs = result.all()
     
     # Собираем ID контрибуторов для получения имён
     contributor_ids = set()
-    for row in pairs:
+    for row in debt_pairs:
+        contributor_ids.add(row.payer_id)
+        if row.recipient_id:
+            contributor_ids.add(row.recipient_id)
+    
+    # === ЧАСТЬ 2: Неоплаченные платежи ===
+    unpaid_pairs_query = select(
+        Payment.payer_id,
+        Payment.recipient_id,
+        Payment.currency,
+        func.sum(Payment.amount).label("total")
+    ).where(
+        and_(
+            Payment.recipient_id != None,
+            Payment.payment_status == 'unpaid'
+        )
+    ).group_by(
+        Payment.payer_id,
+        Payment.recipient_id,
+        Payment.currency
+    )
+    
+    if user_contributor_id:
+        unpaid_pairs_query = unpaid_pairs_query.where(
+            (Payment.payer_id == user_contributor_id) | 
+            (Payment.recipient_id == user_contributor_id)
+        )
+    
+    result = await db.execute(unpaid_pairs_query)
+    unpaid_pairs = result.all()
+    
+    for row in unpaid_pairs:
         contributor_ids.add(row.payer_id)
         if row.recipient_id:
             contributor_ids.add(row.recipient_id)
@@ -579,14 +619,24 @@ async def get_mutual_balances(
         for c in result.scalars().all():
             contributor_names[c.id] = c.name
     
-    # Для каждой пары рассчитываем баланс долга
-    balances = []
-    for payer_id, recipient_id, currency in pairs:
+    # === Обрабатываем долговые отношения ===
+    processed_debt_pairs = set()
+    
+    for payer_id, recipient_id, currency in debt_pairs:
         if not recipient_id:
             continue
-            
-        # Кредит/Аванс = выданные суммы из группы "debt" со статусом 'paid'
-        credit_query = select(func.sum(Payment.amount)).select_from(
+        
+        # Избегаем дубликатов (нормализуем пару)
+        pair_key = (min(payer_id, recipient_id), max(payer_id, recipient_id), currency)
+        if pair_key in processed_debt_pairs:
+            continue
+        processed_debt_pairs.add(pair_key)
+        
+        a_id = pair_key[0]
+        b_id = pair_key[1]
+        
+        # Кредит A→B
+        credit_a_to_b_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
             PaymentCategory, Payment.category_id == PaymentCategory.id
@@ -594,43 +644,97 @@ async def get_mutual_balances(
             PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
-                Payment.payer_id == payer_id,
-                Payment.recipient_id == recipient_id,
+                Payment.payer_id == a_id,
+                Payment.recipient_id == b_id,
                 Payment.currency == currency,
                 Payment.payment_status == 'paid',
                 PaymentCategoryGroup.code == 'debt'
             )
         )
-        result = await db.execute(credit_query)
-        credit = float(result.scalar() or 0)
+        result = await db.execute(credit_a_to_b_query)
+        credit_a_to_b = float(result.scalar() or 0)
         
-        # Погашено = ВСЕ платежи со статусом 'offset' между этой парой (в ЛЮБОМ направлении)
+        # Кредит B→A
+        credit_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == b_id,
+                Payment.recipient_id == a_id,
+                Payment.currency == currency,
+                Payment.payment_status == 'paid',
+                PaymentCategoryGroup.code == 'debt'
+            )
+        )
+        result = await db.execute(credit_b_to_a_query)
+        credit_b_to_a = float(result.scalar() or 0)
+        
+        # Погашено (offset) между парой
         offset_query = select(func.sum(Payment.amount)).where(
             and_(
                 Payment.currency == currency,
                 Payment.payment_status == 'offset',
-                # Любое направление между парой
-                ((Payment.payer_id == payer_id) & (Payment.recipient_id == recipient_id)) |
-                ((Payment.payer_id == recipient_id) & (Payment.recipient_id == payer_id))
+                ((Payment.payer_id == a_id) & (Payment.recipient_id == b_id)) |
+                ((Payment.payer_id == b_id) & (Payment.recipient_id == a_id))
             )
         )
         result = await db.execute(offset_query)
         offset_amount = float(result.scalar() or 0)
         
-        # Остаток долга
-        remaining = round(credit - offset_amount, 2)
+        # Для A→B: remaining = credit_a_to_b - offset
+        if credit_a_to_b > 0:
+            remaining_b = credit_a_to_b - offset_amount
+            if remaining_b > 0.01:
+                balances.append(MutualBalance(
+                    creditor_id=a_id,
+                    creditor_name=contributor_names.get(a_id, f"ID:{a_id}"),
+                    debtor_id=b_id,
+                    debtor_name=contributor_names.get(b_id, f"ID:{b_id}"),
+                    credit=round(credit_a_to_b, 2),
+                    offset=round(offset_amount, 2),
+                    remaining=round(remaining_b, 2),
+                    currency=currency
+                ))
         
-        # Показываем только если есть выданный кредит (избегаем дубликатов от обратного направления)
-        if credit > 0:
-            balances.append(MutualBalance(
-                creditor_id=payer_id,
-                creditor_name=contributor_names.get(payer_id, f"ID:{payer_id}"),
-                debtor_id=recipient_id,
-                debtor_name=contributor_names.get(recipient_id, f"ID:{recipient_id}"),
-                credit=round(credit, 2),
-                offset=round(offset_amount, 2),
-                remaining=remaining,
-                currency=currency
-            ))
+        # Для B→A: remaining = credit_b_to_a - offset (если есть взаимный долг)
+        if credit_b_to_a > 0:
+            remaining_a = credit_b_to_a - offset_amount
+            if remaining_a > 0.01:
+                balances.append(MutualBalance(
+                    creditor_id=b_id,
+                    creditor_name=contributor_names.get(b_id, f"ID:{b_id}"),
+                    debtor_id=a_id,
+                    debtor_name=contributor_names.get(a_id, f"ID:{a_id}"),
+                    credit=round(credit_b_to_a, 2),
+                    offset=round(offset_amount, 2),
+                    remaining=round(remaining_a, 2),
+                    currency=currency
+                ))
+    
+    # === Обрабатываем неоплаченные платежи как отдельные строки ===
+    for row in unpaid_pairs:
+        payer_id = row.payer_id
+        recipient_id = row.recipient_id
+        currency = row.currency
+        unpaid_amount = float(row.total or 0)
+        
+        if unpaid_amount < 0.01:
+            continue
+        
+        # Неоплаченный платеж: payer должен recipient
+        balances.append(MutualBalance(
+            creditor_id=recipient_id,
+            creditor_name=contributor_names.get(recipient_id, f"ID:{recipient_id}"),
+            debtor_id=payer_id,
+            debtor_name=contributor_names.get(payer_id, f"ID:{payer_id}"),
+            credit=0,  # Это не кредит, а неоплаченная работа
+            offset=0,
+            remaining=round(unpaid_amount, 2),
+            currency=currency
+        ))
     
     return balances
