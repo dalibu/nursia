@@ -90,6 +90,7 @@ class PaymentCategoryGroup(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)  # Название группы
+    code: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)  # salary, expense, bonus, debt
     color: Mapped[str] = mapped_column(String(7), default="#808080")  # Hex color
     emoji: Mapped[str] = mapped_column(String(10), default="💰")  # Emoji icon
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -98,7 +99,7 @@ class PaymentCategoryGroup(Base):
     categories: Mapped[list["PaymentCategory"]] = relationship("PaymentCategory", back_populates="category_group")
 
     def __repr__(self) -> str:
-        return f"<PaymentCategoryGroup(id={self.id}, name={self.name})>"
+        return f"<PaymentCategoryGroup(id={self.id}, name={self.name}, code={self.code})>"
 
 
 class PaymentCategory(Base):
