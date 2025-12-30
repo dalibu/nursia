@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
     TrendingUp, AccessTime, Payment, AccountBalance,
-    AttachMoney, CardGiftcard, ShoppingCart
+    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz
 } from '@mui/icons-material';
 import { balances } from '../services/api';
 
@@ -21,6 +21,7 @@ function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState(null);
     const [monthly, setMonthly] = useState([]);
+    const [mutual, setMutual] = useState([]);
     const [months, setMonths] = useState(6);
 
     useEffect(() => {
@@ -30,12 +31,14 @@ function DashboardPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [summaryRes, monthlyRes] = await Promise.all([
+            const [summaryRes, monthlyRes, mutualRes] = await Promise.all([
                 balances.getSummary({}),
-                balances.getMonthly({ months })
+                balances.getMonthly({ months }),
+                balances.getMutual({})
             ]);
             setSummary(summaryRes.data);
             setMonthly(monthlyRes.data);
+            setMutual(mutualRes.data);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
@@ -188,6 +191,56 @@ function DashboardPage() {
                                                 label={formatCurrency(balance.amount, balance.currency)}
                                                 color="error"
                                                 size="small"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+            )}
+
+            {/* Mutual Balances - Взаимные расчёты */}
+            {mutual?.length > 0 && (
+                <Paper sx={{ p: 3, mb: 4 }}>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <SwapHoriz color="primary" /> Взаимные расчёты
+                    </Typography>
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Кредитор</TableCell>
+                                    <TableCell>Должник</TableCell>
+                                    <TableCell align="right">Кредит/Аванс</TableCell>
+                                    <TableCell align="right">Погашено</TableCell>
+                                    <TableCell align="right">Остаток</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {mutual.map((row, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>{row.creditor_name}</TableCell>
+                                        <TableCell>{row.debtor_name}</TableCell>
+                                        <TableCell align="right">
+                                            {formatCurrency(row.credit, row.currency)}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            {formatCurrency(row.offset, row.currency)}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Chip
+                                                label={formatCurrency(row.remaining, row.currency)}
+                                                size="small"
+                                                sx={{
+                                                    backgroundColor: row.remaining === 0
+                                                        ? '#4caf50'  // green - balanced
+                                                        : row.remaining > 0
+                                                            ? '#ff9800'  // orange - debt remains
+                                                            : '#4caf50', // green - overpaid
+                                                    color: 'white'
+                                                }}
                                             />
                                         </TableCell>
                                     </TableRow>

@@ -92,7 +92,8 @@ export const employment = {
 
 export const balances = {
   getSummary: (params) => api.get('/balances/summary', { params }),
-  getMonthly: (params) => api.get('/balances/monthly', { params })
+  getMonthly: (params) => api.get('/balances/monthly', { params }),
+  getMutual: (params) => api.get('/balances/mutual', { params })
 };
 
 export default api;
