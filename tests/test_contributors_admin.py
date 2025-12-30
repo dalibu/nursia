@@ -18,12 +18,15 @@ def client():
 
 def test_contributors_endpoint_exists(client):
   """Проверка доступности эндпоинта contributors."""
+  # GET /contributors/ uses get_current_user -> 401
   response = client.get("/api/contributors/")
-  assert response.status_code == 403
+  assert response.status_code == 401
 
 
 def test_contributors_admin_endpoints_exist(client):
   """Проверка доступности админских эндпоинтов contributors."""
+  # All admin endpoints use get_admin_user -> 403
+  
   # 1. GET /api/contributors/admin
   response = client.get("/api/contributors/admin")
   assert response.status_code == 403

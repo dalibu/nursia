@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -51,7 +51,7 @@ class PaymentBase(BaseModel):
     currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
     payment_date: datetime
-    is_paid: Optional[bool] = False
+    payment_status: Literal['unpaid', 'paid', 'offset'] = 'unpaid'
 
 
 class PaymentCreate(PaymentBase):

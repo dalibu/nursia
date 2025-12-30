@@ -141,7 +141,8 @@ function PaymentsPage() {
           payment.payer?.name,
           payment.description,
           new Date(payment.payment_date).toLocaleDateString(),
-          payment.is_paid ? 'оплачено' : 'к оплате'
+          payment.payment_status === 'paid' ? 'оплачено' :
+            payment.payment_status === 'offset' ? 'зачтено' : 'к оплате'
         ];
 
         return searchFields.some(field =>
@@ -171,9 +172,11 @@ function PaymentsPage() {
     if (filters.paymentStatus !== 'all') {
       filtered = filtered.filter(payment => {
         if (filters.paymentStatus === 'paid') {
-          return payment.is_paid === true;
+          return payment.payment_status === 'paid';
+        } else if (filters.paymentStatus === 'offset') {
+          return payment.payment_status === 'offset';
         } else if (filters.paymentStatus === 'unpaid') {
-          return payment.is_paid === false || payment.is_paid === undefined;
+          return payment.payment_status === 'unpaid' || !payment.payment_status;
         }
         return true;
       });
@@ -217,9 +220,10 @@ function PaymentsPage() {
           aVal = a.payer?.name || '';
           bVal = b.payer?.name || '';
           break;
-        case 'is_paid':
-          aVal = a.is_paid ? 1 : 0;
-          bVal = b.is_paid ? 1 : 0;
+        case 'payment_status':
+          const statusOrder = { 'paid': 2, 'offset': 1, 'unpaid': 0 };
+          aVal = statusOrder[a.payment_status] || 0;
+          bVal = statusOrder[b.payment_status] || 0;
           break;
         case 'description':
           aVal = a.description || '';
@@ -258,7 +262,7 @@ function PaymentsPage() {
 
       newTotals[currency] += amount;
 
-      if (payment.is_paid) {
+      if (payment.payment_status === 'paid' || payment.payment_status === 'offset') {
         paidTotals[currency] += amount;
       } else {
         unpaidTotals[currency] += amount;
@@ -322,7 +326,7 @@ function PaymentsPage() {
       payer_id: payment.payer_id || '',
       payment_date: today,
       description: payment.description || '',
-      is_paid: false
+      payment_status: 'unpaid'
     };
 
     setEditingPayment(null);
@@ -336,12 +340,12 @@ function PaymentsPage() {
     loadPayments();
   };
 
-  const handlePaymentToggle = async (paymentId, isPaid) => {
+  const handlePaymentToggle = async (paymentId, newStatus) => {
     try {
       const payment = paymentList.find(e => e.id === paymentId);
       await payments.update(paymentId, {
         ...payment,
-        is_paid: isPaid
+        payment_status: newStatus
       });
       loadPayments();
     } catch (error) {
@@ -385,8 +389,8 @@ function PaymentsPage() {
       {/* Summary Cards */}
       {(() => {
         const totalCount = filteredList.length;
-        const paidPayments = filteredList.filter(p => p.is_paid);
-        const unpaidPayments = filteredList.filter(p => !p.is_paid);
+        const paidPayments = filteredList.filter(p => p.payment_status === 'paid' || p.payment_status === 'offset');
+        const unpaidPayments = filteredList.filter(p => p.payment_status === 'unpaid' || !p.payment_status);
         const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
         const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
         const totalAmount = paidAmount + unpaidAmount;
@@ -505,6 +509,7 @@ function PaymentsPage() {
             >
               <MenuItem value="all">Все</MenuItem>
               <MenuItem value="paid">Оплачено</MenuItem>
+              <MenuItem value="offset">Зачтено</MenuItem>
               <MenuItem value="unpaid">Не оплачено</MenuItem>
             </TextField>
           )}
@@ -631,11 +636,11 @@ function PaymentsPage() {
               {isAdmin && (
                 <TableCell sx={{ width: 130 }}>
                   <TableSortLabel
-                    active={sortField === 'is_paid'}
-                    direction={sortField === 'is_paid' ? sortDirection : 'asc'}
-                    onClick={() => handleSort('is_paid')}
+                    active={sortField === 'payment_status'}
+                    direction={sortField === 'payment_status' ? sortDirection : 'asc'}
+                    onClick={() => handleSort('payment_status')}
                   >
-                    <strong>Оплачено</strong>
+                    <strong>Статус</strong>
                   </TableSortLabel>
                 </TableCell>
               )}
@@ -727,18 +732,18 @@ function PaymentsPage() {
                 {isAdmin && (
                   <TableCell>
                     <Chip
-                      label={payment.is_paid ? 'Оплачено' : 'К оплате'}
-                      color={payment.is_paid ? 'success' : 'warning'}
+                      label={payment.payment_status === 'paid' ? 'Оплачено' : payment.payment_status === 'offset' ? 'Зачтено' : 'К оплате'}
+                      color={payment.payment_status === 'paid' ? 'success' : payment.payment_status === 'offset' ? 'info' : 'warning'}
                       size="small"
                       clickable
-                      onClick={() => handlePaymentToggle(payment.id, !payment.is_paid)}
+                      onClick={() => {
+                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : payment.payment_status === 'paid' ? 'offset' : 'unpaid';
+                        handlePaymentToggle(payment.id, nextStatus);
+                      }}
                       icon={<Payment />}
                       sx={{
                         cursor: 'pointer',
-                        '&:hover': {
-                          backgroundColor: payment.is_paid ? '#2e7d32' : '#ed6c02',
-                          color: 'white'
-                        }
+                        '&:hover': { opacity: 0.8 }
                       }}
                     />
                   </TableCell>

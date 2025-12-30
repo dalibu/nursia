@@ -83,7 +83,7 @@ class AssignmentResponse(BaseModel):
     is_active: bool
     payment_id: Optional[int] = None  # Linked payment ID
     payment_tracking_nr: Optional[str] = None  # Linked payment tracking number
-    payment_is_paid: Optional[bool] = None  # Payment status
+    payment_status: Optional[str] = None  # Payment status: unpaid, paid, offset
     segments: List[WorkSessionResponse] = []  # Все сегменты (work + pause)
 
 
@@ -294,7 +294,7 @@ async def stop_work_session(
             currency=assignment.currency,
             description=full_description,
             payment_date=now,
-            is_paid=False,
+            payment_status='unpaid',
             assignment_id=assignment.id
         )
         db.add(payment)
@@ -488,7 +488,7 @@ async def delete_work_session(
     
     # Проверяем связанный платёж
     if assignment.payment:
-        if assignment.payment.is_paid:
+        if assignment.payment.payment_status != 'unpaid':
             raise HTTPException(
                 status_code=400, 
                 detail="Невозможно удалить сессию: платёж уже оплачен"
@@ -581,7 +581,7 @@ async def delete_assignment(
             raise HTTPException(status_code=403, detail="Нет прав на удаление")
     
     # Проверяем платёж
-    if assignment.payment and assignment.payment.is_paid:
+    if assignment.payment and assignment.payment.payment_status != 'unpaid':
         raise HTTPException(
             status_code=400,
             detail="Невозможно удалить: платёж уже оплачен"
@@ -846,7 +846,7 @@ async def get_grouped_sessions(
             is_active=is_active,
             payment_id=assignment.payment.id if assignment.payment else None,
             payment_tracking_nr=assignment.payment.tracking_nr if assignment.payment else None,
-            payment_is_paid=assignment.payment.is_paid if assignment.payment else None,
+            payment_status=assignment.payment.payment_status if assignment.payment else None,
             segments=segment_responses
         ))
     

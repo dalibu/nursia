@@ -25,7 +25,7 @@ def test_payment_update_with_status(client):
         "category_id": 1,
         "recipient_id": 1,
         "payment_date": "2024-01-01T00:00:00",
-        "is_paid": True
+        "payment_status": "paid"
     })
     
     assert response.status_code in [401, 403, 404]
@@ -38,7 +38,7 @@ def test_payment_create_with_status(client):
         "category_id": 1,
         "recipient_id": 1,
         "payment_date": "2024-01-01T00:00:00",
-        "is_paid": False
+        "payment_status": "unpaid"
     })
     
     # Без авторизации должен вернуть 401/403
@@ -46,8 +46,8 @@ def test_payment_create_with_status(client):
 
 def test_payment_status_validation():
     """Тест валидации статуса оплаты"""
-    # Проверяем что is_paid принимает boolean значения
-    valid_statuses = [True, False, None]
+    # Проверяем что payment_status принимает три значения
+    valid_statuses = ["unpaid", "paid", "offset"]
     
     for status in valid_statuses:
         payment_data = {
@@ -56,27 +56,27 @@ def test_payment_status_validation():
             "category_id": 1,
             "recipient_id": 1,
             "payment_date": "2024-01-01T00:00:00",
-            "is_paid": status
+            "payment_status": status
         }
         
         # Проверяем что данные корректны
-        assert isinstance(payment_data["is_paid"], (bool, type(None)))
+        assert payment_data["payment_status"] in valid_statuses
 
 def test_paid_at_field_logic():
     """Тест логики поля paid_at"""
     from datetime import datetime
     
-    # Когда is_paid = True, должно устанавливаться paid_at
-    payment_paid = {"is_paid": True}
-    if payment_paid["is_paid"]:
+    # Когда payment_status = 'paid' или 'offset', должно устанавливаться paid_at
+    payment_paid = {"payment_status": "paid"}
+    if payment_paid["payment_status"] in ["paid", "offset"]:
         payment_paid["paid_at"] = datetime.now()
     
     assert "paid_at" in payment_paid
     assert payment_paid["paid_at"] is not None
     
-    # Когда is_paid = False, paid_at должно быть None
-    payment_unpaid = {"is_paid": False}
-    if not payment_unpaid["is_paid"]:
+    # Когда payment_status = 'unpaid', paid_at должно быть None
+    payment_unpaid = {"payment_status": "unpaid"}
+    if payment_unpaid["payment_status"] == "unpaid":
         payment_unpaid["paid_at"] = None
     
     assert payment_unpaid.get("paid_at") is None

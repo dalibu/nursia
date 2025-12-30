@@ -14,8 +14,7 @@ import { balances } from '../services/api';
 const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
-    'USD': '$',
-    'RUB': '₽'
+    'USD': '$'
 };
 
 function DashboardPage() {
@@ -228,6 +227,7 @@ function DashboardPage() {
                                 <TableCell align="right"><strong>Зарплата</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
                                 <TableCell align="right"><strong>Кредит</strong></TableCell>
+                                <TableCell align="right"><strong>Погашение</strong></TableCell>
                                 <TableCell align="right"><strong>Не выплачено</strong></TableCell>
                                 <TableCell align="right"><strong>Премия</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
@@ -270,6 +270,16 @@ function DashboardPage() {
                                             <Chip
                                                 label={formatCurrency(row.paid, row.currency)}
                                                 sx={{ backgroundColor: '#764ba2', color: 'white' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    {/* Погашение - зелёный с минусом */}
+                                    <TableCell align="right">
+                                        {row.offset > 0 && (
+                                            <Chip
+                                                label={formatCurrency(-row.offset, row.currency)}
+                                                sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
                                                 size="small"
                                             />
                                         )}

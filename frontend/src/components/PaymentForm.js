@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, MenuItem, Box, Chip, Switch, FormControlLabel
+  TextField, Button, MenuItem, Box, Chip, Select, InputLabel, FormControl
 } from '@mui/material';
 import { payments, contributors, currencies } from '../services/api';
 
@@ -14,7 +14,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
     payer_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     description: '',
-    is_paid: false
+    payment_status: 'unpaid'
   });
   const [originalTime, setOriginalTime] = useState(null); // Сохраняем оригинальное время при редактировании
   const [categories, setCategories] = useState([]);
@@ -39,7 +39,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           payer_id: payment.payer_id || '',
           payment_date: dateTimeParts[0],
           description: payment.description || '',
-          is_paid: payment.is_paid || false
+          payment_status: payment.payment_status || 'unpaid'
         });
       } else if (initialData) {
         // Предзаполнение формы из шаблона (повторить платёж)
@@ -51,7 +51,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           payer_id: initialData.payer_id || '',
           payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
           description: initialData.description || '',
-          is_paid: initialData.is_paid || false
+          payment_status: initialData.payment_status || 'unpaid'
         });
       } else {
         // Сброс формы для нового платежа - валюта будет установлена в loadData
@@ -63,7 +63,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           payer_id: '',
           payment_date: new Date().toISOString().split('T')[0],
           description: '',
-          is_paid: false
+          payment_status: 'unpaid'
         });
       }
     }
@@ -230,16 +230,18 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           />
           {isAdmin && (
             <Box mt={2}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={Boolean(formData.is_paid)}
-                    onChange={(e) => setFormData({ ...formData, is_paid: e.target.checked })}
-                    color="primary"
-                  />
-                }
-                label={formData.is_paid ? 'Оплачено' : 'Не оплачено'}
-              />
+              <FormControl sx={{ minWidth: 200 }}>
+                <InputLabel>Статус оплаты</InputLabel>
+                <Select
+                  value={formData.payment_status}
+                  onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+                  label="Статус оплаты"
+                >
+                  <MenuItem value="unpaid">Не оплачено</MenuItem>
+                  <MenuItem value="paid">Оплачено</MenuItem>
+                  <MenuItem value="offset">Зачтено</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
           )}
         </DialogContent>

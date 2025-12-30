@@ -14,8 +14,7 @@ import { employment, contributors, currencies } from '../services/api';
 const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
-    'USD': '$',
-    'RUB': '₽'
+    'USD': '$'
 };
 
 function EmploymentPage() {

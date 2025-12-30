@@ -67,7 +67,6 @@ async def init_currencies(session):
         {"code": "UAH", "name": "Украинская гривна", "symbol": "₴", "is_default": True},
         {"code": "USD", "name": "Доллар США", "symbol": "$", "is_default": False},
         {"code": "EUR", "name": "Евро", "symbol": "€", "is_default": False},
-        {"code": "RUB", "name": "Российский рубль", "symbol": "₽", "is_default": False},
     ]
     created = 0
     for curr_data in currencies:

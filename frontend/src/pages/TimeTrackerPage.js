@@ -44,8 +44,7 @@ const toLocalDateString = (date) => {
 const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
-    'USD': '$',
-    'RUB': '₽'
+    'USD': '$'
 };
 
 function TimeTrackerPage() {
@@ -695,8 +694,8 @@ function TimeTrackerPage() {
                 const totalHours = filteredAssignments.reduce((sum, a) => sum + (a.total_work_seconds || 0), 0) / 3600;
                 const activeSessions = filteredAssignments.filter(a => a.is_active).length;
                 const completedSessions = filteredAssignments.filter(a => !a.is_active).length;
-                const paidSessions = filteredAssignments.filter(a => a.payment_is_paid === true).length;
-                const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_is_paid === false).length;
+                const paidSessions = filteredAssignments.filter(a => a.payment_status === 'paid' || a.payment_status === 'offset').length;
+                const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_status === 'unpaid').length;
 
                 return (
                     <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -1007,7 +1006,7 @@ function TimeTrackerPage() {
                                                 <Chip
                                                     label={assignment.payment_tracking_nr}
                                                     size="small"
-                                                    color={assignment.payment_is_paid ? "success" : "warning"}
+                                                    color={assignment.payment_status === 'paid' ? "success" : assignment.payment_status === 'offset' ? "info" : "warning"}
                                                     clickable
                                                     onClick={(e) => {
                                                         e.stopPropagation();

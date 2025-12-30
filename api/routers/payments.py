@@ -143,9 +143,9 @@ async def create_payment(
     if not payment_data.get('payer_id'):
         raise HTTPException(status_code=400, detail="payer_id is required")
     
-    # Обрабатываем is_paid и paid_at
-    is_paid_value = payment_data.get('is_paid', False)
-    if is_paid_value:
+    # Обрабатываем payment_status и paid_at
+    payment_status = payment_data.get('payment_status', 'unpaid')
+    if payment_status in ['paid', 'offset']:
         payment_data['paid_at'] = now_server()
     else:
         payment_data['paid_at'] = None
@@ -221,7 +221,7 @@ async def get_payments(
             "payment_date": payment.payment_date.isoformat(),
             "payer_id": payment.payer_id,
             "created_at": payment.created_at.isoformat(),
-            "is_paid": payment.is_paid,
+            "payment_status": payment.payment_status,
             "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
             "assignment_id": payment.assignment_id,
             "assignment_tracking_nr": payment.assignment.tracking_nr if payment.assignment else None,
@@ -365,11 +365,12 @@ async def update_payment(
     
     payment_data = payment.model_dump()
     
-    # Если указан is_paid, обновляем paid_at
-    if 'is_paid' in payment_data:
-        if payment_data['is_paid'] and not db_payment.paid_at:
+    # Если указан payment_status, обновляем paid_at
+    if 'payment_status' in payment_data:
+        status = payment_data['payment_status']
+        if status in ['paid', 'offset'] and not db_payment.paid_at:
             payment_data['paid_at'] = now_server()
-        elif not payment_data['is_paid']:
+        elif status == 'unpaid':
             payment_data['paid_at'] = None
     
     # Удаляем payer_id, если он не должен обновляться, или оставляем?

@@ -5,10 +5,10 @@ echo "Ensuring data directory exists..."
 mkdir -p data
 
 echo "Running database migrations..."
-cd database && python -m alembic upgrade head && cd ..
+(cd database && python -m alembic upgrade head)
 
 echo "Running system setup (database, settings, categories, currencies, admin)..."
-python scripts/setup_system.py
+python /app/scripts/setup_system.py
 
 echo "🧪 Running smoke tests..."
 python -m pytest tests/test_smoke.py -v --tb=short || { echo "❌ Smoke tests failed!"; exit 1; }

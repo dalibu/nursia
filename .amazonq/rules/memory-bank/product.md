@@ -6,7 +6,7 @@ Nursia is a comprehensive household payment tracking service designed for multi-
 ## Key Features
 
 ### Core Functionality
-- **Multi-currency Support**: Track payments in UAH, EUR, USD, and RUB
+- **Multi-currency Support**: Track payments in UAH, EUR and USD
 - **Payment Management**: Full CRUD operations for payment tracking
 - **Category System**: Organized payment categorization with admin controls
 - **Contributor Management**: Track payments to contributors

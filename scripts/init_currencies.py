@@ -39,7 +39,6 @@ async def init_currencies():
                 Currency(code="UAH", name="Ukrainian Hryvnia", symbol="₴", is_active=True),
                 Currency(code="EUR", name="Euro", symbol="€", is_active=True),
                 Currency(code="USD", name="US Dollar", symbol="$", is_active=True),
-                Currency(code="RUB", name="Russian Ruble", symbol="₽", is_active=True),
             ]
             
             for currency in currencies:

@@ -14,13 +14,15 @@ def client():
 @pytest.mark.asyncio
 async def test_get_categories_unauthorized(client, db_session):
     """Test that unauthorized users cannot get categories"""
+    # GET /categories uses get_current_user -> 401
     response = client.get("/api/payments/categories")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_create_category_unauthorized(client):
     """Test that unauthorized users cannot create categories"""
+    # POST /categories uses get_admin_user -> 403
     response = client.post("/api/payments/categories", json={"name": "Test"})
     assert response.status_code == 403
 
@@ -28,6 +30,7 @@ async def test_create_category_unauthorized(client):
 @pytest.mark.asyncio
 async def test_update_category_unauthorized(client):
     """Test that unauthorized users cannot update categories"""
+    # PUT /categories/{id} uses get_admin_user -> 403
     response = client.put("/api/payments/categories/1", json={"name": "Test"})
     assert response.status_code == 403
 
@@ -35,16 +38,18 @@ async def test_update_category_unauthorized(client):
 @pytest.mark.asyncio
 async def test_delete_category_unauthorized(client):
     """Test that unauthorized users cannot delete categories"""
+    # DELETE /categories/{id} uses get_admin_user -> 403
     response = client.delete("/api/payments/categories/1")
     assert response.status_code == 403
 
 
 def test_category_endpoints_exist(client):
     """Test that category endpoints exist and return proper error codes"""
-    # Test without auth - should return 403
+    # GET uses get_current_user -> 401
     response = client.get("/api/payments/categories")
-    assert response.status_code == 403
+    assert response.status_code == 401
     
+    # POST/PUT/DELETE use get_admin_user -> 403
     response = client.post("/api/payments/categories", json={"name": "Test"})
     assert response.status_code == 403
     

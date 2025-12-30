@@ -1,6 +1,9 @@
 import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock
+
+# Skip if telegram module not available
+telegram = pytest.importorskip("telegram")
 from telegram import Update, User
 from bot.rate_limiter import rate_limit
 
