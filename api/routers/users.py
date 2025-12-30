@@ -3,6 +3,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from typing import List
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -92,8 +93,6 @@ async def update_current_user_profile(
     current_user: User = Depends(get_current_user)
 ):
     """Обновить профиль текущего пользователя"""
-    from datetime import datetime
-    
     # Проверяем уникальность username если он изменился
     if user_data.username != current_user.username:
         result = await db.execute(select(User).where(User.username == user_data.username))
@@ -113,7 +112,7 @@ async def update_current_user_profile(
             current_user.status = user_data.status
     
     # Устанавливаем updated_at при редактировании
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(current_user)
@@ -121,7 +120,7 @@ async def update_current_user_profile(
     return {"message": "Profile updated successfully"}
 
 @router.get("/")
-async def get_all_users(
+async def get_all_users_admin(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
@@ -211,8 +210,6 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    from datetime import datetime
-    
     # Проверяем уникальность username если он изменился
     if user_data.username != user.username:
         result = await db.execute(select(User).where(User.username == user_data.username))
@@ -225,7 +222,7 @@ async def update_user(
         user.email = user_data.email
     user.role = user_data.role
     user.status = user_data.status
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(user)
@@ -261,7 +258,6 @@ async def change_password(
 ):
     """Изменить свой пароль"""
     from utils.password_utils import verify_password, hash_password
-    from datetime import datetime
     
     if password_data.new_password != password_data.confirm_password:
         raise HTTPException(status_code=400, detail="New passwords do not match")
@@ -271,7 +267,7 @@ async def change_password(
     
     current_user.password_hash = hash_password(password_data.new_password)
     current_user.force_password_change = False
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     return {"message": "Password changed successfully"}
@@ -283,8 +279,6 @@ async def reset_user_password(
     current_user: User = Depends(get_admin_user)
 ):
     """Сбросить пароль пользователя (только для админов)"""
-    from datetime import datetime
-    
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
@@ -292,7 +286,7 @@ async def reset_user_password(
         raise HTTPException(status_code=404, detail="User not found")
     
     user.force_password_change = True
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     return {"message": "Password reset. User must change password on next login"}

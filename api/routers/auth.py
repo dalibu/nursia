@@ -1,8 +1,9 @@
 import sys
+import asyncio
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,8 +12,7 @@ from database.models import User, RegistrationRequest
 from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse, ChangePassword
 from api.auth.oauth import create_access_token, get_current_user
 from config.settings import settings
-from utils.settings_helper import get_jwt_expire_minutes
-from utils.password_utils import hash_password, verify_password
+from utils.settings_helper import get_jwt_expire_minutes, get_setting
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -32,6 +32,7 @@ async def register(
         raise HTTPException(status_code=400, detail="Registration request already exists")
     
     # Хешируем пароль с bcrypt (пароль уже SHA-256 с клиента)
+    from utils.password_utils import hash_password
     password_hash = hash_password(user_data.password)
     
     # Создаем заявку на регистрацию
@@ -54,10 +55,6 @@ async def login(
     user_data: UserLogin,
     db: AsyncSession = Depends(get_db)
 ):
-    import asyncio
-    from datetime import datetime
-    from utils.settings_helper import get_setting
-    
     # Получаем настройки безопасности
     delay_enabled = await get_setting("security_login_delay_enabled", "true")
     base_delay = float(await get_setting("security_login_delay_seconds", "1.0"))
@@ -70,8 +67,12 @@ async def login(
     if user:
         # Если последняя неудачная попытка была давно (например, больше часа назад), сбрасываем счетчик
         if user.last_failed_login:
-            # Сравниваем naive UTC datetimes
-            if datetime.utcnow() - user.last_failed_login > timedelta(hours=1):
+            # Превращаем наивное время в aware UTC для корректного сравнения
+            last_failed = user.last_failed_login
+            if last_failed.tzinfo is None:
+                last_failed = last_failed.replace(tzinfo=timezone.utc)
+                
+            if datetime.now(timezone.utc) - last_failed > timedelta(hours=1):
                 user.failed_login_attempts = 0
                 await db.commit()
         
@@ -90,6 +91,7 @@ async def login(
         )
     
     # Проверка пароля
+    from utils.password_utils import verify_password
     is_password_correct = False
     if user.password_hash and user.password_hash != 'temp_hash':
         is_password_correct = verify_password(user_data.password, user.password_hash)
@@ -97,7 +99,7 @@ async def login(
     if not is_password_correct:
         # Увеличиваем счетчик неудачных попыток
         user.failed_login_attempts += 1
-        user.last_failed_login = datetime.utcnow()
+        user.last_failed_login = datetime.now(timezone.utc)
         await db.commit()
         
         if total_delay > 0:
@@ -127,7 +129,6 @@ async def login(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     
-    expire_minutes = await get_jwt_expire_minutes()
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -142,6 +143,7 @@ async def change_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    from utils.password_utils import verify_password, hash_password
     # Проверяем старый пароль
     if not verify_password(data.old_password, current_user.password_hash):
         raise HTTPException(

@@ -9,6 +9,7 @@ services:
     command: sh -c "npm install && npm start"
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - NODE_OPTIONS=--no-deprecation
 
   api:
     build: .

@@ -3,7 +3,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, union_all, func
@@ -155,7 +155,7 @@ async def update_contributor(
 
     for field, value in contributor.model_dump().items():
         setattr(db_contributor, field, value)
-    db_contributor.changed_at = datetime.utcnow()
+    db_contributor.changed_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_contributor)
