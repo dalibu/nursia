@@ -65,8 +65,9 @@ async def setup_categories(db: AsyncSession):
     debt_group = PaymentCategoryGroup(name="Долги", code="debt")
     bonus_group = PaymentCategoryGroup(name="Премии", code="bonus")
     expense_group = PaymentCategoryGroup(name="Расходы", code="expense")
+    repayment_group = PaymentCategoryGroup(name="Погашения", code="repayment")
     
-    db.add_all([salary_group, debt_group, bonus_group, expense_group])
+    db.add_all([salary_group, debt_group, bonus_group, expense_group, repayment_group])
     await db.flush()
     
     # Create categories
@@ -75,8 +76,9 @@ async def setup_categories(db: AsyncSession):
     debt_cat = PaymentCategory(name="Долг", group_id=debt_group.id)
     bonus_cat = PaymentCategory(name="Премия", group_id=bonus_group.id)
     expense_cat = PaymentCategory(name="Расходы", group_id=expense_group.id)
+    repayment_cat = PaymentCategory(name="Возврат долга", group_id=repayment_group.id)
     
-    db.add_all([salary_cat, advance_cat, debt_cat, bonus_cat, expense_cat])
+    db.add_all([salary_cat, advance_cat, debt_cat, bonus_cat, expense_cat, repayment_cat])
     await db.commit()
     
     return {
@@ -84,7 +86,8 @@ async def setup_categories(db: AsyncSession):
         "advance": advance_cat,
         "debt": debt_cat,
         "bonus": bonus_cat,
-        "expense": expense_cat
+        "expense": expense_cat,
+        "repayment": repayment_cat
     }
 
 
@@ -195,7 +198,7 @@ async def test_mutual_balance_simple_debt(db, setup_categories, setup_users):
 @pytest.mark.asyncio
 async def test_mutual_balance_with_partial_offset(db, setup_categories, setup_users):
     """
-    Scenario: АВК gives 1000₴, Татьяна returns 400₴
+    Scenario: АВК gives 1000₴ debt, Татьяна returns 400₴ via repayment
     Expected: Credit=1000, Offset=400, Remaining=600
     """
     cats = setup_categories
@@ -207,10 +210,10 @@ async def test_mutual_balance_with_partial_offset(db, setup_categories, setup_us
         cats["debt"].id, 1000, "paid"
     )
     
-    # Татьяна → АВК: 400₴ (Долг, offset) - возврат
+    # Татьяна → АВК: 400₴ (Возврат, paid) - repayment category
     await create_payment(
         db, users["worker"].id, users["employer"].id,
-        cats["debt"].id, 400, "offset"
+        cats["repayment"].id, 400, "paid"
     )
     await db.commit()
     
@@ -226,42 +229,40 @@ async def test_mutual_balance_with_partial_offset(db, setup_categories, setup_us
 @pytest.mark.asyncio
 async def test_mutual_balance_mixed_offset_types(db, setup_categories, setup_users):
     """
-    Scenario: АВК gives 1300₴ advance, Татьяна returns:
-    - 500₴ as debt offset (direct return)
-    - 300₴ as salary offset (deduction from salary)
-    Expected: Credit=1300, Offset=800, Remaining=500
+    Scenario: Multiple payments between parties with repayment
+    Expected: credit = debt payments, offset = salary + repayment, remaining = net
     """
     cats = setup_categories
     users = setup_users
     
-    # АВК → Татьяна: 1000₴ (Долг, paid) - ноябрь
+    # АВК → Татьяна: 1000₴ (Долг, paid)
     await create_payment(
         db, users["employer"].id, users["worker"].id,
         cats["debt"].id, 1000, "paid"
     )
     
-    # АВК → Татьяна: 300₴ (Аванс, paid) - декабрь
+    # АВК → Татьяна: 300₴ (Аванс, paid)
     await create_payment(
         db, users["employer"].id, users["worker"].id,
         cats["advance"].id, 300, "paid"
     )
     
-    # Татьяна → АВК: 500₴ (Долг, offset) - прямой возврат
+    # Татьяна → АВК: 500₴ (Возврат долга, paid) - repayment category
     await create_payment(
         db, users["worker"].id, users["employer"].id,
-        cats["debt"].id, 500, "offset"
+        cats["repayment"].id, 500, "paid"
     )
     
-    # АВК → Татьяна: 200₴ (Зарплата, offset) - зачёт из зарплаты
+    # АВК → Татьяна: 200₴ (Зарплата, paid)
     await create_payment(
         db, users["employer"].id, users["worker"].id,
-        cats["salary"].id, 200, "offset"
+        cats["salary"].id, 200, "paid"
     )
     
-    # АВК → Татьяна: 100₴ (Зарплата, offset) - ещё зачёт
+    # АВК → Татьяна: 100₴ (Зарплата, paid)
     await create_payment(
         db, users["employer"].id, users["worker"].id,
-        cats["salary"].id, 100, "offset"
+        cats["salary"].id, 100, "paid"
     )
     await db.commit()
     
@@ -269,8 +270,12 @@ async def test_mutual_balance_mixed_offset_types(db, setup_categories, setup_use
     
     assert len(result) == 1
     balance = result[0]
-    assert balance.credit == 1300  # 1000 + 300
-    assert balance.offset == 800   # 500 + 200 + 100 (all offsets between pair)
+    # debt: 1000 + 300 = 1300
+    # salary: 200 + 100 = 300
+    # repayment: 500
+    # net = 1300 - 300 - 500 = 500
+    assert balance.credit == 1300
+    assert balance.offset == 800  # salary(300) + repayment(500)
     assert balance.remaining == 500
 
 
@@ -454,22 +459,22 @@ async def test_balance_summary_salary_includes_offset(db, setup_categories, setu
 @pytest.mark.asyncio
 async def test_monthly_summary_offset_both_directions(db, setup_categories, setup_users):
     """
-    Test that monthly offset includes user as recipient OR payer
+    Test that monthly offset shows repayment from worker to employer
     """
     cats = setup_categories
     users = setup_users
     today = date.today()
     
-    # Offset where worker is recipient (salary deduction)
+    # Salary payment (included in salary, not offset)
     await create_payment(
         db, users["employer"].id, users["worker"].id,
-        cats["salary"].id, 200, "offset", payment_date=today
+        cats["salary"].id, 200, "paid", payment_date=today
     )
     
-    # Offset where worker is payer (debt return)
+    # Repayment: worker → employer (this becomes negative offset)
     await create_payment(
         db, users["worker"].id, users["employer"].id,
-        cats["debt"].id, 500, "offset", payment_date=today
+        cats["repayment"].id, 500, "paid", payment_date=today
     )
     await db.commit()
     
@@ -481,10 +486,11 @@ async def test_monthly_summary_offset_both_directions(db, setup_categories, setu
         current_user=users["admin"]
     )
     
-    # Should include both offsets: 200 + 500 = 700
+    # Offset shows repayment as negative
     assert len(result) >= 1
     current_month = result[0]
-    assert current_month.offset == 700
+    assert current_month.salary == 200
+    assert current_month.offset == -500  # Repayment shown as negative
 
 
 @pytest.mark.asyncio
@@ -617,3 +623,150 @@ async def test_monthly_summary_worker_view(db, setup_categories, setup_users):
     
     assert len(result) == 1
     assert result[0].salary == 1000  # Should not see other worker's salary
+
+
+# ============================================================================
+# COMPREHENSIVE REAL-WORLD TEST (mirrors production data)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_real_world_scenario(db, setup_categories, setup_users):
+    """
+    Comprehensive test mirroring real production data:
+    - P1:  15.11.2025 АВК→Татьяна Долг     1000 (debt)
+    - P6:  26.11.2025 АВК→Татьяна Премии    500 (bonus - excluded from mutual)
+    - P23: 29.12.2025 АВК→Татьяна Зарплата  100 (salary)
+    - P24: 30.12.2025 АВК→Татьяна Аванс     300 (debt)
+    - P25: 30.12.2025 АВК→Татьяна Зарплата  200 (salary)
+    - P26: 30.12.2025 Татьяна→АВК Возврат   500 (repayment)
+    - P27: 30.12.2025 АВК→Татьяна Зарплата  600 (salary)
+    - P28: 31.12.2025 АВК→Татьяна Зарплата  100 (salary)
+    
+    Expected results:
+    ================
+    
+    MUTUAL BALANCES (Взаимные расчёты):
+    - Кредитор: Татьяна, Должник: АВК
+    - Кредит/Аванс: 1300 (debt 1000 + advance 300)
+    - Погашено: 1500 (salary 1000 + repayment 500)
+    - К оплате: 200 (АВК owes Татьяна because 1300 - 1500 = -200)
+    
+    MONTHLY SUMMARY 12.2025:
+    - Зарплата: 1000 (100 + 200 + 600 + 100)
+    - Кредиты: 300 (advance only in Dec)
+    - Погашено: -500 (repayment, negative)
+    - Итого: 800 (1000 + 300 - 500)
+    
+    MONTHLY SUMMARY 11.2025:
+    - Кредиты: 1000 (долг in Nov)
+    - Премии: 500
+    - Итого: 1500
+    """
+    cats = setup_categories
+    users = setup_users
+    
+    # Dates
+    nov_15 = date(2025, 11, 15)
+    nov_26 = date(2025, 11, 26)
+    dec_29 = date(2025, 12, 29)
+    dec_30 = date(2025, 12, 30)
+    dec_31 = date(2025, 12, 31)
+    
+    employer = users["employer"]  # АВК
+    worker = users["worker"]      # Татьяна
+    
+    # P1: Долг 1000 (November)
+    await create_payment(db, employer.id, worker.id, cats["debt"].id, 1000, "paid", payment_date=nov_15)
+    
+    # P6: Премия 500 (November) - excluded from mutual balance
+    await create_payment(db, employer.id, worker.id, cats["bonus"].id, 500, "paid", payment_date=nov_26)
+    
+    # P23: Зарплата 100 (December)
+    await create_payment(db, employer.id, worker.id, cats["salary"].id, 100, "paid", payment_date=dec_29)
+    
+    # P24: Аванс 300 (December)
+    await create_payment(db, employer.id, worker.id, cats["advance"].id, 300, "paid", payment_date=dec_30)
+    
+    # P25: Зарплата 200 (December)
+    await create_payment(db, employer.id, worker.id, cats["salary"].id, 200, "paid", payment_date=dec_30)
+    
+    # P26: Возврат долга 500 (December) - Татьяна→АВК (repayment)
+    await create_payment(db, worker.id, employer.id, cats["repayment"].id, 500, "paid", payment_date=dec_30)
+    
+    # P27: Зарплата 600 (December)
+    await create_payment(db, employer.id, worker.id, cats["salary"].id, 600, "paid", payment_date=dec_30)
+    
+    # P28: Зарплата 100 (December with time - testing datetime handling)
+    await create_payment(db, employer.id, worker.id, cats["salary"].id, 100, "paid", payment_date=dec_31)
+    
+    await db.commit()
+    
+    # ===== TEST 1: MUTUAL BALANCES =====
+    print("\n" + "="*60)
+    print("TEST: MUTUAL BALANCES (Взаимные расчёты)")
+    print("="*60)
+    
+    mutual_result = await get_mutual_balances(db=db, current_user=users["admin"])
+    
+    print(f"Found {len(mutual_result)} mutual balance entries")
+    for mb in mutual_result:
+        print(f"  Creditor: {mb.creditor_name}, Debtor: {mb.debtor_name}")
+        print(f"  Credit: {mb.credit}, Offset: {mb.offset}, Remaining: {mb.remaining}")
+    
+    # Assertions
+    assert len(mutual_result) == 1, f"Expected 1 mutual balance, got {len(mutual_result)}"
+    mb = mutual_result[0]
+    
+    # Татьяна is the creditor (АВК owes her because overpaid)
+    assert mb.creditor_name == "Татьяна", f"Expected Татьяна as creditor, got {mb.creditor_name}"
+    assert mb.debtor_name == "АВК", f"Expected АВК as debtor, got {mb.debtor_name}"
+    assert mb.credit == 1300, f"Credit: expected 1300, got {mb.credit}"  # debt 1000 + advance 300
+    assert mb.offset == 1500, f"Offset: expected 1500, got {mb.offset}"  # salary 1000 + repayment 500
+    assert mb.remaining == 200, f"Remaining: expected 200, got {mb.remaining}"  # АВК owes 200
+    
+    print("✓ Mutual balances correct!")
+    
+    # ===== TEST 2: MONTHLY SUMMARY =====
+    print("\n" + "="*60)
+    print("TEST: MONTHLY SUMMARY (Помесячный обзор)")
+    print("="*60)
+    
+    monthly_result = await get_monthly_summary(
+        months=6,
+        db=db,
+        current_user=users["admin"],
+        employer_id=None,
+        worker_id=None
+    )
+    
+    # Find December and November summaries
+    dec_summary = next((s for s in monthly_result if s.period == "2025-12"), None)
+    nov_summary = next((s for s in monthly_result if s.period == "2025-11"), None)
+    
+    print("\nDecember 2025:")
+    if dec_summary:
+        print(f"  Зарплата: {dec_summary.salary}")
+        print(f"  Кредиты:  {dec_summary.paid}")
+        print(f"  Погашено: {dec_summary.offset}")
+        print(f"  Итого:    {dec_summary.total}")
+    
+    print("\nNovember 2025:")
+    if nov_summary:
+        print(f"  Кредиты:  {nov_summary.paid}")
+        print(f"  Премии:   {nov_summary.bonus}")
+        print(f"  Итого:    {nov_summary.total}")
+    
+    # December assertions
+    assert dec_summary is not None, "December summary not found"
+    assert dec_summary.salary == 1000, f"Dec salary: expected 1000, got {dec_summary.salary}"
+    assert dec_summary.paid == 300, f"Dec credits: expected 300, got {dec_summary.paid}"
+    assert dec_summary.offset == -500, f"Dec offset: expected -500, got {dec_summary.offset}"
+    assert dec_summary.total == 800, f"Dec total: expected 800, got {dec_summary.total}"
+    
+    # November assertions
+    assert nov_summary is not None, "November summary not found"
+    assert nov_summary.paid == 1000, f"Nov credits: expected 1000, got {nov_summary.paid}"
+    assert nov_summary.bonus == 500, f"Nov bonus: expected 500, got {nov_summary.bonus}"
+    
+    print("\n✓ Monthly summary correct!")
+    print("="*60)

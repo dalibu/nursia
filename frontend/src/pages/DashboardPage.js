@@ -67,10 +67,10 @@ function DashboardPage() {
                 Обозрение
             </Typography>
 
-            {/* Summary Cards */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            {/* Summary Cards - 7 cards in one row */}
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 {/* Зарплата */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                         color: 'white',
@@ -83,10 +83,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Расходы */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                         color: 'white',
@@ -99,10 +99,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Кредиты */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: 'white',
@@ -115,10 +115,26 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
+
+                {/* Погашения (orange) */}
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                        color: 'white',
+                        height: '100%'
+                    }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Погашения</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                                {formatCurrency(-(summary?.total_repayment || 0), summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Box>
 
                 {/* К оплате */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
                         color: 'white',
@@ -131,13 +147,13 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
-                {/* Премии */}
-                <Grid item xs={6} sm={4} md={2}>
+                {/* Премии (yellow) */}
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
-                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
-                        color: 'white',
+                        background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
+                        color: '#333',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
@@ -147,10 +163,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Всего */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                         color: 'white',
@@ -163,8 +179,8 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
-            </Grid>
+                </Box>
+            </Box>
 
 
             {/* Mutual Balances - Взаимные расчёты */}
@@ -199,12 +215,15 @@ function DashboardPage() {
                                                 />
                                             )}
                                         </TableCell>
-                                        {/* Погашено - зелёный */}
+                                        {/* Погашено - зелёный для положительных, красный для отрицательных */}
                                         <TableCell align="right">
-                                            {row.offset > 0 && (
+                                            {row.offset !== 0 && (
                                                 <Chip
                                                     label={formatCurrency(row.offset, row.currency)}
-                                                    sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                    sx={{
+                                                        backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
+                                                        color: row.offset > 0 ? '#1a1a1a' : 'white'
+                                                    }}
                                                     size="small"
                                                 />
                                             )}
@@ -303,12 +322,15 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    {/* Погашено - зелёный */}
+                                    {/* Погашено - зелёный для положительных, красный для отрицательных */}
                                     <TableCell align="right">
-                                        {row.offset > 0 && (
+                                        {row.offset !== 0 && (
                                             <Chip
                                                 label={formatCurrency(row.offset, row.currency)}
-                                                sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                sx={{
+                                                    backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
+                                                    color: row.offset > 0 ? '#1a1a1a' : 'white'
+                                                }}
                                                 size="small"
                                             />
                                         )}
