@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    TextField, MenuItem, CircularProgress, Chip
+    TextField, MenuItem, CircularProgress, Chip, Button, Tooltip
 } from '@mui/material';
 import {
     TrendingUp, AccessTime, Payment, AccountBalance,
-    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz
+    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz, Download
 } from '@mui/icons-material';
-import { balances } from '../services/api';
+import { balances, payments } from '../services/api';
 
 // Символы валют
 const currencySymbols = {
@@ -18,11 +18,32 @@ const currencySymbols = {
 };
 
 function DashboardPage() {
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState(null);
     const [monthly, setMonthly] = useState([]);
     const [mutual, setMutual] = useState([]);
     const [months, setMonths] = useState(6);
+    const [exporting, setExporting] = useState(false);
+
+    const handleExportJSON = async () => {
+        setExporting(true);
+        try {
+            const response = await balances.getDebug({ months });
+            const jsonStr = JSON.stringify(response.data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dashboard_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export failed:', error);
+        } finally {
+            setExporting(false);
+        }
+    };
 
     useEffect(() => {
         loadData();
@@ -31,14 +52,16 @@ function DashboardPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [summaryRes, monthlyRes, mutualRes] = await Promise.all([
+            const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
                 balances.getSummary({}),
                 balances.getMonthly({ months }),
-                balances.getMutual({})
+                balances.getMutual({}),
+                payments.getUserInfo()
             ]);
             setSummary(summaryRes.data);
             setMonthly(monthlyRes.data);
             setMutual(mutualRes.data);
+            setUser(userRes.data);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
@@ -63,9 +86,24 @@ function DashboardPage() {
 
     return (
         <Box>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: '#1a237e' }}>
-                Обозрение
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
+                    Обозрение
+                </Typography>
+                {user?.role === 'admin' && (
+                    <Tooltip title="Экспорт всех данных в JSON">
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={exporting ? <CircularProgress size={16} /> : <Download />}
+                            onClick={handleExportJSON}
+                            disabled={exporting}
+                        >
+                            Экспорт JSON
+                        </Button>
+                    </Tooltip>
+                )}
+            </Box>
 
             {/* Summary Cards - 7 cards in one row */}
             <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
