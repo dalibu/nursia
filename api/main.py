@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, payments, settings as settings_router, currencies, contributors, admin, users, user_status
+from api.routers import auth, payments, settings as settings_router, currencies, admin, users, user_status
 from api.routers import assignments, employment, balances
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
@@ -47,7 +47,6 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(currencies.router, prefix="/api")
-app.include_router(contributors.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(user_status.router, prefix="/api")
@@ -59,6 +58,11 @@ app.include_router(balances.router, prefix="/api")
 # React статические файлы
 if os.path.exists("frontend/build/static"):
     app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+
+# Favicon
+@app.get("/favicon.svg")
+async def favicon():
+    return FileResponse("frontend/build/favicon.svg", media_type="image/svg+xml")
 
 @app.get("/api")
 async def api_root():

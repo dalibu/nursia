@@ -191,7 +191,7 @@ function DashboardPage() {
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
-                        color: '#333',
+                        color: 'white',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
@@ -389,7 +389,7 @@ function DashboardPage() {
                                             <Chip
                                                 icon={<CardGiftcard />}
                                                 label={formatCurrency(row.bonus, row.currency)}
-                                                sx={{ backgroundColor: '#FFD700', color: '#333' }}
+                                                sx={{ backgroundColor: '#FFD700', color: 'white' }}
                                                 size="small"
                                             />
                                         )}
@@ -399,7 +399,7 @@ function DashboardPage() {
                                         {row.total > 0 && (
                                             <Chip
                                                 label={formatCurrency(row.total, row.currency)}
-                                                sx={{ backgroundColor: '#00f2fe', color: '#333' }}
+                                                sx={{ backgroundColor: '#00f2fe', color: 'white' }}
                                                 size="small"
                                             />
                                         )}

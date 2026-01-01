@@ -15,7 +15,7 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
-import ContributorForm from '../components/ContributorForm';
+// ContributorForm removed - RBAC
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -203,7 +203,7 @@ function PaymentsPage() {
       setPaymentList(paymentsWithRowNumbers);
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
-      setIsAdmin(userRes.data.role === 'admin');
+      setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
     } catch (error) {
       console.error('Failed to load payments:', error);
     }
@@ -221,8 +221,8 @@ function PaymentsPage() {
           payment.amount?.toString(),
           payment.currency,
           payment.category?.name,
-          payment.recipient?.name,
-          payment.payer?.name,
+          '-',
+          payment.payer?.name || payment.payer?.full_name,
           payment.description,
           new Date(payment.payment_date).toLocaleDateString(),
           payment.payment_status === 'paid' ? 'оплачено' :
@@ -406,7 +406,6 @@ function PaymentsPage() {
       amount: payment.amount,
       currency: payment.currency,
       category_id: payment.category_id || '',
-      recipient_id: payment.recipient_id,
       payer_id: payment.payer_id || '',
       payment_date: today,
       description: payment.description || '',
@@ -754,34 +753,34 @@ function PaymentsPage() {
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.payer?.name && isAdmin ? 'pointer' : 'default'
+                    cursor: payment.payer?.name || payment.payer?.full_name && isAdmin ? 'pointer' : 'default'
                   }}
                   onClick={() => isAdmin && handleContributorClick(payment.payer)}
                 >
                   <span
                     style={{
-                      textDecoration: payment.payer?.name && isAdmin ? 'underline' : 'none',
+                      textDecoration: payment.payer?.name || payment.payer?.full_name && isAdmin ? 'underline' : 'none',
                       textDecorationStyle: 'dotted',
                       textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
                   >
-                    {payment.payer?.name || '-'}
+                    {payment.payer?.name || payment.payer?.full_name || '-'}
                   </span>
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                    cursor: '-' && isAdmin ? 'pointer' : 'default'
                   }}
                   onClick={() => handleContributorClick(payment.recipient)}
                 >
                   <span
                     style={{
-                      textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                      textDecoration: '-' && isAdmin ? 'underline' : 'none',
                       textDecorationStyle: 'dotted',
                       textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
                   >
-                    {payment.recipient?.name || '-'}
+                    {'-' || '-'}
                   </span>
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>

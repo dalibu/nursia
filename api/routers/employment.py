@@ -13,7 +13,7 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, EmploymentRelation, Contributor
+from database.models import User, EmploymentRelation
 from api.auth.oauth import get_current_user, get_admin_user
 
 router = APIRouter(prefix="/employment", tags=["employment"])
@@ -52,8 +52,8 @@ async def get_employment_relations(
     current_user: User = Depends(get_current_user)
 ):
     """Получить список трудовых отношений"""
-    from database.models import UserRole
-    from api.auth.oauth import get_user_contributor
+    # UserRole removed - using is_admin
+    # get_user_contributor removed
     
     query = select(EmploymentRelation).options(
         joinedload(EmploymentRelation.employer),
@@ -61,10 +61,10 @@ async def get_employment_relations(
     )
     
     # Для обычного пользователя — только его трудовые отношения
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
+    if not current_user.is_admin:
+        pass  # User is now worker directly
         if user_contributor:
-            query = query.where(EmploymentRelation.employee_id == user_contributor.id)
+            query = query.where(EmploymentRelation.employee_id == current_user.id)
         else:
             return []  # Нет contributor — нет трудовых отношений
     

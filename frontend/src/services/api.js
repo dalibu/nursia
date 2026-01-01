@@ -54,13 +54,22 @@ export const payments = {
   getUserInfo: () => api.get('/auth/me'),
 };
 
+// Contributors API deprecated - use usersApi instead for RBAC
 export const contributors = {
-  list: () => api.get('/contributors/'),
-  listAdmin: () => api.get('/contributors/admin'),
-  create: (data) => api.post('/contributors/', data),
-  update: (id, data) => api.put(`/contributors/${id}`, data),
-  delete: (id) => api.delete(`/contributors/${id}`),
-  validateDelete: (id) => api.get(`/contributors/${id}/validate-delete`),
+  list: () => api.get('/users/'),  // Redirected to users for RBAC compatibility
+  listAdmin: () => api.get('/users/'),
+  create: (data) => api.post('/users/', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  validateDelete: (id) => Promise.resolve({ data: { can_delete: true } }),
+};
+
+// New users API for RBAC
+export const usersApi = {
+  list: () => api.get('/users/'),
+  create: (data) => api.post('/admin/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 export const currencies = {

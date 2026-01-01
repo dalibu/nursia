@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency, Assignment
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -165,7 +165,6 @@ async def create_payment(
         select(Payment)
         .options(
             joinedload(Payment.category).joinedload(PaymentCategory.category_group),
-            joinedload(Payment.recipient),
             joinedload(Payment.payer)
         )
         .where(Payment.id == db_payment.id)
@@ -187,7 +186,6 @@ async def get_payments(
 ) -> List[PaymentSchema]:
     query = select(Payment).options(
         joinedload(Payment.category).joinedload(PaymentCategory.category_group),
-        joinedload(Payment.recipient),
         joinedload(Payment.payer),
         joinedload(Payment.assignment)
     )
@@ -214,7 +212,6 @@ async def get_payments(
             "id": payment.id,
             "tracking_nr": payment.tracking_nr,
             "category_id": payment.category_id,
-            "recipient_id": payment.recipient_id,
             "amount": str(payment.amount),
             "currency": payment.currency,
             "description": payment.description,
@@ -231,15 +228,10 @@ async def get_payments(
                 "description": payment.category.description,
                 "created_at": payment.category.created_at.isoformat()
             } if payment.category else None,
-            "recipient": {
-                "id": payment.recipient.id,
-                "name": payment.recipient.name,
-                "type": payment.recipient.type
-            } if payment.recipient else None,
             "payer": {
                 "id": payment.payer.id,
-                "name": payment.payer.name,
-                "type": payment.payer.type
+                "name": payment.payer.full_name,
+                "username": payment.payer.username
             } if payment.payer else None
         }
         response.append(payment_dict)
@@ -269,10 +261,10 @@ async def get_payment_reports(
         end_date = now_server()
     
     # Получаем детальные платежи
-    query = select(Payment, PaymentCategory.name, Contributor.name).join(
+    query = select(Payment, PaymentCategory.name, User.full_name).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).outerjoin(
-        Contributor, Payment.recipient_id == Contributor.id
+        User, Payment.payer_id == User.id
     ).where(
         and_(
             Payment.payment_date >= start_date,
@@ -284,13 +276,13 @@ async def get_payment_reports(
     payments = []
     totals_by_currency = {}
     
-    for payment, category_name, recipient_name in result:
+    for payment, category_name, payer_name in result:
         payments.append({
             "id": payment.id,
             "amount": float(payment.amount),
             "currency": payment.currency,
             "category_name": category_name,
-            "recipient_name": recipient_name,
+            "payer_name": payer_name,
             "description": payment.description,
             "payment_date": payment.payment_date.isoformat(),
             "created_at": payment.created_at.isoformat()

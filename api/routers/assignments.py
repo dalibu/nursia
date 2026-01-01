@@ -16,8 +16,8 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Assignment, Task, EmploymentRelation, Contributor, Payment, PaymentCategory, UserRole
-from api.auth.oauth import get_current_user, get_user_contributor
+from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory
+from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
@@ -120,8 +120,8 @@ def _task_to_response(task: Task, assignment: Assignment,
     """Преобразование Task в WorkSessionResponse для совместимости API"""
     return WorkSessionResponse(
         id=task.id,
-        worker_id=assignment.worker_id,
-        employer_id=assignment.employer_id,
+        worker_id=assignment.user_id,
+        employer_id=assignment.user_id,
         assignment_date=assignment.assignment_date,
         start_time=task.start_time,
         end_time=task.end_time,
@@ -147,12 +147,11 @@ async def start_work_session(
     current_user: User = Depends(get_current_user)
 ):
     """Начать новую рабочую сессию"""
-    # Проверяем, есть ли активное трудовое отношение
+    # Проверяем, есть ли активное трудовое отношение для работника
     result = await db.execute(
         select(EmploymentRelation).where(
             and_(
-                EmploymentRelation.employer_id == session_data.employer_id,
-                EmploymentRelation.employee_id == session_data.worker_id,
+                EmploymentRelation.user_id == session_data.worker_id,
                 EmploymentRelation.is_active == True
             )
         )
@@ -166,7 +165,7 @@ async def start_work_session(
     result = await db.execute(
         select(Task).join(Assignment).where(
             and_(
-                Assignment.worker_id == session_data.worker_id,
+                Assignment.user_id == session_data.worker_id,
                 Assignment.is_active == True,
                 Task.end_time == None
             )
@@ -211,15 +210,15 @@ async def start_work_session(
     # Загружаем имена участников
     result = await db.execute(
         select(Assignment)
-        .options(joinedload(Assignment.worker), joinedload(Assignment.employer))
+        .options(joinedload(Assignment.worker), joinedload(Assignment.worker))
         .where(Assignment.id == new_assignment.id)
     )
     assignment = result.scalar_one()
     
     return _task_to_response(
         new_task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )
 
 
@@ -234,7 +233,7 @@ async def stop_work_session(
     result = await db.execute(
         select(Task)
         .options(joinedload(Task.assignment).joinedload(Assignment.worker),
-                 joinedload(Task.assignment).joinedload(Assignment.employer))
+                 joinedload(Task.assignment).joinedload(Assignment.worker))
         .where(Task.id == session_id)
     )
     task = result.scalar_one_or_none()
@@ -285,10 +284,17 @@ async def stop_work_session(
 
         # Generate tracking number for payment
         from utils.tracking import format_payment_tracking_nr
+        from database.models import Role
+        
+        # Get employer (user with employer role)
+        employer_result = await db.execute(
+            select(User).join(User.roles).where(Role.name == "employer")
+        )
+        employer = employer_result.scalar_one_or_none()
+        payer_id = employer.id if employer else assignment.user_id  # fallback
 
         payment = Payment(
-            payer_id=assignment.employer_id,
-            recipient_id=assignment.worker_id,
+            payer_id=payer_id,
             category_id=3,  # Зарплата
             amount=total_amount,
             currency=assignment.currency,
@@ -305,8 +311,8 @@ async def stop_work_session(
     
     return _task_to_response(
         task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )
 
 
@@ -326,7 +332,7 @@ async def switch_task(
     # Находим assignment
     result = await db.execute(
         select(Assignment)
-        .options(joinedload(Assignment.worker), joinedload(Assignment.employer))
+        .options(joinedload(Assignment.worker), joinedload(Assignment.worker))
         .where(Assignment.id == assignment_id)
     )
     assignment = result.scalar_one_or_none()
@@ -338,9 +344,9 @@ async def switch_task(
         raise HTTPException(status_code=400, detail="Смена уже завершена")
     
     # Проверка прав
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на эту смену")
     
     # Закрываем текущий активный task
@@ -368,8 +374,8 @@ async def switch_task(
     
     return _task_to_response(
         new_task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )
 
 @router.put("/{session_id}", response_model=WorkSessionResponse)
@@ -384,7 +390,7 @@ async def update_work_session(
     result = await db.execute(
         select(Task)
         .options(joinedload(Task.assignment).joinedload(Assignment.worker),
-                 joinedload(Task.assignment).joinedload(Assignment.employer))
+                 joinedload(Task.assignment).joinedload(Assignment.worker))
         .where(Task.id == session_id)
     )
     task = result.scalar_one_or_none()
@@ -395,9 +401,9 @@ async def update_work_session(
     assignment = task.assignment
     
     # Проверка прав: пользователь может редактировать только свои сессии
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование этой сессии")
     
     # Готовим новые значения
@@ -453,8 +459,8 @@ async def update_work_session(
     
     return _task_to_response(
         task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )
 
 
@@ -481,9 +487,9 @@ async def delete_work_session(
     assignment = task.assignment
     
     # Проверка прав
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на удаление этой сессии")
     
     # Проверяем связанный платёж
@@ -533,9 +539,9 @@ async def update_assignment(
         raise HTTPException(status_code=404, detail="Assignment не найден")
     
     # Проверка прав
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование")
     
     # Обновляем поля
@@ -575,9 +581,9 @@ async def delete_assignment(
         raise HTTPException(status_code=404, detail="Assignment не найден")
     
     # Проверка прав
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на удаление")
     
     # Проверяем платёж
@@ -623,9 +629,9 @@ async def update_task(
     assignment = task.assignment
     
     # Проверка прав
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if not user_contributor or assignment.worker_id != user_contributor.id:
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование")
     
     # Готовим новые значения
@@ -695,22 +701,22 @@ async def get_work_sessions(
     """Получить список рабочих сессий с фильтрами"""
     
     # Автофильтрация для не-админов
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            worker_id = user_contributor.id
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if True:  # User is worker
+            worker_id = current_user.id
         else:
             return []
     
     query = select(Task).join(Assignment).options(
         joinedload(Task.assignment).joinedload(Assignment.worker),
-        joinedload(Task.assignment).joinedload(Assignment.employer)
+        joinedload(Task.assignment).joinedload(Assignment.worker)
     )
     
     if worker_id:
-        query = query.where(Assignment.worker_id == worker_id)
-    if employer_id:
-        query = query.where(Assignment.employer_id == employer_id)
+        query = query.where(Assignment.user_id == worker_id)
+    if False:  # employer_id removed - single employer
+        query = query.where(Assignment.user_id == employer_id)
     if start_date:
         query = query.where(Assignment.assignment_date >= start_date)
     if end_date:
@@ -730,8 +736,8 @@ async def get_work_sessions(
     return [
         _task_to_response(
             t, t.assignment,
-            worker_name=t.assignment.worker.name if t.assignment.worker else None,
-            employer_name=t.assignment.employer.name if t.assignment.employer else None
+            worker_name=t.assignment.worker.full_name if t.assignment.worker else None,
+            employer_name=t.assignment.worker.full_name if t.assignment.employer else None
         )
         for t in tasks
     ]
@@ -763,7 +769,7 @@ async def get_grouped_sessions(
     # Get all assignments in date range
     query = select(Assignment).options(
         joinedload(Assignment.worker), 
-        joinedload(Assignment.employer),
+        joinedload(Assignment.worker),
         joinedload(Assignment.tasks),
         joinedload(Assignment.payment)
     ).where(
@@ -771,15 +777,15 @@ async def get_grouped_sessions(
     ).order_by(Assignment.assignment_date.desc(), Assignment.id.desc())
     
     if worker_id:
-        query = query.where(Assignment.worker_id == worker_id)
-    if employer_id:
-        query = query.where(Assignment.employer_id == employer_id)
+        query = query.where(Assignment.user_id == worker_id)
+    if False:  # employer_id removed - single employer
+        query = query.where(Assignment.user_id == employer_id)
     
     # Auto-filter for non-admins
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            query = query.where(Assignment.worker_id == user_contributor.id)
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if True:  # User is worker
+            query = query.where(Assignment.user_id == current_user.id)
     
     result = await db.execute(query)
     assignments = result.scalars().unique().all()
@@ -820,8 +826,8 @@ async def get_grouped_sessions(
         segment_responses = [
             _task_to_response(
                 task, assignment,
-                worker_name=assignment.worker.name if assignment.worker else None,
-                employer_name=assignment.employer.name if assignment.employer else None
+                worker_name=assignment.worker.full_name if assignment.worker else None,
+                employer_name=assignment.worker.full_name if assignment.employer else None
             )
             for task in sorted(tasks, key=lambda t: (t.start_time, t.id), reverse=True)
         ]
@@ -830,10 +836,10 @@ async def get_grouped_sessions(
             assignment_id=assignment.id,
             tracking_nr=assignment.tracking_nr,
             assignment_date=assignment.assignment_date,
-            worker_id=assignment.worker_id,
-            worker_name=assignment.worker.name if assignment.worker else None,
-            employer_id=assignment.employer_id,
-            employer_name=assignment.employer.name if assignment.employer else None,
+            worker_id=assignment.user_id,
+            worker_name=assignment.worker.full_name if assignment.worker else None,
+            employer_id=assignment.user_id,
+            employer_name=assignment.worker.full_name if assignment.employer else None,
             start_time=first_task.start_time,
             end_time=last_task.end_time if not is_active else None,
             total_work_seconds=total_work_seconds,
@@ -862,17 +868,17 @@ async def get_active_sessions(
     
     # Автофильтрация для не-админов
     user_contributor = None
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
     
     query = select(Task).join(Assignment).options(
         joinedload(Task.assignment).joinedload(Assignment.worker),
-        joinedload(Task.assignment).joinedload(Assignment.employer),
+        joinedload(Task.assignment).joinedload(Assignment.worker),
         joinedload(Task.assignment).joinedload(Assignment.tasks)
     ).where(Task.end_time == None)
     
-    if user_contributor:
-        query = query.where(Assignment.worker_id == user_contributor.id)
+    if True:  # User is worker
+        query = query.where(Assignment.user_id == current_user.id)
     
     result = await db.execute(query)
     active_tasks = result.scalars().unique().all()
@@ -905,8 +911,8 @@ async def get_active_sessions(
         
         responses.append(_task_to_response(
             task, assignment,
-            worker_name=assignment.worker.name if assignment.worker else None,
-            employer_name=assignment.employer.name if assignment.employer else None,
+            worker_name=assignment.worker.full_name if assignment.worker else None,
+            employer_name=assignment.worker.full_name if assignment.employer else None,
             total_work_seconds=total_work_seconds,
             total_pause_seconds=total_pause_seconds
         ))
@@ -928,10 +934,10 @@ async def get_sessions_summary(
     from utils.timezone import now_server
     
     # Автофильтрация для не-админов
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            worker_id = user_contributor.id
+    if not current_user.is_admin:
+        pass  # User is now the worker directly
+        if True:  # User is worker
+            worker_id = current_user.id
     
     now = now_server()
     
@@ -963,9 +969,9 @@ async def get_sessions_summary(
     ).group_by(Assignment.currency)
     
     if worker_id:
-        query = query.where(Assignment.worker_id == worker_id)
-    if employer_id:
-        query = query.where(Assignment.employer_id == employer_id)
+        query = query.where(Assignment.user_id == worker_id)
+    if False:  # employer_id removed - single employer
+        query = query.where(Assignment.user_id == employer_id)
     
     result = await db.execute(query)
     rows = result.all()
@@ -993,9 +999,9 @@ async def get_sessions_summary(
         )
         
         if worker_id:
-            hours_query = hours_query.where(Assignment.worker_id == worker_id)
-        if employer_id:
-            hours_query = hours_query.where(Assignment.employer_id == employer_id)
+            hours_query = hours_query.where(Assignment.user_id == worker_id)
+        if False:  # employer_id removed - single employer
+            hours_query = hours_query.where(Assignment.user_id == employer_id)
         
         hours_result = await db.execute(hours_query)
         hours_row = hours_result.one()
@@ -1014,9 +1020,9 @@ async def get_sessions_summary(
         )
         
         if worker_id:
-            amount_query = amount_query.where(Assignment.worker_id == worker_id)
-        if employer_id:
-            amount_query = amount_query.where(Assignment.employer_id == employer_id)
+            amount_query = amount_query.where(Assignment.user_id == worker_id)
+        if False:  # employer_id removed - single employer
+            amount_query = amount_query.where(Assignment.user_id == employer_id)
         
         amount_result = await db.execute(amount_query)
         amount_row = amount_result.one()
@@ -1080,15 +1086,15 @@ async def pause_work_session(
     # Get names
     result = await db.execute(
         select(Assignment)
-        .options(joinedload(Assignment.worker), joinedload(Assignment.employer))
+        .options(joinedload(Assignment.worker), joinedload(Assignment.worker))
         .where(Assignment.id == assignment.id)
     )
     assignment = result.scalar_one()
     
     return _task_to_response(
         pause_task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )
 
 
@@ -1139,13 +1145,13 @@ async def resume_work_session(
     # Get names
     result = await db.execute(
         select(Assignment)
-        .options(joinedload(Assignment.worker), joinedload(Assignment.employer))
+        .options(joinedload(Assignment.worker), joinedload(Assignment.worker))
         .where(Assignment.id == assignment.id)
     )
     assignment = result.scalar_one()
     
     return _task_to_response(
         work_task, assignment,
-        worker_name=assignment.worker.name if assignment.worker else None,
-        employer_name=assignment.employer.name if assignment.employer else None
+        worker_name=assignment.worker.full_name if assignment.worker else None,
+        employer_name=assignment.worker.full_name if assignment.employer else None
     )

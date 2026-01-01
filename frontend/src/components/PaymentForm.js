@@ -3,22 +3,20 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, MenuItem, Box, Chip, Select, InputLabel, FormControl
 } from '@mui/material';
-import { payments, contributors, currencies } from '../services/api';
+import { payments, currencies } from '../services/api';
 
 function PaymentForm({ open, payment, initialData, onClose }) {
   const [formData, setFormData] = useState({
     amount: '',
     currency: '',
     category_id: '',
-    recipient_id: '',
     payer_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     description: '',
     payment_status: 'unpaid'
   });
-  const [originalTime, setOriginalTime] = useState(null); // Сохраняем оригинальное время при редактировании
+  const [originalTime, setOriginalTime] = useState(null);
   const [categories, setCategories] = useState([]);
-  const [contributorList, setContributorList] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
   const [userList, setUserList] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -27,7 +25,6 @@ function PaymentForm({ open, payment, initialData, onClose }) {
     if (open) {
       loadData();
       if (payment) {
-        // Сохраняем оригинальное время для редактирования
         const dateTimeParts = payment.payment_date.split('T');
         setOriginalTime(dateTimeParts[1] || null);
 
@@ -35,31 +32,26 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           amount: payment.amount,
           currency: payment.currency,
           category_id: payment.category_id,
-          recipient_id: payment.recipient_id,
           payer_id: payment.payer_id || '',
           payment_date: dateTimeParts[0],
           description: payment.description || '',
           payment_status: payment.payment_status || 'unpaid'
         });
       } else if (initialData) {
-        // Предзаполнение формы из шаблона (повторить платёж)
         setFormData({
           amount: initialData.amount || '',
           currency: initialData.currency || '',
           category_id: initialData.category_id || '',
-          recipient_id: initialData.recipient_id || '',
           payer_id: initialData.payer_id || '',
           payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
           description: initialData.description || '',
           payment_status: initialData.payment_status || 'unpaid'
         });
       } else {
-        // Сброс формы для нового платежа - валюта будет установлена в loadData
         setFormData({
           amount: '',
           currency: '',
           category_id: '',
-          recipient_id: '',
           payer_id: '',
           payment_date: new Date().toISOString().split('T')[0],
           description: '',
@@ -71,20 +63,21 @@ function PaymentForm({ open, payment, initialData, onClose }) {
 
   const loadData = async () => {
     try {
-      const [categoriesRes, contributorsRes, currenciesRes, userRes, usersRes] = await Promise.all([
+      const token = localStorage.getItem('token');
+      const [categoriesRes, currenciesRes, userRes, usersRes] = await Promise.all([
         payments.categories(),
-        contributors.list(),
         currencies.list(),
         payments.getUserInfo(),
-        fetch('/api/users/', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json())
+        fetch('/api/users/', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
       ]);
       setCategories(categoriesRes.data);
-      setContributorList(contributorsRes.data);
       setCurrencyList(currenciesRes.data.currencies);
       setUserList(usersRes || []);
-      setIsAdmin(userRes.data.role === 'admin');
+      // Check admin role via roles array (RBAC)
+      const roles = userRes.data.roles || [];
+      setIsAdmin(roles.includes('admin'));
 
-      // Устанавливаем валюту по умолчанию
+      // Set default currency
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
       if (defaultCurrency && !payment && !initialData) {
         setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
@@ -97,14 +90,12 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // При редактировании используем оригинальное время, иначе 00:00:00 для новых платежей
     const timeToUse = payment && originalTime ? originalTime : '00:00:00';
 
     const submitData = {
       ...formData,
       amount: parseFloat(formData.amount),
       category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
-      recipient_id: parseInt(formData.recipient_id),
       payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
       payment_date: formData.payment_date + 'T' + timeToUse
     };
@@ -152,34 +143,20 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             </TextField>
           </Box>
 
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <TextField
-              select
-              label="Плательщик"
-              margin="normal"
-              value={formData.payer_id}
-              onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
-              required
-              sx={{ flex: 1, minWidth: 160 }}
-            >
-              {contributorList.map((rec) => (
-                <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Получатель"
-              margin="normal"
-              value={formData.recipient_id}
-              onChange={(e) => setFormData({ ...formData, recipient_id: e.target.value })}
-              required
-              sx={{ flex: 1, minWidth: 160 }}
-            >
-              {contributorList.map((rec) => (
-                <MenuItem key={rec.id} value={rec.id}>{rec.name}</MenuItem>
-              ))}
-            </TextField>
-          </Box>
+          <TextField
+            select
+            label="Плательщик"
+            margin="normal"
+            fullWidth
+            value={formData.payer_id}
+            onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
+            required
+          >
+            {userList.map((user) => (
+              <MenuItem key={user.id} value={user.id}>{user.full_name || user.username}</MenuItem>
+            ))}
+          </TextField>
+
           <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
             <TextField
               select

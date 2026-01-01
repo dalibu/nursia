@@ -3,17 +3,83 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean
+from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean, Table, Column, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 
 class Base(DeclarativeBase):
     pass
 
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
-    PENDING = "pending"
-    BLOCKED = "blocked"
+
+# ================================
+# RBAC: Roles, Permissions
+# ================================
+
+class RoleType(str, Enum):
+    """Тип роли: техническая или бизнес"""
+    AUTH = "auth"
+    BUSINESS = "business"
+
+
+class Role(Base):
+    """Роли пользователей (admin, employer, worker)"""
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)  # admin, employer, worker
+    type: Mapped[str] = mapped_column(String(20))  # auth, business
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    users: Mapped[list["User"]] = relationship("User", secondary="user_roles", back_populates="roles")
+    permissions: Mapped[list["Permission"]] = relationship("Permission", secondary="role_permissions", back_populates="roles")
+    category_groups: Mapped[list["PaymentCategoryGroup"]] = relationship("PaymentCategoryGroup", secondary="role_category_groups", back_populates="roles")
+
+    def __repr__(self) -> str:
+        return f"<Role(id={self.id}, name={self.name}, type={self.type})>"
+
+
+class Permission(Base):
+    """Разрешения для ролей"""
+    __tablename__ = "permissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)  # manage_users, create_payments
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    roles: Mapped[list["Role"]] = relationship("Role", secondary="role_permissions", back_populates="permissions")
+
+    def __repr__(self) -> str:
+        return f"<Permission(id={self.id}, name={self.name})>"
+
+
+# Junction tables for RBAC
+user_roles = Table(
+    "user_roles",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
+)
+
+role_permissions = Table(
+    "role_permissions",
+    Base.metadata,
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
+    Column("permission_id", Integer, ForeignKey("permissions.id"), primary_key=True),
+)
+
+role_category_groups = Table(
+    "role_category_groups",
+    Base.metadata,
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
+    Column("group_id", Integer, ForeignKey("payment_category_groups.id"), primary_key=True),
+)
+
+
+# ================================
+# Users
+# ================================
 
 class UserStatusType(str, Enum):
     PENDING = "pending"
@@ -21,9 +87,6 @@ class UserStatusType(str, Enum):
     BLOCKED = "blocked"
     RESETED = "reseted"
 
-class TaskType(str, Enum):
-    WORK = "work"
-    PAUSE = "pause"
 
 class User(Base):
     __tablename__ = "users"
@@ -34,7 +97,6 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     full_name: Mapped[str] = mapped_column(String)
-    role: Mapped[UserRole] = mapped_column(String, default=UserRole.PENDING)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     force_password_change: Mapped[bool] = mapped_column(default=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
@@ -42,11 +104,35 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
+    roles: Mapped[list["Role"]] = relationship("Role", secondary="user_roles", back_populates="users")
+    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="payer")
+    assignments: Mapped[list["Assignment"]] = relationship("Assignment", back_populates="worker")
 
+    def has_role(self, role_name: str) -> bool:
+        """Проверить наличие роли у пользователя"""
+        return any(r.name == role_name for r in self.roles)
 
+    def has_permission(self, permission_name: str) -> bool:
+        """Проверить наличие разрешения у пользователя через роли"""
+        for role in self.roles:
+            if any(p.name == permission_name for p in role.permissions):
+                return True
+        return False
+
+    @property
+    def is_admin(self) -> bool:
+        return self.has_role("admin")
+
+    @property
+    def is_employer(self) -> bool:
+        return self.has_role("employer")
+
+    @property
+    def is_worker(self) -> bool:
+        return self.has_role("worker")
 
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, username={self.username}, role={self.role})>"
+        return f"<User(id={self.id}, username={self.username})>"
 
 
 class UserStatus(Base):
@@ -84,19 +170,24 @@ class RegistrationRequest(Base):
         return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
+# ================================
+# Payment Categories
+# ================================
+
 class PaymentCategoryGroup(Base):
     """Группы категорий платежей (Зарплата, Расходы, Премии, Долги и т.д.)"""
     __tablename__ = "payment_category_groups"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)  # Название группы
+    name: Mapped[str] = mapped_column(String(100), unique=True)
     code: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)  # salary, expense, bonus, debt
-    color: Mapped[str] = mapped_column(String(7), default="#808080")  # Hex color
-    emoji: Mapped[str] = mapped_column(String(10), default="💰")  # Emoji icon
+    color: Mapped[str] = mapped_column(String(7), default="#808080")
+    emoji: Mapped[str] = mapped_column(String(10), default="💰")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     categories: Mapped[list["PaymentCategory"]] = relationship("PaymentCategory", back_populates="category_group")
+    roles: Mapped[list["Role"]] = relationship("Role", secondary="role_category_groups", back_populates="category_groups")
 
     def __repr__(self) -> str:
         return f"<PaymentCategoryGroup(id={self.id}, name={self.name}, code={self.code})>"
@@ -118,13 +209,16 @@ class PaymentCategory(Base):
         return f"<PaymentCategory(id={self.id}, name={self.name}, group_id={self.group_id})>"
 
 
+# ================================
+# Payments (упрощённая структура)
+# ================================
+
 class Payment(Base):
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    payer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))
+    payer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто платит → users!
     category_id: Mapped[int] = mapped_column(ForeignKey("payment_categories.id"))
-    recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contributors.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -135,14 +229,17 @@ class Payment(Base):
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    payer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[payer_id])
+    payer: Mapped["User"] = relationship("User", back_populates="payments")
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
-    recipient: Mapped[Optional["Contributor"]] = relationship("Contributor", foreign_keys=[recipient_id], back_populates="payments")
     assignment: Mapped[Optional["Assignment"]] = relationship("Assignment", back_populates="payment")
 
     def __repr__(self) -> str:
         return f"<Payment(id={self.id}, amount={self.amount}, category_id={self.category_id})>"
 
+
+# ================================
+# System
+# ================================
 
 class SystemSetting(Base):
     __tablename__ = "system_settings"
@@ -160,9 +257,9 @@ class Currency(Base):
     __tablename__ = "currencies"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String(3), unique=True)  # UAH, EUR, USD
-    name: Mapped[str] = mapped_column(String(100))  # Ukrainian Hryvnia
-    symbol: Mapped[str] = mapped_column(String(10))  # ₴, €, $
+    code: Mapped[str] = mapped_column(String(3), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    symbol: Mapped[str] = mapped_column(String(10))
     is_active: Mapped[bool] = mapped_column(default=True)
     is_default: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -171,44 +268,31 @@ class Currency(Base):
         return f"<Currency(id={self.id}, code={self.code}, name={self.name})>"
 
 
-class Contributor(Base):
-    __tablename__ = "contributors"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)  # Связь с User
-    name: Mapped[str] = mapped_column(String(200))
-    type: Mapped[str] = mapped_column(String(50))  # 'user' или 'organization'
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    is_active: Mapped[bool] = mapped_column(default=True)
-
-    user: Mapped[Optional["User"]] = relationship("User")
-    payments: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="[Payment.recipient_id]", back_populates="recipient")
-    payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="[Payment.payer_id]", back_populates="payer")
-
-    def __repr__(self) -> str:
-        return f"<Contributor(id={self.id}, name={self.name}, type={self.type})>"
-
+# ================================
+# Employment & Assignments (упрощённая структура)
+# ================================
 
 class EmploymentRelation(Base):
-    """Трудовые отношения: работодатель нанимает работника с почасовой ставкой"""
+    """Трудовые отношения работника с системой"""
     __tablename__ = "employment_relations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанимает (А)
-    employee_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает (Е)
-    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 100 ₴/час
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Работник
+    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
-    employer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employer_id])
-    employee: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employee_id])
+    user: Mapped["User"] = relationship("User")
 
     def __repr__(self) -> str:
-        return f"<EmploymentRelation(employer={self.employer_id}, employee={self.employee_id}, rate={self.hourly_rate})>"
+        return f"<EmploymentRelation(user_id={self.user_id}, rate={self.hourly_rate})>"
+
+
+class TaskType(str, Enum):
+    WORK = "work"
+    PAUSE = "pause"
 
 
 class Assignment(Base):
@@ -216,23 +300,21 @@ class Assignment(Base):
     __tablename__ = "assignments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    worker_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто работает
-    employer_id: Mapped[int] = mapped_column(ForeignKey("contributors.id"))  # Кто нанял
-    assignment_date: Mapped[date] = mapped_column(Date)  # Дата работы
-    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # Ставка за час
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто работал → users!
+    assignment_date: Mapped[date] = mapped_column(Date)
+    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Комментарий
-    is_active: Mapped[bool] = mapped_column(default=True)  # В процессе работы?
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    worker: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[worker_id])
-    employer: Mapped["Contributor"] = relationship("Contributor", foreign_keys=[employer_id])
+    worker: Mapped["User"] = relationship("User", back_populates="assignments")
     tasks: Mapped[list["Task"]] = relationship("Task", back_populates="assignment", order_by="Task.start_time")
     payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="assignment", uselist=False)
 
     def __repr__(self) -> str:
-        return f"<Assignment(id={self.id}, date={self.assignment_date}, worker={self.worker_id})>"
+        return f"<Assignment(id={self.id}, date={self.assignment_date}, user_id={self.user_id})>"
 
 
 class Task(Base):
@@ -241,9 +323,9 @@ class Task(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"))
-    start_time: Mapped[time] = mapped_column(Time)  # Время начала
-    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)  # Время окончания
-    task_type: Mapped[str] = mapped_column(String(10), default="work")  # work или pause
+    start_time: Mapped[time] = mapped_column(Time)
+    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    task_type: Mapped[str] = mapped_column(String(10), default="work")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

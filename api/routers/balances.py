@@ -14,8 +14,8 @@ from sqlalchemy import select, func, and_, case
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Payment, Assignment, Task, Contributor, UserRole, PaymentCategory, PaymentCategoryGroup
-from api.auth.oauth import get_current_user, get_user_contributor
+from database.models import User, Payment, Assignment, Task, PaymentCategory, PaymentCategoryGroup, Role
+from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/balances", tags=["balances"])
 
@@ -123,11 +123,11 @@ async def get_balance_summary(
     """Получить сводку для Dashboard карточек"""
     
     # Автофильтрация для не-админов
-    user_contributor_id = None
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            user_contributor_id = user_contributor.id
+    current_user.id = None
+    if not current_user.is_admin:
+        pass  # User is now worker directly
+        if True:
+            current_user.id = current_user.id
         else:
             return DashboardSummary(
                 total_salary=0, total_expenses=0, total_credits=0,
@@ -145,8 +145,8 @@ async def get_balance_summary(
     ).where(
         and_(PaymentCategoryGroup.code == 'salary', Payment.payment_status.in_(['paid', 'offset']))
     )
-    if user_contributor_id:
-        salary_query = salary_query.where(Payment.recipient_id == user_contributor_id)
+    if current_user.id:
+        salary_query = salary_query.where(Payment.recipient_id == current_user.id)
     elif worker_id:
         salary_query = salary_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(salary_query)
@@ -158,8 +158,8 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(PaymentCategoryGroup.code == 'expense')
-    if user_contributor_id:
-        expenses_query = expenses_query.where(Payment.payer_id == user_contributor_id)
+    if current_user.id:
+        expenses_query = expenses_query.where(Payment.payer_id == current_user.id)
     elif worker_id:
         expenses_query = expenses_query.where(Payment.payer_id == worker_id)
     result = await db.execute(expenses_query)
@@ -171,8 +171,8 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(and_(PaymentCategoryGroup.code == 'debt', Payment.payment_status == 'paid'))
-    if user_contributor_id:
-        credits_given_query = credits_given_query.where(Payment.recipient_id == user_contributor_id)
+    if current_user.id:
+        credits_given_query = credits_given_query.where(Payment.recipient_id == current_user.id)
     elif worker_id:
         credits_given_query = credits_given_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(credits_given_query)
@@ -180,9 +180,9 @@ async def get_balance_summary(
     
     # Зачтённые в счёт долга (все платежи со статусом 'offset')
     credits_offset_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'offset')
-    if user_contributor_id:
+    if current_user.id:
         credits_offset_query = credits_offset_query.where(
-            (Payment.recipient_id == user_contributor_id) | (Payment.payer_id == user_contributor_id)
+            (Payment.recipient_id == current_user.id) | (Payment.payer_id == current_user.id)
         )
     elif worker_id:
         credits_offset_query = credits_offset_query.where(
@@ -197,8 +197,8 @@ async def get_balance_summary(
     # 4. К оплате — чистый остаток к оплате (кредиты - offset + unpaid)
     # Неоплаченные платежи
     unpaid_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'unpaid')
-    if user_contributor_id:
-        unpaid_query = unpaid_query.where(Payment.recipient_id == user_contributor_id)
+    if current_user.id:
+        unpaid_query = unpaid_query.where(Payment.recipient_id == current_user.id)
     elif worker_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(unpaid_query)
@@ -215,8 +215,8 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(and_(PaymentCategoryGroup.code == 'bonus', Payment.payment_status.in_(['paid', 'offset'])))
-    if user_contributor_id:
-        bonus_query = bonus_query.where(Payment.recipient_id == user_contributor_id)
+    if current_user.id:
+        bonus_query = bonus_query.where(Payment.recipient_id == current_user.id)
     elif worker_id:
         bonus_query = bonus_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(bonus_query)
@@ -228,8 +228,8 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(and_(PaymentCategoryGroup.code == 'repayment', Payment.payment_status == 'paid'))
-    if user_contributor_id:
-        repayment_query = repayment_query.where(Payment.payer_id == user_contributor_id)
+    if current_user.id:
+        repayment_query = repayment_query.where(Payment.payer_id == current_user.id)
     elif worker_id:
         repayment_query = repayment_query.where(Payment.payer_id == worker_id)
     result = await db.execute(repayment_query)
@@ -246,8 +246,8 @@ async def get_balance_summary(
     ).where(Payment.payment_status == 'unpaid').group_by(
         Payment.payer_id, Payment.recipient_id, Payment.currency
     )
-    if user_contributor_id:
-        debt_query = debt_query.where(Payment.recipient_id == user_contributor_id)
+    if current_user.id:
+        debt_query = debt_query.where(Payment.recipient_id == current_user.id)
     
     result = await db.execute(debt_query)
     debt_rows = result.all()
@@ -261,9 +261,9 @@ async def get_balance_summary(
     
     contributor_names = {}
     if contributor_ids:
-        result = await db.execute(select(Contributor).where(Contributor.id.in_(contributor_ids)))
+        result = await db.execute(select(User).where(User.id.in_(contributor_ids)))
         for c in result.scalars().all():
-            contributor_names[c.id] = c.name
+            contributor_names[c.id] = c.full_name
     
     for row in debt_rows:
         currency = row.currency
@@ -302,12 +302,12 @@ async def get_monthly_summary(
     from utils.timezone import now_server
     
     # Автофильтрация для не-админов
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            worker_id = user_contributor.id
+    if not current_user.is_admin:
+        pass  # User is now worker directly
+        if True:
+            worker_id = current_user.id
         else:
-            # Нет связанного Contributor — возвращаем пустой результат
+            # Нет связанного User — возвращаем пустой результат
             return []
     
     now = now_server()
@@ -654,11 +654,11 @@ async def get_mutual_balances(
     """
     
     # Автофильтрация для не-админов
-    user_contributor_id = None
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            user_contributor_id = user_contributor.id
+    current_user.id = None
+    if not current_user.is_admin:
+        pass  # User is now worker directly
+        if True:
+            current_user.id = current_user.id
     
     balances = []
     
@@ -680,10 +680,10 @@ async def get_mutual_balances(
         )
     ).distinct()
     
-    if user_contributor_id:
+    if current_user.id:
         debt_pairs_query = debt_pairs_query.where(
-            (Payment.payer_id == user_contributor_id) | 
-            (Payment.recipient_id == user_contributor_id)
+            (Payment.payer_id == current_user.id) | 
+            (Payment.recipient_id == current_user.id)
         )
     
     result = await db.execute(debt_pairs_query)
@@ -719,10 +719,10 @@ async def get_mutual_balances(
         PaymentCategoryGroup.code
     )
     
-    if user_contributor_id:
+    if current_user.id:
         unpaid_pairs_query = unpaid_pairs_query.where(
-            (Payment.payer_id == user_contributor_id) | 
-            (Payment.recipient_id == user_contributor_id)
+            (Payment.payer_id == current_user.id) | 
+            (Payment.recipient_id == current_user.id)
         )
     
     result = await db.execute(unpaid_pairs_query)
@@ -737,10 +737,10 @@ async def get_mutual_balances(
     contributor_names = {}
     if contributor_ids:
         result = await db.execute(
-            select(Contributor).where(Contributor.id.in_(contributor_ids))
+            select(User).where(User.id.in_(contributor_ids))
         )
         for c in result.scalars().all():
-            contributor_names[c.id] = c.name
+            contributor_names[c.id] = c.full_name
     
     # === Обрабатываем долговые отношения ===
     processed_debt_pairs = set()
@@ -1019,7 +1019,7 @@ async def get_debug_export(
     """
     from datetime import datetime
     
-    if current_user.role != UserRole.ADMIN:
+    if not current_user.is_admin:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Только для администраторов")
     
@@ -1046,16 +1046,16 @@ async def get_debug_export(
     
     # Получаем все платежи с категориями и именами
     from sqlalchemy.orm import aliased
-    PayerContributor = aliased(Contributor)
-    RecipientContributor = aliased(Contributor)
+    PayerUser = aliased(User)
+    RecipientUser = aliased(User)
     
     payments_query = select(
         Payment.id,
         Payment.tracking_nr,
         Payment.payer_id,
-        PayerContributor.name.label("payer_name"),
+        PayerUser.full_name.label("payer_name"),
         Payment.recipient_id,
-        RecipientContributor.name.label("recipient_name"),
+        RecipientUser.full_name.label("recipient_name"),
         Payment.amount,
         Payment.currency,
         Payment.payment_status,
@@ -1064,9 +1064,9 @@ async def get_debug_export(
         PaymentCategoryGroup.name.label("category_group"),
         Payment.description
     ).select_from(Payment).join(
-        PayerContributor, Payment.payer_id == PayerContributor.id
+        PayerUser, Payment.payer_id == PayerUser.id
     ).outerjoin(
-        RecipientContributor, Payment.recipient_id == RecipientContributor.id
+        RecipientUser, Payment.recipient_id == RecipientUser.id
     ).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(

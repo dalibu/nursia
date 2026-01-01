@@ -4,9 +4,7 @@ set -e
 echo "Ensuring data directory exists..."
 mkdir -p data
 
-echo "Running database migrations..."
-(cd database && python -m alembic upgrade head)
-
+# Skip alembic migrations - using setup_system.py for fresh RBAC schema
 echo "Running system setup (database, settings, categories, currencies, admin)..."
 python /app/scripts/setup_system.py
 

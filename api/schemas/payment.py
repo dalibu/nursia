@@ -44,7 +44,6 @@ class PaymentCategory(PaymentCategoryBase):
 
 class PaymentBase(BaseModel):
     category_id: int
-    recipient_id: Optional[int] = None
     amount: Decimal = Field(..., gt=0, decimal_places=2)
     currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
@@ -81,8 +80,7 @@ class Payment(PaymentBase):
     assignment_id: Optional[int] = None
     assignment_tracking_nr: Optional[str] = None
     category: Optional[PaymentCategory] = None
-    recipient: Optional[RecipientInfo] = None
-    payer: Optional[RecipientInfo] = None
+    payer: Optional[UserInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 
