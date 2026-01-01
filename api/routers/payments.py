@@ -165,7 +165,8 @@ async def create_payment(
         select(Payment)
         .options(
             joinedload(Payment.category).joinedload(PaymentCategory.category_group),
-            joinedload(Payment.payer)
+            joinedload(Payment.payer),
+            joinedload(Payment.recipient)
         )
         .where(Payment.id == db_payment.id)
     )
@@ -187,6 +188,7 @@ async def get_payments(
     query = select(Payment).options(
         joinedload(Payment.category).joinedload(PaymentCategory.category_group),
         joinedload(Payment.payer),
+        joinedload(Payment.recipient),
         joinedload(Payment.assignment)
     )
     

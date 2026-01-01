@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 # Payment Category Group schemas
 class PaymentCategoryGroupBase(BaseModel):
     name: str = Field(..., max_length=100)
+    code: Optional[str] = Field(None, max_length=20)
     color: str = Field(default="#808080", max_length=7)
     emoji: str = Field(default="💰", max_length=10)
     is_active: bool = True
@@ -53,6 +54,7 @@ class PaymentBase(BaseModel):
 
 class PaymentCreate(PaymentBase):
     payer_id: Optional[int] = None
+    recipient_id: Optional[int] = None
 
 
 class RecipientInfo(BaseModel):
@@ -74,6 +76,7 @@ class UserInfo(BaseModel):
 class Payment(PaymentBase):
     id: int
     payer_id: int
+    recipient_id: Optional[int] = None
     tracking_nr: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
@@ -81,6 +84,7 @@ class Payment(PaymentBase):
     assignment_tracking_nr: Optional[str] = None
     category: Optional[PaymentCategory] = None
     payer: Optional[UserInfo] = None
+    recipient: Optional[UserInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -105,7 +105,8 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
     roles: Mapped[list["Role"]] = relationship("Role", secondary="user_roles", back_populates="users")
-    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="payer")
+    payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="Payment.payer_id", back_populates="payer")
+    payments_received: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="Payment.recipient_id", back_populates="recipient")
     assignments: Mapped[list["Assignment"]] = relationship("Assignment", back_populates="worker")
 
     def has_role(self, role_name: str) -> bool:
@@ -217,7 +218,8 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    payer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто платит → users!
+    payer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто платит (работодатель)
+    recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)  # Кто получает (работник)
     category_id: Mapped[int] = mapped_column(ForeignKey("payment_categories.id"))
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
@@ -229,12 +231,13 @@ class Payment(Base):
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    payer: Mapped["User"] = relationship("User", back_populates="payments")
+    payer: Mapped["User"] = relationship("User", foreign_keys=[payer_id], back_populates="payments_made")
+    recipient: Mapped[Optional["User"]] = relationship("User", foreign_keys=[recipient_id], back_populates="payments_received")
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
     assignment: Mapped[Optional["Assignment"]] = relationship("Assignment", back_populates="payment")
 
     def __repr__(self) -> str:
-        return f"<Payment(id={self.id}, amount={self.amount}, category_id={self.category_id})>"
+        return f"<Payment(id={self.id}, amount={self.amount}, payer={self.payer_id}, recipient={self.recipient_id})>"
 
 
 # ================================

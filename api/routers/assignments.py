@@ -295,6 +295,7 @@ async def stop_work_session(
 
         payment = Payment(
             payer_id=payer_id,
+            recipient_id=assignment.user_id,  # Работник — получатель
             category_id=3,  # Зарплата
             amount=total_amount,
             currency=assignment.currency,
@@ -312,7 +313,7 @@ async def stop_work_session(
     return _task_to_response(
         task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=employer.full_name if employer else None
     )
 
 

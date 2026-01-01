@@ -5,21 +5,29 @@ import {
 } from '@mui/material';
 import { payments, currencies } from '../services/api';
 
+// Группы категорий доступные для worker
+const WORKER_ALLOWED_GROUPS = ['expense', 'repayment', 'other'];
+
 function PaymentForm({ open, payment, initialData, onClose }) {
   const [formData, setFormData] = useState({
     amount: '',
     currency: '',
     category_id: '',
-    payer_id: '',
+    recipient_id: '',
+    payer_id: '',  // Добавляем payer_id
     payment_date: new Date().toISOString().split('T')[0],
     description: '',
     payment_status: 'unpaid'
   });
   const [originalTime, setOriginalTime] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [allCategories, setAllCategories] = useState([]);
+  const [categories, setCategories] = useState([]);  // Отфильтрованные по роли
   const [currencyList, setCurrencyList] = useState([]);
   const [userList, setUserList] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isEmployer, setIsEmployer] = useState(false);
+  const [isWorker, setIsWorker] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -32,6 +40,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           amount: payment.amount,
           currency: payment.currency,
           category_id: payment.category_id,
+          recipient_id: payment.recipient_id || '',
           payer_id: payment.payer_id || '',
           payment_date: dateTimeParts[0],
           description: payment.description || '',
@@ -42,6 +51,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           amount: initialData.amount || '',
           currency: initialData.currency || '',
           category_id: initialData.category_id || '',
+          recipient_id: initialData.recipient_id || '',
           payer_id: initialData.payer_id || '',
           payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
           description: initialData.description || '',
@@ -52,6 +62,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           amount: '',
           currency: '',
           category_id: '',
+          recipient_id: '',
           payer_id: '',
           payment_date: new Date().toISOString().split('T')[0],
           description: '',
@@ -70,17 +81,65 @@ function PaymentForm({ open, payment, initialData, onClose }) {
         payments.getUserInfo(),
         fetch('/api/users/', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
       ]);
-      setCategories(categoriesRes.data);
+
+      const allCats = categoriesRes.data;
+      setAllCategories(allCats);
       setCurrencyList(currenciesRes.data.currencies);
-      setUserList(usersRes || []);
-      // Check admin role via roles array (RBAC)
-      const roles = userRes.data.roles || [];
-      setIsAdmin(roles.includes('admin'));
+      // Получаем информацию о текущем пользователе
+      const userData = userRes.data;
+      setCurrentUser(userData);
+
+      const userId = userData.id;
+      console.log('Current User ID:', userId);
+      console.log('Raw users from API:', usersRes?.length);
+      if (usersRes && usersRes.length > 0) {
+        console.log('Sample user from list:', usersRes[0]);
+      }
+
+      // Сразу фильтруем список пользователей, чтобы не показывать себя
+      const filteredUsers = (usersRes || []).filter(u => {
+        const uId = u.id || u.user_id;
+        return String(uId) !== String(userId);
+      });
+      console.log('Filtered users count:', filteredUsers.length);
+
+      setUserList(filteredUsers);
+
+      // Check roles via roles array (RBAC)
+      const roles = userData.roles || [];
+      const admin = roles.includes('admin');
+      const employer = roles.includes('employer');
+      const worker = roles.includes('worker');
+
+      setIsAdmin(admin);
+      setIsEmployer(employer);
+      setIsWorker(worker);
+
+      // Фильтруем категории по роли
+      if (admin || employer) {
+        // Работодатель/Админ видит все категории
+        setCategories(allCats);
+      } else if (worker) {
+        // Worker видит только expense, repayment, other
+        const filteredCats = allCats.filter(cat =>
+          cat.category_group && WORKER_ALLOWED_GROUPS.includes(cat.category_group.code)
+        );
+        setCategories(filteredCats);
+      } else {
+        setCategories([]);
+      }
 
       // Set default currency
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
       if (defaultCurrency && !payment && !initialData) {
         setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
+      }
+
+      // Auto-set payer_id для нового платежа
+      if (!payment && !initialData && userData.id) {
+        // Для worker: payer = сам worker
+        // Для employer/admin: payer = сам пользователь (работодатель)
+        setFormData(prev => ({ ...prev, payer_id: userData.id }));
       }
     } catch (error) {
       console.error('Failed to load form data:', error);
@@ -96,7 +155,8 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       ...formData,
       amount: parseFloat(formData.amount),
       category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
-      payer_id: formData.payer_id ? parseInt(formData.payer_id) : undefined,
+      recipient_id: formData.recipient_id ? parseInt(formData.recipient_id) : undefined,
+      payer_id: formData.payer_id ? parseInt(formData.payer_id) : (currentUser?.id || undefined),
       payment_date: formData.payment_date + 'T' + timeToUse
     };
 
@@ -111,6 +171,9 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       console.error('Failed to save payment:', error);
     }
   };
+
+  // Определяем нужно ли показывать поле Получатель
+  const showRecipientField = isAdmin || isEmployer;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -143,19 +206,25 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             </TextField>
           </Box>
 
-          <TextField
-            select
-            label="Плательщик"
-            margin="normal"
-            fullWidth
-            value={formData.payer_id}
-            onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
-            required
-          >
-            {userList.map((user) => (
-              <MenuItem key={user.id} value={user.id}>{user.full_name || user.username}</MenuItem>
-            ))}
-          </TextField>
+          {/* Поле Получатель только для employer/admin */}
+          {showRecipientField && (
+            <TextField
+              select
+              label="Получатель"
+              margin="normal"
+              fullWidth
+              value={formData.recipient_id}
+              onChange={(e) => setFormData({ ...formData, recipient_id: e.target.value })}
+              required
+            >
+              <MenuItem value="">—</MenuItem>
+              {userList.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.full_name || user.username}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
 
           <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
             <TextField
@@ -165,6 +234,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               value={formData.category_id}
               onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
               sx={{ flex: 1, minWidth: 160 }}
+              required
             >
               <MenuItem value="">—</MenuItem>
               {categories.map((cat) => (
