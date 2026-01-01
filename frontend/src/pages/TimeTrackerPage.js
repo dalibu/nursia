@@ -17,7 +17,7 @@ import {
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange
 } from '@mui/icons-material';
-import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
+import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
 
 // Russian localized static ranges for DateRangePicker
@@ -64,7 +64,6 @@ function TimeTrackerPage() {
     const [groupedAssignments, setGroupedAssignments] = useState([]);
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
-    const [contributorsList, setContributorsList] = useState([]);
     const [summary, setSummary] = useState([]);
     const [period, setPeriod] = useState('month');
     const [isAdmin, setIsAdmin] = useState(false);
@@ -262,18 +261,16 @@ function TimeTrackerPage() {
     const loadData = async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const [groupedRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
+            const [groupedRes, activeRes, empRes, userRes] = await Promise.all([
                 assignmentsService.getGrouped({ period }),
                 assignmentsService.getActive(),
                 employmentService.list({ is_active: true }),
-                contributorsService.list(),
                 paymentsService.getUserInfo()
             ]);
             setGroupedAssignments(groupedRes.data);
             setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
-            setContributorsList(contribRes.data);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
         } catch (error) {
             console.error('Failed to load data:', error);
@@ -866,15 +863,15 @@ function TimeTrackerPage() {
                     {isAdmin && (
                         <TextField
                             select
-                            label="Работник"
+                            label="Клиент"
                             size="small"
                             value={filters.worker}
                             onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
                             sx={{ minWidth: 150 }}
                         >
                             <MenuItem value="">Все</MenuItem>
-                            {contributorsList.map(c => (
-                                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                            {employmentList.map(emp => (
+                                <MenuItem key={emp.id} value={emp.employer_id}>{emp.employer_name}</MenuItem>
                             ))}
                         </TextField>
                     )}

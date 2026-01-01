@@ -10,7 +10,6 @@ import Layout from './components/Layout';
 import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import CurrenciesPage from './pages/CurrenciesPage';
-import ContributorsPage from './pages/ContributorsPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -71,7 +70,6 @@ function App() {
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="currencies" element={<CurrenciesPage />} />
-              <Route path="contributors" element={<ContributorsPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="reports" element={<ReportsPage />} />

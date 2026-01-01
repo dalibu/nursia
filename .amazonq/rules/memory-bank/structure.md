@@ -89,8 +89,7 @@ Telegram Bot ─┘
 
 ### Domain-Driven Organization
 - **Payments**: Core payment tracking functionality
-- **Authentication**: User management and security
-- **Contributors**: Payment contributors management
+- **Authentication**: User management and security (RBAC)
 - **Categories**: Payment categorization system
 - **Currencies**: Multi-currency support
 - **Settings**: System configuration management

@@ -867,11 +867,6 @@ async def get_active_sessions(
 ):                                    
     """Получить активные рабочие сессии"""
     
-    # Автофильтрация для не-админов
-    user_contributor = None
-    if not current_user.is_admin:
-        pass  # User is now the worker directly
-    
     query = select(Task).join(Assignment).options(
         joinedload(Task.assignment).joinedload(Assignment.worker),
         joinedload(Task.assignment).joinedload(Assignment.worker),

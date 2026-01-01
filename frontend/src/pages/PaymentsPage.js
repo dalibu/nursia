@@ -15,7 +15,6 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
-// ContributorForm removed - RBAC
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -60,8 +59,6 @@ function PaymentsPage() {
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
-  const [showContributorForm, setShowContributorForm] = useState(false);
-  const [editingContributor, setEditingContributor] = useState(null);
   const [sortField, setSortField] = useState('tracking_nr');
   const [sortDirection, setSortDirection] = useState('desc');
 
@@ -448,16 +445,6 @@ function PaymentsPage() {
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
-  const handleContributorClick = (contributor) => {
-    if (contributor && isAdmin) {
-      setEditingContributor(contributor);
-      setShowContributorForm(true);
-    }
-  };
-
-  const handleContributorFormSuccess = () => {
-    loadPayments(); // Перезагружаем платежи, чтобы обновить имена участников
-  };
 
   return (
     <Box>
@@ -753,9 +740,8 @@ function PaymentsPage() {
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.payer?.name || payment.payer?.full_name && isAdmin ? 'pointer' : 'default'
+                    cursor: 'default'
                   }}
-                  onClick={() => isAdmin && handleContributorClick(payment.payer)}
                 >
                   <span
                     style={{
@@ -769,9 +755,8 @@ function PaymentsPage() {
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.recipient?.full_name && isAdmin ? 'pointer' : 'default'
+                    cursor: 'default'
                   }}
-                  onClick={() => isAdmin && handleContributorClick(payment.recipient)}
                 >
                   <span
                     style={{
@@ -865,8 +850,6 @@ function PaymentsPage() {
         initialData={repeatTemplate}
         onClose={() => { setRepeatTemplate(null); handleFormClose(); }}
       />
-
-      {/* ContributorForm removed - RBAC */}
 
       <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
         <DialogTitle>Подтвердите удаление</DialogTitle>
