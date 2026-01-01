@@ -4,7 +4,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -126,11 +126,16 @@ async def update_current_user_profile(
 
 @router.get("/")
 async def get_all_users_admin(
+    include_deleted: bool = Query(False, description="Включить удалённых пользователей"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
     """Получить всех пользователей (только для админов)"""
-    result = await db.execute(select(User).options(selectinload(User.roles))) # Changed
+    query = select(User).options(selectinload(User.roles))
+    if not include_deleted:
+        query = query.where(User.status != "deleted")
+    
+    result = await db.execute(query)
     users = result.scalars().all()
     
     return [
@@ -257,7 +262,11 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    """Удалить пользователя (только для админов)"""
+    """Удалить пользователя (soft delete - только для админов).
+    
+    Устанавливает статус 'deleted' вместо физического удаления,
+    чтобы сохранить ссылочную целостность с платежами и другими данными.
+    """
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     
@@ -267,10 +276,37 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    await db.delete(user)
+    if user.status == "deleted":
+        raise HTTPException(status_code=400, detail="User already deleted")
+    
+    # Soft delete: меняем статус вместо физического удаления
+    user.status = "deleted"
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     
     return {"message": "User deleted successfully"}
+
+@router.post("/{user_id}/restore")
+async def restore_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Восстановить удалённого пользователя (только для админов)"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.status != "deleted":
+        raise HTTPException(status_code=400, detail="User is not deleted")
+    
+    user.status = "active"
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    
+    return {"message": "User restored successfully"}
 
 @router.put("/me/password")
 async def change_password(
