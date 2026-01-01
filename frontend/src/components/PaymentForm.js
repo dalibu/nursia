@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, MenuItem, Box, Chip, Select, InputLabel, FormControl
 } from '@mui/material';
-import { payments, currencies } from '../services/api';
+import { payments, currencies, users } from '../services/api';
 
 // Группы категорий доступные для worker
 const WORKER_ALLOWED_GROUPS = ['expense', 'repayment', 'other'];
@@ -25,6 +25,8 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const [currencyList, setCurrencyList] = useState([]);
   const [userList, setUserList] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployer, setIsEmployer] = useState(false);
   const [isWorker, setIsWorker] = useState(false);
@@ -69,6 +71,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           payment_status: 'unpaid'
         });
       }
+      setLocalError(''); // Clear error on dialog open
     }
   }, [open, payment, initialData]);
 
@@ -79,7 +82,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
         payments.categories(),
         currencies.list(),
         payments.getUserInfo(),
-        fetch('/api/users/', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        users.listAll().then(r => r.data)
       ]);
 
       const allCats = categoriesRes.data;
@@ -97,7 +100,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       }
 
       // Сразу фильтруем список пользователей, чтобы не показывать себя
-      const filteredUsers = (usersRes || []).filter(u => {
+      const filteredUsers = (Array.isArray(usersRes) ? usersRes : []).filter(u => {
         const uId = u.id || u.user_id;
         return String(uId) !== String(userId);
       });
@@ -143,6 +146,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       }
     } catch (error) {
       console.error('Failed to load form data:', error);
+      setLocalError('Не удалось загрузить данные для формы. Пожалуйста, попробуйте еще раз.');
     }
   };
 
@@ -160,6 +164,8 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       payment_date: formData.payment_date + 'T' + timeToUse
     };
 
+    setLoading(true);
+    setLocalError('');
     try {
       if (payment) {
         await payments.update(payment.id, submitData);
@@ -169,6 +175,9 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       onClose();
     } catch (error) {
       console.error('Failed to save payment:', error);
+      setLocalError(error.response?.data?.detail || 'Ошибка при сохранении платежа. Проверьте правильность заполнения всех полей.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -178,8 +187,9 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{payment ? `Редактировать платёж ${payment.tracking_nr || ''}` : 'Новый платёж'}</DialogTitle>
-      <Box component="form" onSubmit={handleSubmit}>
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
         <DialogContent>
+          {localError && <Alert severity="error" sx={{ mb: 2 }}>{localError}</Alert>}
           <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
             <TextField
               label="Сумма"

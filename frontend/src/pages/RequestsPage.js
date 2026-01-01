@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Button, Box, Chip, Alert, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText
+  Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText,
+  TextField, MenuItem
 } from '@mui/material';
 import { Check, Close, Delete } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
@@ -10,13 +11,31 @@ import { useNotifications } from '../components/Layout';
 function RequestsPage() {
   const { checkRequests } = useNotifications();
   const [requests, setRequests] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, requestId: null, requestName: '' });
+  const [approveDialog, setApproveDialog] = useState({ open: false, requestId: null, username: '' });
+  const [selectedRole, setSelectedRole] = useState('worker');
 
   useEffect(() => {
     loadRequests();
+    loadRoles();
   }, []);
+
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('/api/admin/roles', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setRoles(data);
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+    }
+  };
 
   const loadRequests = async () => {
     try {
@@ -33,16 +52,32 @@ function RequestsPage() {
     }
   };
 
-  const handleApprove = async (requestId) => {
+  const handleApproveClick = (request) => {
+    setApproveDialog({
+      open: true,
+      requestId: request.id,
+      username: request.username
+    });
+  };
+
+  const handleApproveConfirm = async () => {
     setLoading(true);
     try {
-      await fetch(`/api/admin/registration-requests/${requestId}/approve`, {
+      const response = await fetch(`/api/admin/registration-requests/${approveDialog.requestId}/approve`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        },
+        body: JSON.stringify({ role: selectedRole })
       });
-      setMessage('Пользователь одобрен и создан');
+
+      if (!response.ok) {
+        throw new Error('Approval failed');
+      }
+
+      setMessage(`Пользователь ${approveDialog.username} одобрен с ролью ${selectedRole}`);
+      setApproveDialog({ open: false, requestId: null, username: '' });
       loadRequests();
       checkRequests();
     } catch (error) {
@@ -138,8 +173,8 @@ function RequestsPage() {
                     {new Date(request.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={request.status} 
+                    <Chip
+                      label={request.status}
                       color={request.status === 'pending' ? 'warning' : request.status === 'approved' ? 'success' : 'default'}
                       size="small"
                     />
@@ -154,7 +189,7 @@ function RequestsPage() {
                             color="success"
                             startIcon={<Check />}
                             disabled={loading}
-                            onClick={() => handleApprove(request.id)}
+                            onClick={() => handleApproveClick(request)}
                           >
                             Одобрить
                           </Button>
@@ -186,6 +221,36 @@ function RequestsPage() {
           </Table>
         </TableContainer>
       )}
+
+      <Dialog open={approveDialog.open} onClose={() => setApproveDialog({ open: false, requestId: null, username: '' })} maxWidth="xs" fullWidth>
+        <DialogTitle>Одобрение регистрации</DialogTitle>
+        <DialogContent>
+          <DialogContentText mb={2}>
+            Выберите роль для пользователя <b>{approveDialog.username}</b>:
+          </DialogContentText>
+          <TextField
+            select
+            fullWidth
+            label="Роль"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+          >
+            {roles.map((role) => (
+              <MenuItem key={role.id} value={role.name}>
+                {role.name} ({role.description || role.type})
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApproveDialog({ open: false, requestId: null, username: '' })}>
+            Отмена
+          </Button>
+          <Button onClick={handleApproveConfirm} color="success" variant="contained" disabled={loading}>
+            Одобрить
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, requestId: null, requestName: '' })}>
         <DialogTitle>Подтвердите удаление</DialogTitle>

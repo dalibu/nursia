@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from database.core import get_db
-from database.models import User
+from database.models import User, Role
 from api.auth.oauth import get_current_user, get_admin_user
 from pydantic import BaseModel
 
@@ -37,7 +38,7 @@ class AdminUserCreate(BaseModel):
     username: str
     full_name: str
     email: str = None
-    role: str = "user"
+    role: str = "worker"
 
 def generate_password(length: int = 12) -> str:
     """Генерирует безопасный пароль"""
@@ -58,7 +59,7 @@ def generate_password(length: int = 12) -> str:
 @router.get("/all")
 async def get_all_users(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Получить список всех пользователей (для выбора в формах)"""
     result = await db.execute(
@@ -66,7 +67,13 @@ async def get_all_users(
     )
     users = result.scalars().all()
     return [
-        {"id": u.id, "username": u.username, "full_name": u.full_name}
+        {
+            "id": u.id, 
+            "username": u.username, 
+            "full_name": u.full_name,
+            "name": u.full_name,   # Backwards compatibility
+            "type": "user"         # Backwards compatibility
+        }
         for u in users
     ]
 
@@ -123,7 +130,7 @@ async def get_all_users_admin(
     current_user: User = Depends(get_admin_user)
 ):
     """Получить всех пользователей (только для админов)"""
-    result = await db.execute(select(User))
+    result = await db.execute(select(User).options(selectinload(User.roles))) # Changed
     users = result.scalars().all()
     
     return [
@@ -153,7 +160,7 @@ async def create_user(
     """
     import hashlib
     from utils.password_utils import hash_password
-    from database.models import Role
+    # from database.models import Role # Removed local import, now imported globally
     
     # Проверяем уникальность username
     result = await db.execute(select(User).where(User.username == user_data.username))
@@ -186,7 +193,7 @@ async def create_user(
     
     db.add(new_user)
     await db.commit()
-    await db.refresh(new_user)
+    await db.refresh(new_user, attribute_names=["roles"]) # Changed
     
     return {
         "message": "User created successfully",
@@ -209,9 +216,9 @@ async def update_user(
     current_user: User = Depends(get_admin_user)
 ):
     """Обновить пользователя (только для админов)"""
-    from database.models import Role
+    # from database.models import Role # Removed local import, now imported globally
     
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id).options(selectinload(User.roles))) # Changed
     user = result.scalar_one_or_none()
     
     if not user:

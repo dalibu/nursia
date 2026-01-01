@@ -55,6 +55,7 @@ class PaymentBase(BaseModel):
 class PaymentCreate(PaymentBase):
     payer_id: Optional[int] = None
     recipient_id: Optional[int] = None
+    assignment_id: Optional[int] = None
 
 
 class RecipientInfo(BaseModel):

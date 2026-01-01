@@ -3,8 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from typing import List
 
+from sqlalchemy.orm import selectinload
 from database.core import get_db
-from database.models import User, UserStatus, UserStatusType
+from database.models import User, UserStatus, UserStatusType, Role
 from api.auth.oauth import get_admin_user
 from api.schemas.user_status import UserStatusResponse, UserStatusUpdate
 
@@ -16,7 +17,7 @@ async def list_user_statuses(
     current_user: User = Depends(get_admin_user)
 ):
     """Получить список всех пользователей с их статусами"""
-    query = select(User).order_by(User.created_at.desc())
+    query = select(User).options(selectinload(User.roles)).order_by(User.created_at.desc())
     result = await db.execute(query)
     users = result.scalars().all()
     
@@ -32,7 +33,7 @@ async def list_user_statuses(
             username=user.username,
             full_name=user.full_name,
             email=user.email,
-            role=user.role,
+            roles=[r.name for r in user.roles],
             status=user_status.status if user_status else UserStatusType.PENDING,
             force_password_change=user.force_password_change,
             created_at=user.created_at,
@@ -50,7 +51,7 @@ async def update_user_status(
 ):
     """Обновить статус пользователя"""
     # Проверяем, что пользователь существует
-    user_query = select(User).where(User.id == user_id)
+    user_query = select(User).options(selectinload(User.roles)).where(User.id == user_id)
     user_result = await db.execute(user_query)
     user = user_result.scalar_one_or_none()
     
@@ -104,7 +105,7 @@ async def update_user_status(
         username=user.username,
         full_name=user.full_name,
         email=user.email,
-        role=user.role,
+        roles=[r.name for r in user.roles],
         status=updated_status.status,
         force_password_change=user.force_password_change,
         created_at=user.created_at,

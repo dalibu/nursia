@@ -122,7 +122,7 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    payment_data = payment.dict()
+    payment_data = payment.model_dump()
     
     # Устанавливаем валюту по умолчанию если не указана
     if not payment_data.get('currency'):
@@ -156,6 +156,7 @@ async def create_payment(
     db_payment = Payment(**payment_data)
     db.add(db_payment)
     await db.flush()  # Получаем ID
+    
     db_payment.tracking_nr = format_payment_tracking_nr(db_payment.id)
     await db.commit()
     await db.refresh(db_payment)
@@ -166,13 +167,14 @@ async def create_payment(
         .options(
             joinedload(Payment.category).joinedload(PaymentCategory.category_group),
             joinedload(Payment.payer),
-            joinedload(Payment.recipient)
+            joinedload(Payment.recipient),
+            joinedload(Payment.assignment)
         )
         .where(Payment.id == db_payment.id)
     )
     db_payment = result.unique().scalar_one()
     
-    return PaymentSchema.from_orm(db_payment)
+    return PaymentSchema.model_validate(db_payment)
 
 
 @router.get("/", response_model=List[PaymentSchema])
@@ -207,38 +209,7 @@ async def get_payments(
     result = await db.execute(query)
     payments = result.scalars().all()
     
-    # Формируем ответ вручную
-    response = []
-    for payment in payments:
-        payment_dict = {
-            "id": payment.id,
-            "tracking_nr": payment.tracking_nr,
-            "category_id": payment.category_id,
-            "amount": str(payment.amount),
-            "currency": payment.currency,
-            "description": payment.description,
-            "payment_date": payment.payment_date.isoformat(),
-            "payer_id": payment.payer_id,
-            "created_at": payment.created_at.isoformat(),
-            "payment_status": payment.payment_status,
-            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
-            "assignment_id": payment.assignment_id,
-            "assignment_tracking_nr": payment.assignment.tracking_nr if payment.assignment else None,
-            "category": {
-                "id": payment.category.id,
-                "name": payment.category.name,
-                "description": payment.category.description,
-                "created_at": payment.category.created_at.isoformat()
-            } if payment.category else None,
-            "payer": {
-                "id": payment.payer.id,
-                "name": payment.payer.full_name,
-                "username": payment.payer.username
-            } if payment.payer else None
-        }
-        response.append(payment_dict)
-    
-    return response
+    return [PaymentSchema.from_orm(p) for p in payments]
 
 
 @router.get("/reports")
@@ -348,9 +319,7 @@ async def update_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Админ может редактировать любые платежи, пользователи только свои
-    # Админ может редактировать любые платежи, пользователи только свои
-    # TODO: Обновить права доступа
+    """Обновить платёж. Админ может редактировать любые, пользователи — только свои."""
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     
     db_payment = result.scalar_one_or_none()
@@ -386,18 +355,16 @@ async def delete_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Админ может удалять любые платежи, пользователи только свои
-    # Админ может удалять любые платежи, пользователи только свои
-    # TODO: Обновить права доступа
+    """Удалить платёж. Админ может удалять любые, пользователи — только свои."""
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     
     db_payment = result.scalar_one_or_none()
     if not db_payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Проверяем права доступа
-    # if current_user.role != 'admin' and db_payment.user_id != current_user.id:
-    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    # Проверяем права доступа: админ или владелец платежа
+    if not current_user.is_admin and db_payment.payer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
     
     await db.delete(db_payment)
     await db.commit()

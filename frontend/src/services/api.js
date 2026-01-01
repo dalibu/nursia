@@ -56,7 +56,7 @@ export const payments = {
 
 // Contributors API deprecated - use usersApi instead for RBAC
 export const contributors = {
-  list: () => api.get('/users/'),  // Redirected to users for RBAC compatibility
+  list: () => api.get('/users/all'),  // Use minimal list for compatibility and security
   listAdmin: () => api.get('/users/'),
   create: (data) => api.post('/users/', data),
   update: (id, data) => api.put(`/users/${id}`, data),

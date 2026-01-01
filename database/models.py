@@ -236,6 +236,10 @@ class Payment(Base):
     category: Mapped["PaymentCategory"] = relationship("PaymentCategory", back_populates="payments")
     assignment: Mapped[Optional["Assignment"]] = relationship("Assignment", back_populates="payment")
 
+    @property
+    def assignment_tracking_nr(self) -> Optional[str]:
+        return self.assignment.tracking_nr if self.assignment else None
+
     def __repr__(self) -> str:
         return f"<Payment(id={self.id}, amount={self.amount}, payer={self.payer_id}, recipient={self.recipient_id})>"
 

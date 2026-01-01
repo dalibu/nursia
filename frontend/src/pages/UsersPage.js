@@ -17,7 +17,7 @@ function UsersPage() {
     username: '',
     full_name: '',
     email: '',
-    role: 'user',
+    role: 'worker',
     status: 'active'
   });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null, userName: '' });
@@ -25,6 +25,7 @@ function UsersPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [searchFilter, setSearchFilter] = useState('');
+  const [roles, setRoles] = useState([]);
 
   const [message, setMessage] = useState('');
 
@@ -34,7 +35,7 @@ function UsersPage() {
     username: '',
     full_name: '',
     email: '',
-    role: 'user'
+    role: 'worker'
   });
   const [createdUserInfo, setCreatedUserInfo] = useState(null);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -42,7 +43,22 @@ function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+    loadRoles();
   }, []);
+
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('/api/admin/roles', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setRoles(data);
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -150,7 +166,7 @@ function UsersPage() {
       username: user.username,
       full_name: user.full_name,
       email: user.email || '',
-      role: user.role,
+      role: user.roles && user.roles.length > 0 ? user.roles[0] : 'worker',
       status: user.status
     });
     setShowForm(true);
@@ -205,7 +221,7 @@ function UsersPage() {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingUser(null);
-    setFormData({ username: '', full_name: '', email: '', role: 'user', status: 'active' });
+    setFormData({ username: '', full_name: '', email: '', role: 'worker', status: 'active' });
   };
 
   const filteredUsers = users.filter(user => {
@@ -215,7 +231,7 @@ function UsersPage() {
       user.username.toLowerCase().includes(search) ||
       user.full_name.toLowerCase().includes(search) ||
       (user.email && user.email.toLowerCase().includes(search)) ||
-      user.role.toLowerCase().includes(search) ||
+      (user.roles && user.roles.join(', ').toLowerCase().includes(search)) ||
       user.status.toLowerCase().includes(search) ||
       user.id.toString().includes(search)
     );
@@ -283,7 +299,7 @@ function UsersPage() {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.full_name}</TableCell>
                   <TableCell>{user.email || '-'}</TableCell>
-                  <TableCell>{user.role}</TableCell>
+                  <TableCell>{user.roles ? user.roles.join(', ') : '-'}</TableCell>
                   <TableCell>
                     <Chip
                       label={user.status}
@@ -358,8 +374,11 @@ function UsersPage() {
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
-              <MenuItem value="user">Пользователь</MenuItem>
-              <MenuItem value="admin">Администратор</MenuItem>
+              {roles.map((role) => (
+                <MenuItem key={role.id} value={role.name}>
+                  {role.name}
+                </MenuItem>
+              ))}
             </TextField>
             <TextField
               fullWidth
@@ -454,8 +473,11 @@ function UsersPage() {
               value={createFormData.role}
               onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value })}
             >
-              <MenuItem value="user">Пользователь</MenuItem>
-              <MenuItem value="admin">Администратор</MenuItem>
+              {roles.map((role) => (
+                <MenuItem key={role.id} value={role.name}>
+                  {role.name}
+                </MenuItem>
+              ))}
             </TextField>
           </DialogContent>
           <DialogActions>

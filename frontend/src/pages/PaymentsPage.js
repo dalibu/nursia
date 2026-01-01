@@ -297,8 +297,8 @@ function PaymentsPage() {
           bVal = b.category?.name || '';
           break;
         case 'recipient':
-          aVal = a.recipient?.name || '';
-          bVal = b.recipient?.name || '';
+          aVal = a.recipient?.full_name || '';
+          bVal = b.recipient?.full_name || '';
           break;
         case 'payer':
           aVal = a.payer?.name || '';
@@ -769,18 +769,18 @@ function PaymentsPage() {
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: '-' && isAdmin ? 'pointer' : 'default'
+                    cursor: payment.recipient?.full_name && isAdmin ? 'pointer' : 'default'
                   }}
-                  onClick={() => handleContributorClick(payment.recipient)}
+                  onClick={() => isAdmin && handleContributorClick(payment.recipient)}
                 >
                   <span
                     style={{
-                      textDecoration: '-' && isAdmin ? 'underline' : 'none',
+                      textDecoration: payment.recipient?.full_name && isAdmin ? 'underline' : 'none',
                       textDecorationStyle: 'dotted',
                       textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
                   >
-                    {'-' || '-'}
+                    {payment.recipient?.full_name || '-'}
                   </span>
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>

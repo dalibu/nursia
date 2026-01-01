@@ -51,7 +51,8 @@ function Layout({ onLogout }) {
       const response = await axios.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const isAdminUser = response.data.role === 'admin';
+      const roles = response.data.roles || [];
+      const isAdminUser = roles.includes('admin');
       setIsAdmin(isAdminUser);
       setUserName(response.data.full_name || response.data.username);
 

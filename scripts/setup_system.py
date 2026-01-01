@@ -111,7 +111,8 @@ async def init_settings(session):
         {"key": "jwt_access_token_expire_minutes", "value": "480", "description": "Время жизни JWT токена (минуты)"},
         {"key": "password_rules", "value": "Пароль должен содержать минимум 6 символов и 1 цифру", "description": "Требования к паролю"},
         {"key": "security_login_delay_enabled", "value": "true", "description": "Включить задержку при неверном входе (защита от перебора)"},
-        {"key": "security_login_delay_seconds", "value": "1.0", "description": "Длительность задержки в секундах"}
+        {"key": "security_login_delay_seconds", "value": "1.0", "description": "Длительность задержки в секундах"},
+        {"key": "requests_check_interval", "value": "5", "description": "Интервал проверки новых заявок (минуты)"}
     ]
     
     created = 0
@@ -277,7 +278,17 @@ async def init_admin(session):
         if role_name in roles:
             await session.execute(insert(user_roles).values(user_id=admin.id, role_id=roles[role_name]))
     
-    print("Администратор создан (admin + employer). Требуется смена пароля при входе.")
+    # Create initial status entry for admin
+    from database.models import UserStatus, UserStatusType
+    admin_status = UserStatus(
+        user_id=admin.id,
+        status=UserStatusType.ACTIVE,
+        changed_by=admin.id,
+        reason="Начальная настройка системы"
+    )
+    session.add(admin_status)
+    
+    print("Администратор создан (admin + employer). Статус: Активен. Требуется смена пароля при входе.")
 
 
 async def main():

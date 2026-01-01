@@ -10,7 +10,7 @@ from typing import List, Optional
 from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import select, func, and_, or_, case
 from pydantic import BaseModel
 
 from database.core import get_db
@@ -270,14 +270,9 @@ async def get_monthly_summary(
     """Получить помесячную сводку (как в Übersicht из Excel)"""
     from utils.timezone import now_server
     
-    # Автофильтрация для не-админов
+    # Автофильтрация для не-админов: показываем только свои данные
     if not current_user.is_admin:
-        pass  # User is now worker directly
-        if True:
-            worker_id = current_user.id
-        else:
-            # Нет связанного User — возвращаем пустой результат
-            return []
+        worker_id = current_user.id
     
     now = now_server()
     summaries = []
@@ -632,7 +627,6 @@ async def get_debug_export(
     
     # Получаем все данные
     summary = await get_balance_summary(
-        employer_id=employer_id,
         worker_id=worker_id,
         db=db,
         current_user=current_user
