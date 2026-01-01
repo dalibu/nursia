@@ -80,7 +80,7 @@ async def get_current_user_profile(
         "username": current_user.username,
         "full_name": current_user.full_name,
         "email": current_user.email,
-        "role": current_user.role,
+        "roles": [role.name for role in current_user.roles],
         "status": current_user.status,
         "created_at": current_user.created_at,
         "updated_at": current_user.updated_at
@@ -104,10 +104,8 @@ async def update_current_user_profile(
     if user_data.email:
         current_user.email = user_data.email
     
-    # Админы могут изменять свою роль и статус
-    if current_user.role == "admin":
-        if user_data.role:
-            current_user.role = user_data.role
+    # Админы могут изменять статус (роли управляются через отдельный API)
+    if current_user.is_admin:
         if user_data.status:
             current_user.status = user_data.status
     
@@ -134,7 +132,7 @@ async def get_all_users_admin(
             "username": user.username,
             "full_name": user.full_name,
             "email": user.email,
-            "role": user.role,
+            "roles": [role.name for role in user.roles],
             "status": user.status,
             "created_at": user.created_at,
             "updated_at": user.updated_at
@@ -155,11 +153,18 @@ async def create_user(
     """
     import hashlib
     from utils.password_utils import hash_password
+    from database.models import Role
     
     # Проверяем уникальность username
     result = await db.execute(select(User).where(User.username == user_data.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Получаем роль из БД
+    role_result = await db.execute(select(Role).where(Role.name == user_data.role))
+    role = role_result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=400, detail=f"Role '{user_data.role}' not found")
     
     # Генерируем пароль
     plain_password = generate_password()
@@ -174,10 +179,10 @@ async def create_user(
         full_name=user_data.full_name,
         email=user_data.email,
         password_hash=password_hash,
-        role=user_data.role,
         status="active",
         force_password_change=True  # Требуем смену пароля при первом входе
     )
+    new_user.roles.append(role)
     
     db.add(new_user)
     await db.commit()
@@ -190,7 +195,7 @@ async def create_user(
             "username": new_user.username,
             "full_name": new_user.full_name,
             "email": new_user.email,
-            "role": new_user.role,
+            "roles": [r.name for r in new_user.roles],
             "status": new_user.status
         },
         "generated_password": plain_password  # Показываем пароль администратору
@@ -204,6 +209,8 @@ async def update_user(
     current_user: User = Depends(get_admin_user)
 ):
     """Обновить пользователя (только для админов)"""
+    from database.models import Role
+    
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
@@ -220,7 +227,15 @@ async def update_user(
     user.full_name = user_data.full_name
     if user_data.email:
         user.email = user_data.email
-    user.role = user_data.role
+    
+    # Обновляем роли (очищаем и добавляем новую)
+    if user_data.role:
+        role_result = await db.execute(select(Role).where(Role.name == user_data.role))
+        role = role_result.scalar_one_or_none()
+        if role:
+            user.roles.clear()
+            user.roles.append(role)
+    
     user.status = user_data.status
     user.updated_at = datetime.now(timezone.utc)
     

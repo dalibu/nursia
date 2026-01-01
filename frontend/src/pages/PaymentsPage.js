@@ -866,15 +866,7 @@ function PaymentsPage() {
         onClose={() => { setRepeatTemplate(null); handleFormClose(); }}
       />
 
-      <ContributorForm
-        open={showContributorForm}
-        contributor={editingContributor}
-        onClose={() => {
-          setShowContributorForm(false);
-          setEditingContributor(null);
-        }}
-        onSuccess={handleContributorFormSuccess}
-      />
+      {/* ContributorForm removed - RBAC */}
 
       <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
         <DialogTitle>Подтвердите удаление</DialogTitle>
