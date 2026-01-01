@@ -90,7 +90,7 @@ function DashboardPage() {
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     Обозрение
                 </Typography>
-                {user?.role === 'admin' && (
+                {user?.roles?.includes('admin') && (
                     <Tooltip title="Экспорт всех данных в JSON">
                         <Button
                             variant="outlined"

@@ -274,7 +274,7 @@ function TimeTrackerPage() {
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setContributorsList(contribRes.data);
-            setIsAdmin(userRes.data.role === 'admin');
+            setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
