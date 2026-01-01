@@ -48,7 +48,6 @@ def test_routers_import():
     from api.routers.assignments import router as assignments_router
     from api.routers.admin import router as admin_router
     from api.routers.users import router as users_router
-    from api.routers.user_status import router as user_status_router
     from api.routers.settings import router as settings_router
     from api.routers.employment import router as employment_router
     
@@ -58,7 +57,6 @@ def test_routers_import():
     assert assignments_router is not None
     assert admin_router is not None
     assert users_router is not None
-    assert user_status_router is not None
     assert settings_router is not None
     assert employment_router is not None
 

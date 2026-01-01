@@ -1,4 +1,4 @@
-from . import auth, payments, settings, currencies, admin, users, user_status
+from . import auth, payments, settings, currencies, admin, users
 
 __all__ = [
     'auth',
@@ -6,6 +6,5 @@ __all__ = [
     'settings',
     'currencies',
     'admin',
-    'users',
-    'user_status'
+    'users'
 ]
