@@ -8,7 +8,7 @@ import {
 import {
     Add, Edit, Delete, Work, Person, AttachMoney
 } from '@mui/icons-material';
-import { employment, contributors, currencies } from '../services/api';
+import { employment, users, currencies } from '../services/api';
 
 // Символы валют
 const currencySymbols = {
@@ -20,15 +20,14 @@ const currencySymbols = {
 function EmploymentPage() {
     const [loading, setLoading] = useState(true);
     const [relations, setRelations] = useState([]);
-    const [contributorsList, setContributorsList] = useState([]);
+    const [usersList, setUsersList] = useState([]);
     const [currencyList, setCurrencyList] = useState(['UAH', 'EUR', 'USD']);
 
     // Dialog state
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
-        employer_id: '',
-        employee_id: '',
+        user_id: '',
         hourly_rate: '',
         currency: 'UAH',
         is_active: true
@@ -38,6 +37,7 @@ function EmploymentPage() {
     // Snackbar for notifications
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
+    const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
     const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
     useEffect(() => {
@@ -47,13 +47,13 @@ function EmploymentPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [relRes, contribRes, currRes] = await Promise.all([
+            const [relRes, usersRes, currRes] = await Promise.all([
                 employment.list({ is_active: null }), // Все отношения
-                contributors.list(),
+                users.listAll(),
                 currencies.list().catch(() => ({ data: { currencies: ['UAH', 'EUR', 'USD'] } }))
             ]);
             setRelations(relRes.data);
-            setContributorsList(contribRes.data);
+            setUsersList(usersRes.data);
             if (currRes.data?.currencies) {
                 setCurrencyList(currRes.data.currencies);
             }
@@ -68,8 +68,7 @@ function EmploymentPage() {
         if (relation) {
             setEditingId(relation.id);
             setFormData({
-                employer_id: relation.employer_id,
-                employee_id: relation.employee_id,
+                user_id: relation.user_id,
                 hourly_rate: relation.hourly_rate,
                 currency: relation.currency,
                 is_active: relation.is_active
@@ -77,8 +76,7 @@ function EmploymentPage() {
         } else {
             setEditingId(null);
             setFormData({
-                employer_id: '',
-                employee_id: '',
+                user_id: '',
                 hourly_rate: '',
                 currency: 'UAH',
                 is_active: true
@@ -96,13 +94,8 @@ function EmploymentPage() {
 
     const handleSave = async () => {
         // Validation
-        if (!formData.employer_id || !formData.employee_id || !formData.hourly_rate) {
+        if (!formData.user_id || !formData.hourly_rate) {
             setError('Заполните все обязательные поля');
-            return;
-        }
-
-        if (formData.employer_id === formData.employee_id) {
-            setError('Работодатель и работник должны быть разными');
             return;
         }
 
@@ -113,13 +106,14 @@ function EmploymentPage() {
                     currency: formData.currency,
                     is_active: formData.is_active
                 });
+                showSuccess('Трудовые отношения обновлены');
             } else {
                 await employment.create({
-                    employer_id: formData.employer_id,
-                    employee_id: formData.employee_id,
+                    user_id: parseInt(formData.user_id),
                     hourly_rate: parseFloat(formData.hourly_rate),
                     currency: formData.currency
                 });
+                showSuccess('Трудовые отношения созданы');
             }
             handleCloseDialog();
             loadData();
@@ -133,6 +127,7 @@ function EmploymentPage() {
 
         try {
             await employment.delete(id);
+            showSuccess('Трудовые отношения деактивированы');
             loadData();
         } catch (error) {
             showError(error.response?.data?.detail || 'Ошибка удаления');
@@ -144,8 +139,20 @@ function EmploymentPage() {
         return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
 
-    // Filter contributors by type
-    const userContributors = contributorsList.filter(c => c.type === 'user');
+    // Get users that are workers (not admins) and don't have active employment
+    const availableUsers = usersList.filter(user => {
+        // Exclude admins - only workers can have employment relations
+        const isAdmin = user.roles?.includes('admin') || user.role === 'admin';
+        if (isAdmin) return false;
+
+        // If editing, include current user
+        if (editingId) {
+            const currentRelation = relations.find(r => r.id === editingId);
+            if (currentRelation && currentRelation.user_id === user.id) return true;
+        }
+        // Exclude users that already have active employment
+        return !relations.some(r => r.user_id === user.id && r.is_active);
+    });
 
     if (loading) {
         return (
@@ -188,7 +195,6 @@ function EmploymentPage() {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell><strong>Работодатель</strong></TableCell>
                                 <TableCell><strong>Работник</strong></TableCell>
                                 <TableCell align="right"><strong>Ставка/час</strong></TableCell>
                                 <TableCell align="center"><strong>Статус</strong></TableCell>
@@ -207,13 +213,7 @@ function EmploymentPage() {
                                     <TableCell>
                                         <Box display="flex" alignItems="center" gap={1}>
                                             <Person color="primary" />
-                                            {rel.employer_name}
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Work color="secondary" />
-                                            {rel.employee_name}
+                                            {rel.user_name || `User #${rel.user_id}`}
                                         </Box>
                                     </TableCell>
                                     <TableCell align="right">
@@ -269,31 +269,15 @@ function EmploymentPage() {
                     <TextField
                         select
                         fullWidth
-                        label="Работодатель (кто нанимает)"
-                        value={formData.employer_id}
-                        onChange={(e) => setFormData({ ...formData, employer_id: e.target.value })}
+                        label="Работник"
+                        value={formData.user_id}
+                        onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
                         sx={{ mt: 2 }}
                         disabled={!!editingId}
                     >
-                        {contributorsList.map((c) => (
-                            <MenuItem key={c.id} value={c.id}>
-                                {c.name} ({c.type === 'user' ? 'Пользователь' : 'Организация'})
-                            </MenuItem>
-                        ))}
-                    </TextField>
-
-                    <TextField
-                        select
-                        fullWidth
-                        label="Работник (кто работает)"
-                        value={formData.employee_id}
-                        onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                        sx={{ mt: 2 }}
-                        disabled={!!editingId}
-                    >
-                        {contributorsList.filter(c => c.id !== formData.employer_id).map((c) => (
-                            <MenuItem key={c.id} value={c.id}>
-                                {c.name} ({c.type === 'user' ? 'Пользователь' : 'Организация'})
+                        {(editingId ? usersList : availableUsers).map((user) => (
+                            <MenuItem key={user.id} value={user.id}>
+                                {user.full_name || user.name} ({user.username})
                             </MenuItem>
                         ))}
                     </TextField>

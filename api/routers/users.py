@@ -61,9 +61,12 @@ async def get_all_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить список всех пользователей (для выбора в формах)"""
+    """Получить список всех активных пользователей (для выбора в формах)"""
     result = await db.execute(
-        select(User).where(User.status == "active").order_by(User.full_name)
+        select(User)
+        .options(selectinload(User.roles))
+        .where(User.status == "active")
+        .order_by(User.full_name)
     )
     users = result.scalars().all()
     return [
@@ -72,7 +75,8 @@ async def get_all_users(
             "username": u.username, 
             "full_name": u.full_name,
             "name": u.full_name,   # Backwards compatibility
-            "type": "user"         # Backwards compatibility
+            "type": "user",        # Backwards compatibility
+            "roles": [r.name for r in u.roles]  # For filtering admins vs workers
         }
         for u in users
     ]
