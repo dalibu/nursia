@@ -236,6 +236,8 @@ function TimeTrackerPage() {
         loadData();
     }, []);
 
+    const { subscribe } = useWebSocket();
+
     useEffect(() => {
         loadData();
         loadSummary();
@@ -243,14 +245,13 @@ function TimeTrackerPage() {
 
     // Subscribe to WebSocket events for assignment changes
     useEffect(() => {
-        const { subscribe } = useWebSocket();
         const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
             console.log('Assignment data changed, reloading...');
             loadData(true); // Silent refresh - no loading spinner
             loadSummary();
         });
         return unsubscribe;
-    }, []);
+    }, [subscribe]);
 
     // Smart sync: reload table when activeSession changes (started/stopped by any client)
     useEffect(() => {

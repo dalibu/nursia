@@ -167,19 +167,20 @@ function PaymentsPage() {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(storageData));
   }, [filters, dateRange, setSearchParams]);
 
+  const { subscribe } = useWebSocket();
+
   useEffect(() => {
     loadPayments();
   }, []);
 
   // Subscribe to payment WebSocket events
   useEffect(() => {
-    const { subscribe } = useWebSocket();
     const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
       console.log('Payment changed, reloading...');
       loadPayments();
     });
     return unsubscribe;
-  }, []);
+  }, [subscribe]);
 
   useEffect(() => {
     applyFiltersAndSort();

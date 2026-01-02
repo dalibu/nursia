@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+// Determine API base URL
+// In development on localhost, connect to localhost:8000
+// In production, use relative URL (same host as frontend)
+const getApiBaseUrl = () => {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:8000/api';
+  }
+  // For production or other environments, use relative URL
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' }
 });
 

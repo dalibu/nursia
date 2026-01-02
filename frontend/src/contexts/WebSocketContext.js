@@ -31,8 +31,22 @@ export const WebSocketProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (!token) return null;
 
+        // For WebSocket, we need to connect directly, bypassing the proxy
+        // In development (localhost), connect to localhost:8000
+        // In production, use the same host as the frontend
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
+        const hostParts = window.location.host.split(':');
+        const hostname = hostParts[0];
+        
+        // If on localhost/127.0.0.1, connect to API on localhost:8000
+        // Otherwise use the same hostname as the frontend (production)
+        let host;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            host = 'localhost:8000';
+        } else {
+            host = window.location.host;
+        }
+        
         return `${protocol}//${host}/api/ws?token=${encodeURIComponent(token)}`;
     }, []);
 

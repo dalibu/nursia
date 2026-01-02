@@ -46,19 +46,20 @@ function DashboardPage() {
         }
     };
 
+    const { subscribe } = useWebSocket();
+
     useEffect(() => {
         loadData();
     }, [months]);
 
     // Subscribe to WebSocket events for data updates
     useEffect(() => {
-        const { subscribe } = useWebSocket();
         const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
             console.log('Dashboard data changed, reloading...');
             loadData();
         });
         return unsubscribe;
-    }, []);
+    }, [subscribe]);
 
     const loadData = async () => {
         setLoading(true);
