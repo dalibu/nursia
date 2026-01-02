@@ -165,7 +165,7 @@ async def create_payment(
     
     # Обрабатываем payment_status и paid_at
     payment_status = payment_data.get('payment_status', 'unpaid')
-    if payment_status in ['paid', 'offset']:
+    if payment_status == 'paid':
         payment_data['paid_at'] = now_server()
     else:
         payment_data['paid_at'] = None
@@ -365,7 +365,7 @@ async def update_payment(
     # Если указан payment_status, обновляем paid_at
     if 'payment_status' in payment_data:
         status = payment_data['payment_status']
-        if status in ['paid', 'offset'] and not db_payment.paid_at:
+        if status == 'paid' and not db_payment.paid_at:
             payment_data['paid_at'] = now_server()
         elif status == 'unpaid':
             payment_data['paid_at'] = None

@@ -767,7 +767,7 @@ function TimeTrackerPage() {
                 const totalHours = filteredAssignments.reduce((sum, a) => sum + (a.total_work_seconds || 0), 0) / 3600;
                 const activeSessions = filteredAssignments.filter(a => a.is_active).length;
                 const completedSessions = filteredAssignments.filter(a => !a.is_active).length;
-                const paidSessions = filteredAssignments.filter(a => a.payment_status === 'paid' || a.payment_status === 'offset').length;
+                const paidSessions = filteredAssignments.filter(a => a.payment_status === 'paid').length;
                 const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_status === 'unpaid').length;
 
                 return (
@@ -1079,7 +1079,7 @@ function TimeTrackerPage() {
                                                 <Chip
                                                     label={assignment.payment_tracking_nr}
                                                     size="small"
-                                                    color={assignment.payment_status === 'paid' ? "success" : assignment.payment_status === 'offset' ? "info" : "warning"}
+                                                    color={assignment.payment_status === 'paid' ? "success" : "warning"}
                                                     clickable
                                                     onClick={(e) => {
                                                         e.stopPropagation();

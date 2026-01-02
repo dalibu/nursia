@@ -140,7 +140,7 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(
-        and_(PaymentCategoryGroup.code == 'salary', Payment.payment_status.in_(['paid', 'offset']))
+        and_(PaymentCategoryGroup.code == 'salary', Payment.payment_status == 'paid')
     )
     if target_worker_id:
         # Фильтруем через Assignment.user_id ИЛИ прямо через recipient_id
@@ -179,22 +179,6 @@ async def get_balance_summary(
     result = await db.execute(credits_query)
     total_credits = float(result.one().total or 0)
     
-    # 4. Зачтённые в счёт долга (offset статус)
-    offset_query = select(func.sum(Payment.amount).label("total")).where(
-        Payment.payment_status == 'offset'
-    )
-    if target_worker_id:
-        offset_query = offset_query.outerjoin(
-            Assignment, Payment.assignment_id == Assignment.id
-        ).where(
-            or_(
-                Assignment.user_id == target_worker_id, 
-                Payment.payer_id == target_worker_id,
-                Payment.recipient_id == target_worker_id
-            )
-        )
-    result = await db.execute(offset_query)
-    credits_offset = float(result.one().total or 0)
     
     # 5. Неоплаченные платежи (unpaid)
     unpaid_query = select(func.sum(Payment.amount).label("total")).where(
@@ -218,7 +202,7 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == 'bonus', Payment.payment_status.in_(['paid', 'offset'])))
+    ).where(and_(PaymentCategoryGroup.code == 'bonus', Payment.payment_status == 'paid'))
     if target_worker_id:
         bonus_query = bonus_query.outerjoin(
             Assignment, Payment.assignment_id == Assignment.id
@@ -244,7 +228,7 @@ async def get_balance_summary(
     
     # Взаимные расчёты: долг работника перед работодателем
     # Долг = Кредиты (авансы) - Погашения
-    worker_debt = total_credits - credits_offset - total_repayment
+    worker_debt = total_credits - total_repayment
     balances = []
     if worker_debt > 0 and target_worker_id:
         balances.append(BalanceItem(
@@ -363,7 +347,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == 'salary',
-                Payment.payment_status.in_(['paid', 'offset'])
+                Payment.payment_status == 'paid'
             )
         )
         
@@ -526,7 +510,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == 'expense',
-                Payment.payment_status.in_(['paid', 'offset'])
+                Payment.payment_status == 'paid'
             )
         )
         

@@ -83,7 +83,7 @@ class AssignmentResponse(BaseModel):
     is_active: bool
     payment_id: Optional[int] = None  # Linked payment ID
     payment_tracking_nr: Optional[str] = None  # Linked payment tracking number
-    payment_status: Optional[str] = None  # Payment status: unpaid, paid, offset
+    payment_status: Optional[str] = None  # Payment status: unpaid, paid
     segments: List[WorkSessionResponse] = []  # Все сегменты (work + pause)
 
 

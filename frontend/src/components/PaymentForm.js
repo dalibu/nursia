@@ -296,7 +296,6 @@ function PaymentForm({ open, payment, initialData, onClose }) {
                 >
                   <MenuItem value="unpaid">Не оплачено</MenuItem>
                   <MenuItem value="paid">Оплачено</MenuItem>
-                  <MenuItem value="offset">Зачтено</MenuItem>
                 </Select>
               </FormControl>
             </Box>

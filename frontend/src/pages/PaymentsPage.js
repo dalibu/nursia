@@ -217,8 +217,7 @@ function PaymentsPage() {
           payment.payer?.name || payment.payer?.full_name,
           payment.description,
           new Date(payment.payment_date).toLocaleDateString(),
-          payment.payment_status === 'paid' ? 'оплачено' :
-            payment.payment_status === 'offset' ? 'зачтено' : 'к оплате'
+          payment.payment_status === 'paid' ? 'оплачено' : 'к оплате'
         ];
 
         return searchFields.some(field =>
@@ -249,8 +248,6 @@ function PaymentsPage() {
       filtered = filtered.filter(payment => {
         if (filters.paymentStatus === 'paid') {
           return payment.payment_status === 'paid';
-        } else if (filters.paymentStatus === 'offset') {
-          return payment.payment_status === 'offset';
         } else if (filters.paymentStatus === 'unpaid') {
           return payment.payment_status === 'unpaid' || !payment.payment_status;
         }
@@ -297,7 +294,7 @@ function PaymentsPage() {
           bVal = b.payer?.name || '';
           break;
         case 'payment_status':
-          const statusOrder = { 'paid': 2, 'offset': 1, 'unpaid': 0 };
+          const statusOrder = { 'paid': 1, 'unpaid': 0 };
           aVal = statusOrder[a.payment_status] || 0;
           bVal = statusOrder[b.payment_status] || 0;
           break;
@@ -338,7 +335,7 @@ function PaymentsPage() {
 
       newTotals[currency] += amount;
 
-      if (payment.payment_status === 'paid' || payment.payment_status === 'offset') {
+      if (payment.payment_status === 'paid') {
         paidTotals[currency] += amount;
       } else {
         unpaidTotals[currency] += amount;
@@ -476,7 +473,7 @@ function PaymentsPage() {
       {/* Summary Cards */}
       {(() => {
         const totalCount = filteredList.length;
-        const paidPayments = filteredList.filter(p => p.payment_status === 'paid' || p.payment_status === 'offset');
+        const paidPayments = filteredList.filter(p => p.payment_status === 'paid');
         const unpaidPayments = filteredList.filter(p => p.payment_status === 'unpaid' || !p.payment_status);
         const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
         const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -596,7 +593,6 @@ function PaymentsPage() {
             >
               <MenuItem value="all">Все</MenuItem>
               <MenuItem value="paid">Оплачено</MenuItem>
-              <MenuItem value="offset">Зачтено</MenuItem>
               <MenuItem value="unpaid">Не оплачено</MenuItem>
             </TextField>
           )}
@@ -817,12 +813,12 @@ function PaymentsPage() {
                 {isAdmin && (
                   <TableCell>
                     <Chip
-                      label={payment.payment_status === 'paid' ? 'Оплачено' : payment.payment_status === 'offset' ? 'Зачтено' : 'К оплате'}
-                      color={payment.payment_status === 'paid' ? 'success' : payment.payment_status === 'offset' ? 'info' : 'warning'}
+                      label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
+                      color={payment.payment_status === 'paid' ? 'success' : 'warning'}
                       size="small"
                       clickable
                       onClick={() => {
-                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : payment.payment_status === 'paid' ? 'offset' : 'unpaid';
+                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
                         handlePaymentToggle(payment.id, nextStatus);
                       }}
                       icon={<Payment />}

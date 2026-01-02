@@ -48,8 +48,8 @@ function DashboardPage() {
 
     const { subscribe } = useWebSocket();
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
+    const loadData = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
                 balances.getSummary({}),
@@ -64,7 +64,7 @@ function DashboardPage() {
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [months]);
 
@@ -76,7 +76,7 @@ function DashboardPage() {
     useEffect(() => {
         const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
             console.log('Dashboard data changed, reloading...');
-            loadData();
+            loadData(true); // Silent refresh - no loading spinner
         });
         return unsubscribe;
     }, [subscribe, loadData]);

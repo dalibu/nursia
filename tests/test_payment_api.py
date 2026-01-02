@@ -46,8 +46,8 @@ def test_payment_create_with_status(client):
 
 def test_payment_status_validation():
     """Тест валидации статуса оплаты"""
-    # Проверяем что payment_status принимает три значения
-    valid_statuses = ["unpaid", "paid", "offset"]
+    # Проверяем что payment_status принимает два значения
+    valid_statuses = ["unpaid", "paid"]
     
     for status in valid_statuses:
         payment_data = {
@@ -66,9 +66,9 @@ def test_paid_at_field_logic():
     """Тест логики поля paid_at"""
     from datetime import datetime
     
-    # Когда payment_status = 'paid' или 'offset', должно устанавливаться paid_at
+    # Когда payment_status = 'paid', должно устанавливаться paid_at
     payment_paid = {"payment_status": "paid"}
-    if payment_paid["payment_status"] in ["paid", "offset"]:
+    if payment_paid["payment_status"] == "paid":
         payment_paid["paid_at"] = datetime.now()
     
     assert "paid_at" in payment_paid

@@ -225,7 +225,7 @@ class Payment(Base):
     currency: Mapped[str] = mapped_column(String(3))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    payment_status: Mapped[str] = mapped_column(String(20), default='unpaid')  # unpaid, paid, offset
+    payment_status: Mapped[str] = mapped_column(String(20), default='unpaid')  # unpaid, paid
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assignments.id"), nullable=True)
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)

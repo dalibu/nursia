@@ -49,7 +49,7 @@ class PaymentBase(BaseModel):
     currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
     payment_date: datetime
-    payment_status: Literal['unpaid', 'paid', 'offset'] = 'unpaid'
+    payment_status: Literal['unpaid', 'paid'] = 'unpaid'
 
 
 class PaymentCreate(PaymentBase):
