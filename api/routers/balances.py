@@ -188,7 +188,11 @@ async def get_balance_summary(
         unpaid_query = unpaid_query.outerjoin(
             Assignment, Payment.assignment_id == Assignment.id
         ).where(
-            or_(Assignment.user_id == target_worker_id, Payment.recipient_id == target_worker_id)
+            or_(
+                Assignment.user_id == target_worker_id,
+                Payment.recipient_id == target_worker_id,
+                Payment.payer_id == target_worker_id  # Добавлено условие для платежника
+            )
         )
     result = await db.execute(unpaid_query)
     unpaid_amount = float(result.one().total or 0)
@@ -387,7 +391,7 @@ async def get_monthly_summary(
         result = await db.execute(credits_given_query)
         credits_given = float(result.scalar() or 0)
         
-        # Погашения (группа 'repayment') — за период
+        # Погашения (группа 'repayment') — за период, ТОЛЬКО оплаченные
         credits_offset_query = select(
             func.sum(Payment.amount).label("total")
         ).join(
@@ -398,7 +402,8 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
-                PaymentCategoryGroup.code == 'repayment'
+                PaymentCategoryGroup.code == 'repayment',
+                Payment.payment_status == 'paid'
             )
         )
         
@@ -442,7 +447,8 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date < next_month_start,
-                PaymentCategoryGroup.code == 'repayment'
+                PaymentCategoryGroup.code == 'repayment',
+                Payment.payment_status == 'paid'
             )
         )
         
@@ -558,7 +564,11 @@ async def get_monthly_summary(
             unpaid_query = unpaid_query.outerjoin(
                 Assignment, Payment.assignment_id == Assignment.id
             ).where(
-                or_(Assignment.user_id == worker_id, Payment.recipient_id == worker_id)
+                or_(
+                    Assignment.user_id == worker_id,
+                    Payment.recipient_id == worker_id,
+                    Payment.payer_id == worker_id  # Добавлено условие для платежника
+                )
             )
         
         result = await db.execute(unpaid_query)
