@@ -250,6 +250,7 @@ function TimeTrackerPage() {
             setGroupedAssignments(groupedRes.data);
             setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
+            console.log('Employment data loaded:', empRes.data);
             setEmploymentList(empRes.data);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
         } catch (error) {

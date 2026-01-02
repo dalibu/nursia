@@ -147,11 +147,21 @@ async def start_work_session(
     current_user: User = Depends(get_current_user)
 ):
     """Начать новую рабочую сессию"""
+    
+    # Определяем worker_id: для работников — всегда свой id
+    target_worker_id = session_data.worker_id
+    
+    # Проверка прав: работник может начать смену только для себя
+    if not current_user.is_admin:
+        if target_worker_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Вы можете начать смену только для себя")
+        target_worker_id = current_user.id
+    
     # Проверяем, есть ли активное трудовое отношение для работника
     result = await db.execute(
         select(EmploymentRelation).where(
             and_(
-                EmploymentRelation.user_id == session_data.worker_id,
+                EmploymentRelation.user_id == target_worker_id,
                 EmploymentRelation.is_active == True
             )
         )
@@ -165,7 +175,7 @@ async def start_work_session(
     result = await db.execute(
         select(Task).join(Assignment).where(
             and_(
-                Assignment.user_id == session_data.worker_id,
+                Assignment.user_id == target_worker_id,
                 Assignment.is_active == True,
                 Task.end_time == None
             )
@@ -179,9 +189,9 @@ async def start_work_session(
     now = datetime.now()
     
     # Создаём Assignment (tracking_nr будет присвоен после flush)
+    # Note: employer relationship is in EmploymentRelation, not Assignment
     new_assignment = Assignment(
-        worker_id=session_data.worker_id,
-        employer_id=session_data.employer_id,
+        user_id=target_worker_id,  # user_id = worker who is assigned
         assignment_date=now.date(),
         hourly_rate=employment.hourly_rate,
         currency=employment.currency,
@@ -218,7 +228,7 @@ async def start_work_session(
     return_response = _task_to_response(
         new_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=None  # Assignment doesn't store employer directly, it's in EmploymentRelation
     )
     
     # WebSocket broadcast
@@ -226,7 +236,7 @@ async def start_work_session(
     await manager.broadcast({
         "type": "assignment_started",
         "assignment_id": new_assignment.id,
-        "user_id": session_data.worker_id
+        "user_id": target_worker_id
     }, exclude_user_id=current_user.id)
     
     return return_response
@@ -396,7 +406,7 @@ async def switch_task(
     return _task_to_response(
         new_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=None,  # Assignment does not have employer relationship
     )
 
 @router.put("/{session_id}", response_model=WorkSessionResponse)
@@ -481,7 +491,7 @@ async def update_work_session(
     return _task_to_response(
         task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=None,  # Assignment does not have employer relationship
     )
 
 
@@ -758,7 +768,7 @@ async def get_work_sessions(
         _task_to_response(
             t, t.assignment,
             worker_name=t.assignment.worker.full_name if t.assignment.worker else None,
-            employer_name=t.assignment.worker.full_name if t.assignment.employer else None
+            employer_name=None  # Assignment doesn't have employer relationship
         )
         for t in tasks
     ]
@@ -848,7 +858,7 @@ async def get_grouped_sessions(
             _task_to_response(
                 task, assignment,
                 worker_name=assignment.worker.full_name if assignment.worker else None,
-                employer_name=assignment.worker.full_name if assignment.employer else None
+                employer_name=None  # Assignment doesn't have employer relationship
             )
             for task in sorted(tasks, key=lambda t: (t.start_time, t.id), reverse=True)
         ]
@@ -860,7 +870,7 @@ async def get_grouped_sessions(
             worker_id=assignment.user_id,
             worker_name=assignment.worker.full_name if assignment.worker else None,
             employer_id=assignment.user_id,
-            employer_name=assignment.worker.full_name if assignment.employer else None,
+            employer_name=None,  # Assignment does not have employer relationship
             start_time=first_task.start_time,
             end_time=last_task.end_time if not is_active else None,
             total_work_seconds=total_work_seconds,
@@ -893,7 +903,8 @@ async def get_active_sessions(
         joinedload(Task.assignment).joinedload(Assignment.tasks)
     ).where(Task.end_time == None)
     
-    if True:  # User is worker
+    # Admin sees all active sessions, workers see only their own
+    if not current_user.is_admin:
         query = query.where(Assignment.user_id == current_user.id)
     
     result = await db.execute(query)
@@ -928,7 +939,7 @@ async def get_active_sessions(
         responses.append(_task_to_response(
             task, assignment,
             worker_name=assignment.worker.full_name if assignment.worker else None,
-            employer_name=assignment.worker.full_name if assignment.employer else None,
+            employer_name=None,  # Assignment does not have employer relationship
             total_work_seconds=total_work_seconds,
             total_pause_seconds=total_pause_seconds
         ))
@@ -1110,7 +1121,7 @@ async def pause_work_session(
     return _task_to_response(
         pause_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=None,  # Assignment does not have employer relationship
     )
 
 
@@ -1169,5 +1180,5 @@ async def resume_work_session(
     return _task_to_response(
         work_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=assignment.worker.full_name if assignment.employer else None
+        employer_name=None,  # Assignment does not have employer relationship
     )
