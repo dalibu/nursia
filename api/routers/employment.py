@@ -39,6 +39,10 @@ class EmploymentResponse(BaseModel):
     currency: str
     is_active: bool
     user_name: Optional[str] = None
+    employee_id: Optional[int] = None
+    employee_name: Optional[str] = None
+    employer_id: Optional[int] = None
+    employer_name: Optional[str] = None
 
 
 @router.get("/", response_model=List[EmploymentResponse])
@@ -73,7 +77,11 @@ async def get_employment_relations(
             hourly_rate=float(r.hourly_rate),
             currency=r.currency,
             is_active=r.is_active,
-            user_name=r.user.full_name if r.user else None
+            user_name=r.user.full_name if r.user else None,
+            employee_id=r.user_id,
+            employee_name=r.user.full_name if r.user else None,
+            employer_id=current_user.id,  # Single employer model
+            employer_name=current_user.full_name  # Single employer model
         )
         for r in relations
     ]
@@ -127,7 +135,11 @@ async def create_employment_relation(
         hourly_rate=float(relation.hourly_rate),
         currency=relation.currency,
         is_active=relation.is_active,
-        user_name=relation.user.full_name if relation.user else None
+        user_name=relation.user.full_name if relation.user else None,
+        employee_id=relation.user_id,
+        employee_name=relation.user.full_name if relation.user else None,
+        employer_id=current_user.id,  # Single employer model
+        employer_name=current_user.full_name  # Single employer model
     )
 
 
@@ -165,7 +177,11 @@ async def update_employment_relation(
         hourly_rate=float(relation.hourly_rate),
         currency=relation.currency,
         is_active=relation.is_active,
-        user_name=relation.user.full_name if relation.user else None
+        user_name=relation.user.full_name if relation.user else None,
+        employee_id=relation.user_id,
+        employee_name=relation.user.full_name if relation.user else None,
+        employer_id=current_user.id,  # Single employer model
+        employer_name=current_user.full_name  # Single employer model
     )
 
 
