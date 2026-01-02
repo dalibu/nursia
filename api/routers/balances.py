@@ -607,11 +607,21 @@ async def get_mutual_balances(
     
     В single-employer модели показываем долг каждого работника:
     Долг = Кредиты (авансы) - Погашения
+    
+    権限:
+    - Admin: видит расчёты всех workers
+    - Worker: видит только свои расчёты
     """
     from sqlalchemy import case
     
-    # Получаем всех workers
-    workers_query = select(User).join(User.roles).where(Role.name == 'worker')
+    # Получаем workers в зависимости от роли
+    if current_user.is_admin:
+        # Admin видит всех workers
+        workers_query = select(User).join(User.roles).where(Role.name == 'worker')
+    else:
+        # Worker видит только себя
+        workers_query = select(User).where(User.id == current_user.id)
+    
     workers_result = await db.execute(workers_query)
     workers = workers_result.scalars().all()
     
