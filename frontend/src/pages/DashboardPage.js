@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -48,6 +49,16 @@ function DashboardPage() {
     useEffect(() => {
         loadData();
     }, [months]);
+
+    // Subscribe to WebSocket events for data updates
+    useEffect(() => {
+        const { subscribe } = useWebSocket();
+        const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
+            console.log('Dashboard data changed, reloading...');
+            loadData();
+        });
+        return unsubscribe;
+    }, []);
 
     const loadData = async () => {
         setLoading(true);

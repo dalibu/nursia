@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
@@ -168,6 +169,16 @@ function PaymentsPage() {
 
   useEffect(() => {
     loadPayments();
+  }, []);
+
+  // Subscribe to payment WebSocket events
+  useEffect(() => {
+    const { subscribe } = useWebSocket();
+    const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
+      console.log('Payment changed, reloading...');
+      loadPayments();
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {

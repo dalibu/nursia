@@ -6,6 +6,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/ru';
 import { ActiveSessionProvider } from './context/ActiveSessionContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import Layout from './components/Layout';
 import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
@@ -58,9 +59,11 @@ function App() {
             } />
             <Route path="/" element={
               isAuthenticated ? (
-                <ActiveSessionProvider>
-                  <Layout onLogout={() => setIsAuthenticated(false)} />
-                </ActiveSessionProvider>
+                <WebSocketProvider>
+                  <ActiveSessionProvider>
+                    <Layout onLogout={() => setIsAuthenticated(false)} />
+                  </ActiveSessionProvider>
+                </WebSocketProvider>
               ) : <Navigate to="/login" replace />
             }>
               <Route index element={<DashboardPage />} />

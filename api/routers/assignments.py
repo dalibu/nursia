@@ -215,11 +215,21 @@ async def start_work_session(
     )
     assignment = result.scalar_one()
     
-    return _task_to_response(
+    return_response = _task_to_response(
         new_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
         employer_name=assignment.worker.full_name if assignment.employer else None
     )
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "assignment_started",
+        "assignment_id": new_assignment.id,
+        "user_id": session_data.worker_id
+    }, exclude_user_id=current_user.id)
+    
+    return return_response
 
 
 @router.post("/{session_id}/stop", response_model=WorkSessionResponse)
@@ -310,11 +320,21 @@ async def stop_work_session(
     await db.commit()
     await db.refresh(task)
     
-    return _task_to_response(
+    return_response = _task_to_response(
         task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
         employer_name=employer.full_name if employer else None
     )
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "assignment_stopped",
+        "assignment_id": assignment.id,
+        "user_id": assignment.user_id
+    }, exclude_user_id=current_user.id)
+    
+    return return_response
 
 
 class SwitchTaskRequest(BaseModel):

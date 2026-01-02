@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
@@ -239,6 +240,17 @@ function TimeTrackerPage() {
         loadData();
         loadSummary();
     }, [period]);
+
+    // Subscribe to WebSocket events for assignment changes
+    useEffect(() => {
+        const { subscribe } = useWebSocket();
+        const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
+            console.log('Assignment data changed, reloading...');
+            loadData(true); // Silent refresh - no loading spinner
+            loadSummary();
+        });
+        return unsubscribe;
+    }, []);
 
     // Smart sync: reload table when activeSession changes (started/stopped by any client)
     useEffect(() => {

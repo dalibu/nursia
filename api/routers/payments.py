@@ -181,7 +181,6 @@ async def create_payment(
     await db.commit()
     await db.refresh(db_payment)
     
-    # Загружаем связанные объекты с вложенной category_group
     result = await db.execute(
         select(Payment)
         .options(
@@ -193,6 +192,15 @@ async def create_payment(
         .where(Payment.id == db_payment.id)
     )
     db_payment = result.unique().scalar_one()
+    
+    # WebSocket broadcast: уведомляем всех (кроме создателя)
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_created",
+        "payment_id": db_payment.id,
+        "payer_id": db_payment.payer_id,
+        "recipient_id": db_payment.recipient_id
+    }, exclude_user_id=current_user.id)
     
     return PaymentSchema.model_validate(db_payment)
 
@@ -372,6 +380,14 @@ async def update_payment(
     
     await db.commit()
     await db.refresh(db_payment)
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_updated",
+        "payment_id": db_payment.id
+    }, exclude_user_id=current_user.id)
+    
     return {"id": db_payment.id, "message": "Payment updated successfully"}
 
 
@@ -394,4 +410,12 @@ async def delete_payment(
     
     await db.delete(db_payment)
     await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_deleted",
+        "payment_id": payment_id
+    }, exclude_user_id=current_user.id)
+    
     return {"message": "Payment deleted"}

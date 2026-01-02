@@ -8,7 +8,7 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routers import auth, payments, settings as settings_router, currencies, admin, users
-from api.routers import assignments, employment, balances
+from api.routers import assignments, employment, balances, websocket
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
@@ -53,6 +53,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(assignments.router, prefix="/api")
 app.include_router(employment.router, prefix="/api")
 app.include_router(balances.router, prefix="/api")
+app.include_router(websocket.router, prefix="/api")
 
 # React статические файлы
 if os.path.exists("frontend/build/static"):
