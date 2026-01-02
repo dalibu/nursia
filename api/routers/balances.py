@@ -640,6 +640,13 @@ async def get_debug_export(
         current_user=current_user
     )
     
+    # Фильтруем только периоды с данными (исключаем пустые периоды)
+    monthly_with_data = [
+        m for m in monthly
+        if any([m.visits, m.hours, m.salary, m.paid, m.offset, 
+                m.to_pay, m.expenses, m.expenses_paid, m.bonus])
+    ]
+    
     mutual = await get_mutual_balances(
         db=db,
         current_user=current_user
@@ -713,7 +720,7 @@ async def get_debug_export(
     return DebugExport(
         cards=cards,
         mutual_balances=mutual,
-        monthly=monthly,
+        monthly=monthly_with_data,
         payments=payments_data,
         export_timestamp=datetime.now().isoformat()
     )
