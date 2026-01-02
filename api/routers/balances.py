@@ -209,9 +209,9 @@ async def get_balance_summary(
     result = await db.execute(unpaid_query)
     unpaid_amount = float(result.one().total or 0)
     
-    # К оплате = unpaid + остаток по кредитам
-    net_debt = total_credits - credits_offset
-    total_unpaid = unpaid_amount + max(0, net_debt)
+    # К оплате = только неоплаченные платежи
+    # Кредиты (авансы) — это долг РАБОТНИКА перед работодателем, не включаем в to_pay
+    total_unpaid = unpaid_amount
     
     # 6. Премии (группа "bonus")
     bonus_query = select(func.sum(Payment.amount).label("total")).join(
@@ -242,9 +242,19 @@ async def get_balance_summary(
     # Итого = Зарплата + Кредиты + Премии + Расходы - Погашения
     total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
     
-    # Балансы — упрощённо для single-employer модели
-    # В RBAC нет взаимных долгов между workers, только employer ↔ worker
+    # Взаимные расчёты: долг работника перед работодателем
+    # Долг = Кредиты (авансы) - Погашения
+    worker_debt = total_credits - credits_offset - total_repayment
     balances = []
+    if worker_debt > 0 and target_worker_id:
+        balances.append(BalanceItem(
+            debtor_id=target_worker_id,
+            debtor_name="Работник",
+            creditor_id=1,  # Admin/Employer
+            creditor_name="Работодатель",
+            amount=worker_debt,
+            currency=currency
+        ))
     
     return DashboardSummary(
         total_salary=total_salary,
@@ -599,13 +609,67 @@ async def get_mutual_balances(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить взаимные балансы (упрощённая RBAC версия).
+    """Получить взаимные балансы (долги работников перед работодателем).
     
-    В single-employer модели нет взаимных долгов между workers.
-    Возвращает пустой список — все расчёты через Dashboard cards.
+    В single-employer модели показываем долг каждого работника:
+    Долг = Кредиты (авансы) - Погашения
     """
-    # TODO: Если нужны балансы employer↔worker, добавить логику позже
-    return []
+    from sqlalchemy import case
+    
+    # Получаем всех workers
+    workers_query = select(User).join(User.roles).where(Role.name == 'worker')
+    workers_result = await db.execute(workers_query)
+    workers = workers_result.scalars().all()
+    
+    balances = []
+    
+    for worker in workers:
+        # Кредиты (авансы) полученные этим worker'ом
+        credits_query = select(func.sum(Payment.amount)).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                PaymentCategoryGroup.code == 'debt',
+                Payment.payment_status == 'paid',
+                Payment.recipient_id == worker.id
+            )
+        )
+        credits_result = await db.execute(credits_query)
+        total_credits = float(credits_result.scalar() or 0)
+        
+        # Погашения от этого worker'а
+        repayment_query = select(func.sum(Payment.amount)).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                PaymentCategoryGroup.code == 'repayment',
+                Payment.payment_status == 'paid',
+                Payment.payer_id == worker.id
+            )
+        )
+        repayment_result = await db.execute(repayment_query)
+        total_repayment = float(repayment_result.scalar() or 0)
+        
+        # Долг = Кредиты - Погашения
+        worker_debt = total_credits - total_repayment
+        
+        if abs(worker_debt) > 0.01:  # Показываем только ненулевые балансы
+            balances.append(MutualBalance(
+                creditor_id=1,  # Работодатель (admin)
+                creditor_name="Работодатель",
+                debtor_id=worker.id,
+                debtor_name=worker.full_name or worker.username,
+                credit=total_credits,
+                offset=total_repayment,
+                remaining=worker_debt,
+                currency="UAH"
+            ))
+    
+    return balances
 
 
 @router.get("/debug", response_model=DebugExport)
@@ -710,7 +774,7 @@ async def get_debug_export(
         salary=summary.total_salary,
         expenses=summary.total_expenses,
         credits=summary.total_credits,
-        repayment=-summary.total_repayment,  # Показываем как отрицательное (как на GUI)
+        repayment=-summary.total_repayment if summary.total_repayment != 0 else 0,  # Избегаем -0
         to_pay=summary.total_unpaid,
         bonus=summary.total_bonus,
         total=summary.total,

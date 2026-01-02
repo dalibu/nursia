@@ -165,7 +165,7 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Погашения</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(-(summary?.total_repayment || 0), summary?.currency)}
+                                {formatCurrency(summary?.total_repayment ? -summary.total_repayment : 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>

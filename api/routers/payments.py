@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment, Role
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -143,6 +143,26 @@ async def create_payment(
     if not payment_data.get('payer_id'):
         raise HTTPException(status_code=400, detail="payer_id is required")
     
+    # Single-employer модель: автоматически устанавливаем recipient_id
+    # Если worker платит → recipient = employer (первый admin)
+    # Если admin платит worker'у → recipient уже должен быть указан
+    if not payment_data.get('recipient_id'):
+        payer_id = payment_data['payer_id']
+        # Проверяем, является ли payer админом
+        payer_result = await db.execute(
+            select(User).options(selectinload(User.roles)).where(User.id == payer_id)
+        )
+        payer = payer_result.scalar_one_or_none()
+        
+        if payer and not payer.is_admin:
+            # Worker платит → recipient = первый admin (employer)
+            admin_result = await db.execute(
+                select(User).join(User.roles).where(Role.name == 'admin').limit(1)
+            )
+            admin_user = admin_result.scalar_one_or_none()
+            if admin_user:
+                payment_data['recipient_id'] = admin_user.id
+    
     # Обрабатываем payment_status и paid_at
     payment_status = payment_data.get('payment_status', 'unpaid')
     if payment_status in ['paid', 'offset']:
@@ -194,9 +214,15 @@ async def get_payments(
         joinedload(Payment.assignment)
     )
     
-    # TODO: Обновить логику прав доступа. Пока показываем все платежи.
-    # if current_user.role != "admin":
-    #     query = query.where(Payment.user_id == current_user.id)
+    # RBAC: workers видят только свои платежи (где они payer или recipient)
+    if not current_user.is_admin:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                Payment.payer_id == current_user.id,
+                Payment.recipient_id == current_user.id
+            )
+        )
     
     if category_id:
         query = query.where(Payment.category_id == category_id)
