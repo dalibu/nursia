@@ -37,7 +37,7 @@ export const WebSocketProvider = ({ children }) => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostParts = window.location.host.split(':');
         const hostname = hostParts[0];
-        
+
         // If on localhost/127.0.0.1, connect to API on localhost:8000
         // Otherwise use the same hostname as the frontend (production)
         let host;
@@ -46,13 +46,26 @@ export const WebSocketProvider = ({ children }) => {
         } else {
             host = window.location.host;
         }
-        
+
         return `${protocol}//${host}/api/ws?token=${encodeURIComponent(token)}`;
     }, []);
 
     const handleMessage = useCallback((event) => {
         try {
-            const data = JSON.parse(event.data);
+            // Skip empty messages or non-JSON data (like ping/pong frames)
+            if (!event.data || typeof event.data !== 'string' || event.data.trim() === '') {
+                return;
+            }
+
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch (parseError) {
+                // Silently ignore non-JSON messages (ping/pong, keep-alive, etc.)
+                console.debug('[WebSocket] Ignoring non-JSON message:', event.data);
+                return;
+            }
+
             console.log('[WebSocket] Received:', data);
             setLastEvent(data);
 
@@ -79,7 +92,7 @@ export const WebSocketProvider = ({ children }) => {
                 });
             }
         } catch (err) {
-            console.error('[WebSocket] Failed to parse message:', err);
+            console.error('[WebSocket] Failed to process message:', err);
         }
     }, []);
 
@@ -95,7 +108,7 @@ export const WebSocketProvider = ({ children }) => {
             return;
         }
 
-        console.log('[WebSocket] Connecting...');
+        console.log('[WebSocket] Connecting to:', url);
         const ws = new WebSocket(url);
         wsRef.current = ws;
 

@@ -238,40 +238,7 @@ function TimeTrackerPage() {
 
     const { subscribe } = useWebSocket();
 
-    useEffect(() => {
-        loadData();
-        loadSummary();
-    }, [period]);
-
-    // Subscribe to WebSocket events for assignment changes
-    useEffect(() => {
-        const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
-            console.log('Assignment data changed, reloading...');
-            loadData(true); // Silent refresh - no loading spinner
-            loadSummary();
-        });
-        return unsubscribe;
-    }, [subscribe]);
-
-    // Smart sync: reload table when activeSession changes (started/stopped by any client)
-    useEffect(() => {
-        const currentSessionId = activeSession?.id ?? null;
-        const prevSessionId = prevSessionIdRef.current;
-
-        // If session ID changed (started, stopped, or switched), reload data
-        if (currentSessionId !== prevSessionId) {
-            const isInitialRender = prevSessionId === undefined;
-            prevSessionIdRef.current = currentSessionId;
-
-            // Reload data when session state changes (but not on initial render)
-            if (!isInitialRender) {
-                loadData(true); // Silent refresh - no loading spinner
-                loadSummary();
-            }
-        }
-    }, [activeSession?.id]);
-
-    const loadData = async (silent = false) => {
+    const loadData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
             const [groupedRes, activeRes, empRes, userRes] = await Promise.all([
@@ -290,7 +257,7 @@ function TimeTrackerPage() {
         } finally {
             if (!silent) setLoading(false);
         }
-    };
+    }, [period]);
 
     // Apply filters to assignments
     useEffect(() => {
@@ -395,14 +362,47 @@ function TimeTrackerPage() {
         }
     };
 
-    const loadSummary = async () => {
+    const loadSummary = useCallback(async () => {
         try {
             const res = await assignmentsService.getSummary({ period });
             setSummary(res.data);
         } catch (error) {
             console.error('Failed to load summary:', error);
         }
-    };
+    }, [period]);
+
+    useEffect(() => {
+        loadData();
+        loadSummary();
+    }, [period, loadData, loadSummary]);
+
+    // Subscribe to WebSocket events for assignment changes
+    useEffect(() => {
+        const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
+            console.log('Assignment data changed, reloading...');
+            loadData(true); // Silent refresh - no loading spinner
+            loadSummary();
+        });
+        return unsubscribe;
+    }, [subscribe, loadData, loadSummary]);
+
+    // Smart sync: reload table when activeSession changes (started/stopped by any client)
+    useEffect(() => {
+        const currentSessionId = activeSession?.id ?? null;
+        const prevSessionId = prevSessionIdRef.current;
+
+        // If session ID changed (started, stopped, or switched), reload data
+        if (currentSessionId !== prevSessionId) {
+            const isInitialRender = prevSessionId === undefined;
+            prevSessionIdRef.current = currentSessionId;
+
+            // Reload data when session state changes (but not on initial render)
+            if (!isInitialRender) {
+                loadData(true); // Silent refresh - no loading spinner
+                loadSummary();
+            }
+        }
+    }, [activeSession?.id, loadData, loadSummary]);
 
     const handleStartClick = async () => {
         // Pre-select employment if user has only one

@@ -47,6 +47,7 @@ class ConnectionManager:
     
     async def broadcast(self, event: dict, exclude_user_id: Optional[int] = None):
         """Send event to all connected users (optionally excluding one)"""
+        logger.info(f"Broadcasting event: {event}, exclude_user_id={exclude_user_id}, active_connections={list(self.active_connections.keys())}")
         message = json.dumps(event)
         disconnected = []
         

@@ -169,24 +169,7 @@ function PaymentsPage() {
 
   const { subscribe } = useWebSocket();
 
-  useEffect(() => {
-    loadPayments();
-  }, []);
-
-  // Subscribe to payment WebSocket events
-  useEffect(() => {
-    const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
-      console.log('Payment changed, reloading...');
-      loadPayments();
-    });
-    return unsubscribe;
-  }, [subscribe]);
-
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [paymentList, filters, dateRange, sortField, sortDirection]);
-
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       const [paymentsRes, categoriesRes, userRes] = await Promise.all([
         payments.list(),
@@ -216,9 +199,9 @@ function PaymentsPage() {
     } catch (error) {
       console.error('Failed to load payments:', error);
     }
-  };
+  }, []);
 
-  const applyFiltersAndSort = () => {
+  const applyFiltersAndSort = useCallback(() => {
     let filtered = [...paymentList];
 
     // Применяем фильтры
@@ -363,7 +346,26 @@ function PaymentsPage() {
     });
 
     setTotals({ all: newTotals, paid: paidTotals, unpaid: unpaidTotals });
-  };
+  }, [paymentList, filters, dateRange, sortField, sortDirection]);
+
+  // Initialize data on mount
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
+  // Subscribe to payment WebSocket events
+  useEffect(() => {
+    const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
+      console.log('Payment changed, reloading...');
+      loadPayments();
+    });
+    return unsubscribe;
+  }, [subscribe, loadPayments]);
+
+  // Apply filters when data or filters change
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [applyFiltersAndSort]);
 
   const handleSort = (field) => {
     if (sortField === field) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
@@ -48,20 +48,7 @@ function DashboardPage() {
 
     const { subscribe } = useWebSocket();
 
-    useEffect(() => {
-        loadData();
-    }, [months]);
-
-    // Subscribe to WebSocket events for data updates
-    useEffect(() => {
-        const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
-            console.log('Dashboard data changed, reloading...');
-            loadData();
-        });
-        return unsubscribe;
-    }, [subscribe]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
@@ -79,7 +66,20 @@ function DashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [months]);
+
+    useEffect(() => {
+        loadData();
+    }, [months]);
+
+    // Subscribe to WebSocket events for data updates
+    useEffect(() => {
+        const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
+            console.log('Dashboard data changed, reloading...');
+            loadData();
+        });
+        return unsubscribe;
+    }, [subscribe, loadData]);
 
     const formatCurrency = (amount, currency = 'UAH', showAbsolute = false, hideZero = false) => {
         const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
