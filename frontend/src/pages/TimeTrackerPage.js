@@ -418,14 +418,17 @@ function TimeTrackerPage() {
         if (!selectedEmployment) return;
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
+        const selectedWorkerId = emp.employee_id || emp.user_id;
+
         try {
-            // If there's an active session, stop it first
-            if (activeSession) {
-                await assignmentsService.stop(activeSession.id);
+            // If the SELECTED worker has an active session, stop it first
+            const workerActiveSession = activeSessions.find(s => s.worker_id === selectedWorkerId);
+            if (workerActiveSession) {
+                await assignmentsService.stop(workerActiveSession.id);
             }
 
             await assignmentsService.start({
-                worker_id: emp.employee_id,
+                worker_id: selectedWorkerId,
                 employer_id: emp.employer_id,
                 description: startDescription || null,
                 task_description: startTaskDescription || startDescription || null
@@ -724,7 +727,7 @@ function TimeTrackerPage() {
                         color="success"
                         startIcon={<PlayArrow />}
                         onClick={handleStartClick}
-                        disabled={!!activeSession}
+                        disabled={!isAdmin && !!activeSession}
                     >
                         Начать смену
                     </Button>
@@ -1183,12 +1186,17 @@ function TimeTrackerPage() {
                         </Alert>
                     ) : (
                         <>
-                            {/* Warning if there's an active session */}
-                            {activeSession && (
-                                <Alert severity="warning" sx={{ mt: 2 }}>
-                                    Текущая смена будет завершена и создастся новая.
-                                </Alert>
-                            )}
+                            {/* Warning if selected worker already has an active session */}
+                            {(() => {
+                                const selectedEmp = employmentList.find(e => e.id === selectedEmployment);
+                                const selectedWorkerId = selectedEmp?.user_id || selectedEmp?.employee_id;
+                                const hasActiveSession = selectedWorkerId && activeSessions.some(s => s.worker_id === selectedWorkerId);
+                                return hasActiveSession ? (
+                                    <Alert severity="warning" sx={{ mt: 2 }}>
+                                        У этого работника есть активная смена. Она будет завершена и создастся новая.
+                                    </Alert>
+                                ) : null;
+                            })()}
                             {/* Show employer selection only if admin or user has multiple employers */}
                             {(isAdmin || employmentList.length > 1) && (
                                 <TextField
