@@ -8,7 +8,7 @@ import {
     TrendingUp, AccessTime, Payment, AccountBalance,
     AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz, Download
 } from '@mui/icons-material';
-import { balances, payments } from '../services/api';
+import { balances, payments, settings } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
 
 // Символы валют
@@ -26,6 +26,7 @@ function DashboardPage() {
     const [mutual, setMutual] = useState([]);
     const [months, setMonths] = useState(6);
     const [exporting, setExporting] = useState(false);
+    const [showExportJson, setShowExportJson] = useState(false);
 
     const { subscribe } = useWebSocket();
 
@@ -51,16 +52,18 @@ function DashboardPage() {
     const loadData = useCallback(async (showLoading = true) => {
         if (showLoading) setLoading(true);
         try {
-            const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
+            const [summaryRes, monthlyRes, mutualRes, userRes, settingsRes] = await Promise.all([
                 balances.getSummary({}),
                 balances.getMonthly({ months }),
                 balances.getMutual({}),
-                payments.getUserInfo()
+                payments.getUserInfo(),
+                settings.getDebug()
             ]);
             setSummary(summaryRes.data);
             setMonthly(monthlyRes.data);
             setMutual(mutualRes.data);
             setUser(userRes.data);
+            setShowExportJson(settingsRes.data.show_export_json ?? false);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
@@ -106,7 +109,7 @@ function DashboardPage() {
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     Обозрение
                 </Typography>
-                {user?.roles?.includes('admin') && (
+                {showExportJson && (
                     <Tooltip title="Экспорт всех данных в JSON">
                         <Button
                             variant="outlined"

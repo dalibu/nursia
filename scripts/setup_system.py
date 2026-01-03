@@ -106,13 +106,16 @@ async def init_role_permissions(session):
 
 async def init_settings(session):
     settings = [
-        {"key": "app_name", "value": "Nursia", "description": "Название приложения"},
-        {"key": "remember_me_hours", "value": "24", "description": "Время запоминания пользователя (часы)"},
-        {"key": "jwt_access_token_expire_minutes", "value": "480", "description": "Время жизни JWT токена (минуты)"},
-        {"key": "password_rules", "value": "Пароль должен содержать минимум 6 символов и 1 цифру", "description": "Требования к паролю"},
-        {"key": "security_login_delay_enabled", "value": "true", "description": "Включить задержку при неверном входе (защита от перебора)"},
-        {"key": "security_login_delay_seconds", "value": "1.0", "description": "Длительность задержки в секундах"},
-        {"key": "requests_check_interval", "value": "5", "description": "Интервал проверки новых заявок (минуты)"}
+        {"key": "app_name", "value": "Nursia", "value_type": "string", "description": "Название приложения"},
+        {"key": "remember_me_hours", "value": "24", "value_type": "number", "description": "Время запоминания пользователя (часы)"},
+        {"key": "jwt_access_token_expire_minutes", "value": "480", "value_type": "number", "description": "Время жизни JWT токена (минуты)"},
+        {"key": "password_rules", "value": "Пароль должен содержать минимум 6 символов и 1 цифру", "value_type": "string", "description": "Требования к паролю"},
+        {"key": "security_login_delay_enabled", "value": "true", "value_type": "boolean", "description": "Включить задержку при неверном входе (защита от перебора)"},
+        {"key": "security_login_delay_seconds", "value": "1.0", "value_type": "number", "description": "Длительность задержки в секундах"},
+        {"key": "requests_check_interval", "value": "5", "value_type": "number", "description": "Интервал проверки новых заявок (минуты)"},
+        # Debug settings for export button visibility
+        {"key": "debug_export_json_admin", "value": "true", "value_type": "boolean", "description": "Показывать кнопку экспорта JSON для админов"},
+        {"key": "debug_export_json_worker", "value": "false", "value_type": "boolean", "description": "Показывать кнопку экспорта JSON для работников"},
     ]
     
     created = 0

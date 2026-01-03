@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, ConfigDict
 
 
 class SystemSettingBase(BaseModel):
     key: str
     value: str
+    value_type: Literal["string", "boolean", "number"] = "string"
     description: Optional[str] = None
 
 

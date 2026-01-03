@@ -108,4 +108,8 @@ export const balances = {
   getDebug: (params) => api.get('/balances/debug', { params })
 };
 
+export const settings = {
+  getDebug: () => api.get('/settings/debug')
+};
+
 export default api;

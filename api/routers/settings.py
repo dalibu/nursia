@@ -12,9 +12,36 @@ from api.schemas.settings import (
     SystemSettingCreate, SystemSettingUpdate, 
     SystemSetting as SystemSettingSchema
 )
-from api.auth.oauth import get_admin_user
+from api.auth.oauth import get_admin_user, get_current_user
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+@router.get("/debug", response_model=dict)
+async def get_debug_settings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get debug settings for current user based on their role"""
+    is_admin = current_user.is_admin
+    
+    # Get relevant settings
+    settings_keys = [
+        "debug_export_json_admin" if is_admin else "debug_export_json_worker"
+    ]
+    
+    result = await db.execute(
+        select(SystemSetting).where(SystemSetting.key.in_(settings_keys))
+    )
+    settings = {s.key: s.value for s in result.scalars().all()}
+    
+    # Build response
+    return {
+        "show_export_json": settings.get(
+            "debug_export_json_admin" if is_admin else "debug_export_json_worker",
+            "true" if is_admin else "false"
+        ).lower() == "true"
+    }
 
 
 @router.get("/", response_model=List[SystemSettingSchema])
