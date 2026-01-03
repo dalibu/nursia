@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    TextField, MenuItem, CircularProgress, Chip
+    TextField, MenuItem, CircularProgress, Chip, Button, Tooltip
 } from '@mui/material';
 import {
     TrendingUp, AccessTime, Payment, AccountBalance,
-    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz
+    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz, Download
 } from '@mui/icons-material';
-import { balances } from '../services/api';
+import { balances, payments } from '../services/api';
 
 // Символы валют
 const currencySymbols = {
@@ -18,11 +18,32 @@ const currencySymbols = {
 };
 
 function DashboardPage() {
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState(null);
     const [monthly, setMonthly] = useState([]);
     const [mutual, setMutual] = useState([]);
     const [months, setMonths] = useState(6);
+    const [exporting, setExporting] = useState(false);
+
+    const handleExportJSON = async () => {
+        setExporting(true);
+        try {
+            const response = await balances.getDebug({ months });
+            const jsonStr = JSON.stringify(response.data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dashboard_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export failed:', error);
+        } finally {
+            setExporting(false);
+        }
+    };
 
     useEffect(() => {
         loadData();
@@ -31,14 +52,16 @@ function DashboardPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [summaryRes, monthlyRes, mutualRes] = await Promise.all([
+            const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
                 balances.getSummary({}),
                 balances.getMonthly({ months }),
-                balances.getMutual({})
+                balances.getMutual({}),
+                payments.getUserInfo()
             ]);
             setSummary(summaryRes.data);
             setMonthly(monthlyRes.data);
             setMutual(mutualRes.data);
+            setUser(userRes.data);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
@@ -63,14 +86,29 @@ function DashboardPage() {
 
     return (
         <Box>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: '#1a237e' }}>
-                Обозрение
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
+                    Обозрение
+                </Typography>
+                {user?.roles?.includes('admin') && (
+                    <Tooltip title="Экспорт всех данных в JSON">
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={exporting ? <CircularProgress size={16} /> : <Download />}
+                            onClick={handleExportJSON}
+                            disabled={exporting}
+                        >
+                            Экспорт JSON
+                        </Button>
+                    </Tooltip>
+                )}
+            </Box>
 
-            {/* Summary Cards */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            {/* Summary Cards - 7 cards in one row */}
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 {/* Зарплата */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                         color: 'white',
@@ -83,10 +121,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Расходы */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                         color: 'white',
@@ -99,10 +137,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Кредиты */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: 'white',
@@ -115,10 +153,26 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
+
+                {/* Погашения (orange) */}
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                        color: 'white',
+                        height: '100%'
+                    }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Погашения</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                                {formatCurrency(-(summary?.total_repayment || 0), summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Box>
 
                 {/* К оплате */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
                         color: 'white',
@@ -131,13 +185,13 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
-                {/* Премии */}
-                <Grid item xs={6} sm={4} md={2}>
+                {/* Премии (yellow) */}
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
-                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
-                        color: 'white',
+                        background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
+                        color: '#333',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
@@ -147,10 +201,10 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
+                </Box>
 
                 {/* Всего */}
-                <Grid item xs={6} sm={4} md={2}>
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                         color: 'white',
@@ -163,8 +217,8 @@ function DashboardPage() {
                             </Typography>
                         </CardContent>
                     </Card>
-                </Grid>
-            </Grid>
+                </Box>
+            </Box>
 
 
             {/* Mutual Balances - Взаимные расчёты */}
@@ -199,12 +253,15 @@ function DashboardPage() {
                                                 />
                                             )}
                                         </TableCell>
-                                        {/* Погашено - зелёный */}
+                                        {/* Погашено - зелёный для положительных, красный для отрицательных */}
                                         <TableCell align="right">
-                                            {row.offset > 0 && (
+                                            {row.offset !== 0 && (
                                                 <Chip
                                                     label={formatCurrency(row.offset, row.currency)}
-                                                    sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                    sx={{
+                                                        backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
+                                                        color: row.offset > 0 ? '#1a1a1a' : 'white'
+                                                    }}
                                                     size="small"
                                                 />
                                             )}
@@ -271,7 +328,7 @@ function DashboardPage() {
                                     <TableCell>
                                         <strong>{row.period.split('-').reverse().join('.')}</strong>
                                     </TableCell>
-                                    <TableCell align="center">{row.visits || ''}</TableCell>
+                                    <TableCell align="center">{row.sessions || ''}</TableCell>
                                     <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
                                     {/* Зарплата - зелёный */}
                                     <TableCell align="right">
@@ -303,12 +360,15 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    {/* Погашено - зелёный */}
+                                    {/* Погашено - зелёный для положительных, красный для отрицательных */}
                                     <TableCell align="right">
-                                        {row.offset > 0 && (
+                                        {row.offset !== 0 && (
                                             <Chip
                                                 label={formatCurrency(row.offset, row.currency)}
-                                                sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                sx={{
+                                                    backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
+                                                    color: row.offset > 0 ? '#1a1a1a' : 'white'
+                                                }}
                                                 size="small"
                                             />
                                         )}

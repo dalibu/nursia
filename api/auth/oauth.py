@@ -8,20 +8,13 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from database.core import get_db
-from database.models import User, Contributor, UserRole
+from database.models import User
 from sqlalchemy import select
 from config.settings import settings
 
 security = HTTPBearer(auto_error=False)
-
-
-async def get_user_contributor(user: User, db: AsyncSession):
-    """Получить Contributor, связанный с User через user_id"""
-    result = await db.execute(
-        select(Contributor).where(Contributor.user_id == user.id, Contributor.is_active == True)
-    )
-    return result.scalar_one_or_none()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -58,7 +51,13 @@ async def get_current_user(
     except JWTError:
         raise unauthorized_exception
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Загружаем пользователя с ролями и их permissions
+    from database.models import Role
+    result = await db.execute(
+        select(User).options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        ).where(User.id == user_id)
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise unauthorized_exception
@@ -86,12 +85,19 @@ async def get_admin_user(
     except JWTError:
         raise forbidden_exception
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Загружаем пользователя с ролями и их permissions
+    from database.models import Role
+    result = await db.execute(
+        select(User).options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        ).where(User.id == user_id)
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise forbidden_exception
 
-    if user.role != "admin":
+    # Проверяем роль admin через RBAC
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

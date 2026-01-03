@@ -174,6 +174,6 @@ async def get_current_user_info(
         "id": current_user.id,
         "username": current_user.username,
         "full_name": current_user.full_name,
-        "role": current_user.role,
+        "roles": [role.name for role in current_user.roles],  # RBAC roles array
         "force_password_change": current_user.force_password_change
     }

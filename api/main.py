@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.routers import auth, payments, settings as settings_router, currencies, contributors, admin, users, user_status
-from api.routers import assignments, employment, balances
+from api.routers import auth, payments, settings as settings_router, currencies, admin, users
+from api.routers import assignments, employment, balances, websocket
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
@@ -47,18 +47,37 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(currencies.router, prefix="/api")
-app.include_router(contributors.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(user_status.router, prefix="/api")
 # Новые роутеры для учёта времени и балансов
 app.include_router(assignments.router, prefix="/api")
 app.include_router(employment.router, prefix="/api")
 app.include_router(balances.router, prefix="/api")
+app.include_router(websocket.router, prefix="/api")
+
+
+# Startup/shutdown events for background tasks
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on app startup."""
+    from api.routers.websocket import start_timer_broadcast
+    start_timer_broadcast()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background tasks on app shutdown."""
+    from api.routers.websocket import stop_timer_broadcast
+    stop_timer_broadcast()
 
 # React статические файлы
 if os.path.exists("frontend/build/static"):
     app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+
+# Favicon
+@app.get("/favicon.svg")
+async def favicon():
+    return FileResponse("frontend/build/favicon.svg", media_type="image/svg+xml")
 
 @app.get("/api")
 async def api_root():

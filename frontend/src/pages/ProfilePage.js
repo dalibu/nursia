@@ -217,7 +217,7 @@ function ProfilePage() {
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />
-          {profile.role === 'admin' && (
+          {(profile.roles?.includes('admin') || profile.role === 'admin') && (
             <>
               <TextField
                 fullWidth

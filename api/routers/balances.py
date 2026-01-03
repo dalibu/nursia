@@ -14,8 +14,8 @@ from sqlalchemy import select, func, and_, case
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Payment, Assignment, Task, Contributor, UserRole, PaymentCategory, PaymentCategoryGroup
-from api.auth.oauth import get_current_user, get_user_contributor
+from database.models import User, Payment, Assignment, Task, PaymentCategory, PaymentCategoryGroup, PaymentGroupCode
+from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/balances", tags=["balances"])
 
@@ -33,7 +33,7 @@ class BalanceItem(BaseModel):
 class MonthlySummary(BaseModel):
     """Месячная сводка (как в Übersicht)"""
     period: str  # "2025-09"
-    visits: int  # Количество посещений (сессий)
+    sessions: int  # Количество посещений (сессий)
     hours: float  # Часы работы
     salary: float  # Зарплата (из work_sessions)
     paid: float  # Кредит (выданные авансы)
@@ -52,6 +52,7 @@ class DashboardSummary(BaseModel):
     total_salary: float  # Зарплата (категория Зарплата)
     total_expenses: float  # Расходы (группа Расходы)
     total_credits: float  # Кредиты (оплаченные из группы Долги)
+    total_repayment: float  # Погашения (группа Погашения)
     total_unpaid: float  # К оплате (неоплаченные платежи)
     total_bonus: float  # Премии (группа Премии)
     total: float  # Всего (все оплаченные платежи)
@@ -70,6 +71,48 @@ class MutualBalance(BaseModel):
     remaining: float  # Остаток долга
     currency: str
 
+
+class PaymentDebug(BaseModel):
+    """Платёж для отладки (только ключевые поля)"""
+    id: int
+    tracking_nr: Optional[str]
+    payer_id: int
+    payer_name: str
+    recipient_id: Optional[int]
+    recipient_name: str
+    amount: float
+    currency: str
+    payment_status: str
+    payment_date: str
+    category_name: str
+    category_group: str
+    description: Optional[str]
+
+
+class CardsSummary(BaseModel):
+    """Карточки на Dashboard (точно как на GUI)"""
+    salary: float       # Зарплата (зелёная карточка)
+    expenses: float     # Расходы (розовая карточка)
+    credits: float      # Кредиты (фиолетовая карточка)
+    repayment: float    # Погашения (оранжевая, показывается как отрицательное)
+    to_pay: float       # К оплате (красная карточка)
+    bonus: float        # Премии (жёлтая карточка)
+    total: float        # Всего (голубая карточка)
+    currency: str
+
+
+class DebugExport(BaseModel):
+    """Полный экспорт Dashboard для отладки — структура как на GUI"""
+    # Секция 1: Карточки сверху
+    cards: CardsSummary
+    # Секция 2: Взаимные расчёты
+    mutual_balances: List[MutualBalance]
+    # Секция 3: Помесячный обзор
+    monthly: List[MonthlySummary]
+    # Все платежи для анализа
+    payments: List[PaymentDebug]
+    export_timestamp: str
+
 @router.get("/summary", response_model=DashboardSummary)
 async def get_balance_summary(
     employer_id: Optional[int] = Query(None, description="ID работодателя (А)"),
@@ -78,19 +121,20 @@ async def get_balance_summary(
     current_user: User = Depends(get_current_user)
 ):
     """Получить сводку для Dashboard карточек"""
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Автофильтрация для не-админов
-    user_contributor_id = None
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            user_contributor_id = user_contributor.id
-        else:
-            return DashboardSummary(
-                total_salary=0, total_expenses=0, total_credits=0,
-                total_unpaid=0, total_bonus=0, total=0,
-                currency="UAH", balances=[]
-            )
+    # Автофильтрация — пользователи без view_all_reports видят только свои данные
+    user_filter_id = None
+    try:
+        has_perm = current_user.has_permission('view_all_reports')
+        logger.info(f"User {current_user.id} has_permission('view_all_reports') = {has_perm}")
+        if not has_perm:
+            user_filter_id = current_user.id
+    except Exception as e:
+        logger.error(f"Error checking permission for user {current_user.id}: {e}", exc_info=True)
+        # Fallback: filter by user
+        user_filter_id = current_user.id
     
     currency = "UAH"
     
@@ -100,10 +144,10 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(
-        and_(PaymentCategoryGroup.code == 'salary', Payment.payment_status.in_(['paid', 'offset']))
+        and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status.in_(['paid', 'offset']))
     )
-    if user_contributor_id:
-        salary_query = salary_query.where(Payment.recipient_id == user_contributor_id)
+    if user_filter_id:
+        salary_query = salary_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         salary_query = salary_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(salary_query)
@@ -114,9 +158,9 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(PaymentCategoryGroup.code == 'expense')
-    if user_contributor_id:
-        expenses_query = expenses_query.where(Payment.payer_id == user_contributor_id)
+    ).where(PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value)
+    if user_filter_id:
+        expenses_query = expenses_query.where(Payment.payer_id == user_filter_id)
     elif worker_id:
         expenses_query = expenses_query.where(Payment.payer_id == worker_id)
     result = await db.execute(expenses_query)
@@ -127,9 +171,9 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == 'debt', Payment.payment_status == 'paid'))
-    if user_contributor_id:
-        credits_given_query = credits_given_query.where(Payment.recipient_id == user_contributor_id)
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value, Payment.payment_status == 'paid'))
+    if user_filter_id:
+        credits_given_query = credits_given_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         credits_given_query = credits_given_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(credits_given_query)
@@ -137,9 +181,9 @@ async def get_balance_summary(
     
     # Зачтённые в счёт долга (все платежи со статусом 'offset')
     credits_offset_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'offset')
-    if user_contributor_id:
+    if user_filter_id:
         credits_offset_query = credits_offset_query.where(
-            (Payment.recipient_id == user_contributor_id) | (Payment.payer_id == user_contributor_id)
+            (Payment.recipient_id == user_filter_id) | (Payment.payer_id == user_filter_id)
         )
     elif worker_id:
         credits_offset_query = credits_offset_query.where(
@@ -154,8 +198,8 @@ async def get_balance_summary(
     # 4. К оплате — чистый остаток к оплате (кредиты - offset + unpaid)
     # Неоплаченные платежи
     unpaid_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'unpaid')
-    if user_contributor_id:
-        unpaid_query = unpaid_query.where(Payment.recipient_id == user_contributor_id)
+    if user_filter_id:
+        unpaid_query = unpaid_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(unpaid_query)
@@ -171,22 +215,29 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == 'bonus', Payment.payment_status.in_(['paid', 'offset'])))
-    if user_contributor_id:
-        bonus_query = bonus_query.where(Payment.recipient_id == user_contributor_id)
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.BONUS.value, Payment.payment_status.in_(['paid', 'offset'])))
+    if user_filter_id:
+        bonus_query = bonus_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         bonus_query = bonus_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(bonus_query)
     total_bonus = float(result.one().total or 0)
     
-    # 6. Всего — только реально оплаченные платежи (без offset)
-    total_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'paid')
-    if user_contributor_id:
-        total_query = total_query.where(Payment.recipient_id == user_contributor_id)
+    # 6. Погашения (группа 'repayment')
+    repayment_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value, Payment.payment_status == 'paid'))
+    if user_filter_id:
+        repayment_query = repayment_query.where(Payment.payer_id == user_filter_id)
     elif worker_id:
-        total_query = total_query.where(Payment.recipient_id == worker_id)
-    result = await db.execute(total_query)
-    total = float(result.one().total or 0)
+        repayment_query = repayment_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(repayment_query)
+    total_repayment = float(result.one().total or 0)
+    
+    # 7. Всего = Зарплата + Кредиты + Премии + Расходы - Погашено
+    total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
     
     # Балансы (неоплаченные долги)
     balances = []
@@ -196,8 +247,8 @@ async def get_balance_summary(
     ).where(Payment.payment_status == 'unpaid').group_by(
         Payment.payer_id, Payment.recipient_id, Payment.currency
     )
-    if user_contributor_id:
-        debt_query = debt_query.where(Payment.recipient_id == user_contributor_id)
+    if user_filter_id:
+        debt_query = debt_query.where(Payment.recipient_id == user_filter_id)
     
     result = await db.execute(debt_query)
     debt_rows = result.all()
@@ -209,20 +260,20 @@ async def get_balance_summary(
         if row.recipient_id:
             contributor_ids.add(row.recipient_id)
     
-    contributor_names = {}
+    user_names = {}
     if contributor_ids:
-        result = await db.execute(select(Contributor).where(Contributor.id.in_(contributor_ids)))
-        for c in result.scalars().all():
-            contributor_names[c.id] = c.name
+        result = await db.execute(select(User).where(User.id.in_(contributor_ids)))
+        for u in result.scalars().all():
+            user_names[u.id] = u.full_name
     
     for row in debt_rows:
         currency = row.currency
         # Для неоплаченных платежей: payer — должник (должен заплатить), recipient — кредитор (ему должны)
         balances.append(BalanceItem(
             debtor_id=row.payer_id,
-            debtor_name=contributor_names.get(row.payer_id, f"ID:{row.payer_id}"),
+            debtor_name=user_names.get(row.payer_id, f"ID:{row.payer_id}"),
             creditor_id=row.recipient_id or 0,
-            creditor_name=contributor_names.get(row.recipient_id, "—") if row.recipient_id else "—",
+            creditor_name=user_names.get(row.recipient_id, "—") if row.recipient_id else "—",
             amount=float(row.total),
             currency=row.currency
         ))
@@ -231,6 +282,7 @@ async def get_balance_summary(
         total_salary=total_salary,
         total_expenses=total_expenses,
         total_credits=total_credits,
+        total_repayment=total_repayment,
         total_unpaid=total_unpaid,
         total_bonus=total_bonus,
         total=total,
@@ -249,15 +301,18 @@ async def get_monthly_summary(
 ):
     """Получить помесячную сводку (как в Übersicht из Excel)"""
     from utils.timezone import now_server
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Автофильтрация для не-админов
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            worker_id = user_contributor.id
-        else:
-            # Нет связанного Contributor — возвращаем пустой результат
-            return []
+    # Автофильтрация — пользователи без view_all_reports видят только свои данные
+    try:
+        has_perm = current_user.has_permission('view_all_reports')
+        logger.info(f"[monthly] User {current_user.id} has_permission('view_all_reports') = {has_perm}")
+        if not has_perm:
+            worker_id = current_user.id
+    except Exception as e:
+        logger.error(f"[monthly] Error checking permission for user {current_user.id}: {e}", exc_info=True)
+        worker_id = current_user.id
     
     now = now_server()
     summaries = []
@@ -272,13 +327,14 @@ async def get_monthly_summary(
         # Начало и конец месяца
         start_date = date(year, month, 1)
         if month == 12:
-            end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            next_month_start = date(year + 1, 1, 1)
         else:
-            end_date = date(year, month + 1, 1) - timedelta(days=1)
+            next_month_start = date(year, month + 1, 1)
+        end_date = next_month_start - timedelta(days=1)  # Для Assignment.assignment_date (date only)
         
         # Рабочие сессии за месяц (из Assignment + Task)
         sessions_query = select(
-            func.count(func.distinct(Assignment.id)).label("visits"),
+            func.count(func.distinct(Assignment.id)).label("sessions"),
             Assignment.currency
         ).select_from(Assignment).join(Task).where(
             and_(
@@ -291,14 +347,13 @@ async def get_monthly_summary(
         ).group_by(Assignment.currency)
         
         if worker_id:
-            sessions_query = sessions_query.where(Assignment.worker_id == worker_id)
-        if employer_id:
-            sessions_query = sessions_query.where(Assignment.employer_id == employer_id)
+            sessions_query = sessions_query.where(Assignment.user_id == worker_id)
+        # Note: employer_id not used for Assignment (single-employer model)
         
         result = await db.execute(sessions_query)
         session_row = result.first()
         
-        visits = session_row.visits if session_row else 0
+        sessions = session_row.sessions if session_row else 0
         currency = session_row.currency if session_row else "UAH"
         
         # Подсчёт часов и суммы отдельным запросом
@@ -321,15 +376,14 @@ async def get_monthly_summary(
         )
         
         if worker_id:
-            hours_query = hours_query.where(Assignment.worker_id == worker_id)
-        if employer_id:
-            hours_query = hours_query.where(Assignment.employer_id == employer_id)
+            hours_query = hours_query.where(Assignment.user_id == worker_id)
+        # Note: employer_id not used for Assignment (single-employer model)
         
         result = await db.execute(hours_query)
         hours_row = result.first()
         hours = float(hours_row.hours) if hours_row and hours_row.hours else 0
         
-        # Зарплата из payments по дате платежа (группа "salary")
+        # Зарплата из payments по дате платежа (группа "salary", только оплаченные)
         salary_query = select(
             func.sum(Payment.amount).label("salary")
         ).join(
@@ -339,8 +393,9 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                PaymentCategoryGroup.code == 'salary'
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+                Payment.payment_status.in_(['paid', 'offset'])  # Только выплаченная зарплата
             )
         )
         
@@ -364,9 +419,9 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
+                Payment.payment_date < next_month_start,
                 Payment.payment_status == 'paid',
-                PaymentCategoryGroup.code == 'debt'
+                PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
         
@@ -378,14 +433,20 @@ async def get_monthly_summary(
         result = await db.execute(credits_given_query)
         credits_given = float(result.one().total or 0)
         
-        # Зачтённые в счёт долга (offset) — тоже за период
+        # Погашения (группа 'repayment') — за период
         credits_offset_query = select(
             func.sum(Payment.amount).label("total")
+        ).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                Payment.payment_status == 'offset'
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
             )
         )
         
@@ -399,7 +460,7 @@ async def get_monthly_summary(
             )
         
         result = await db.execute(credits_offset_query)
-        credits_offset = float(result.one().total or 0)
+        credits_offset = float(result.scalar() or 0)
         
         # НАКОПИТЕЛЬНЫЕ значения для to_pay (с начала времён до end_date)
         cumulative_credits_query = select(
@@ -410,9 +471,9 @@ async def get_monthly_summary(
             PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
-                Payment.payment_date <= end_date,
+                Payment.payment_date < next_month_start,
                 Payment.payment_status == 'paid',
-                PaymentCategoryGroup.code == 'debt'
+                PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
         
@@ -426,10 +487,16 @@ async def get_monthly_summary(
         
         cumulative_offset_query = select(
             func.sum(Payment.amount).label("total")
+        ).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
         ).where(
             and_(
-                Payment.payment_date <= end_date,
-                Payment.payment_status == 'offset'
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
             )
         )
         
@@ -443,7 +510,7 @@ async def get_monthly_summary(
             )
         
         result = await db.execute(cumulative_offset_query)
-        cumulative_offset = float(result.one().total or 0)
+        cumulative_offset = float(result.scalar() or 0)
         
         # Итого — только реально оплаченные платежи (без offset)
         total_paid_query = select(
@@ -451,7 +518,7 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
+                Payment.payment_date < next_month_start,
                 Payment.payment_status == 'paid'
             )
         )
@@ -475,8 +542,8 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                PaymentCategoryGroup.code == 'expense'
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
             )
         )
         
@@ -499,8 +566,8 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                PaymentCategoryGroup.code == 'expense',
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
                 Payment.payment_status.in_(['paid', 'offset'])
             )
         )
@@ -519,8 +586,8 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
-                PaymentCategoryGroup.code == 'bonus'
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.BONUS.value
             )
         )
         
@@ -537,7 +604,7 @@ async def get_monthly_summary(
         unpaid_query = select(func.sum(Payment.amount).label("total")).where(
             and_(
                 Payment.payment_date >= start_date,
-                Payment.payment_date <= end_date,
+                Payment.payment_date < next_month_start,
                 Payment.payment_status == 'unpaid'
             )
         )
@@ -550,22 +617,21 @@ async def get_monthly_summary(
         result = await db.execute(unpaid_query)
         unpaid_amount = float(result.one().total or 0)
         
-        # Чистый накопительный остаток к оплате: unpaid + переплата (если offset > credits)
-        net_debt = cumulative_credits - cumulative_offset
-        overcredit = max(0, -net_debt)  # переплата, если offset > credit
-        to_pay = unpaid_amount + overcredit
+        # К оплате = накопительные кредиты - накопительные погашения
+        # Это показывает текущий баланс долга на конец периода
+        cumulative_to_pay = cumulative_credits - cumulative_offset
         
         remaining = expenses - expenses_paid
-        total = total_paid  # Итого = все оплаченные платежи за период
+        total = salary + credits_given + bonus + expenses_paid - credits_offset  # Зарплата + Кредиты + Премии + Расходы - Погашено
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
-            visits=visits,
+            sessions=sessions,
             hours=round(hours, 2),
             salary=round(salary, 2),
             paid=round(credits_given, 2),  # Кредит: выданные авансы
-            offset=round(credits_offset, 2),  # Погашение: зачтённые
-            to_pay=round(to_pay, 2),
+            offset=round(-credits_offset, 2),  # Погашено: отрицательное (возврат)
+            to_pay=round(unpaid_amount, 2),  # Только неоплаченные платежи
             expenses=round(expenses, 2),
             expenses_paid=round(expenses_paid, 2),
             bonus=round(bonus, 2),
@@ -582,19 +648,17 @@ async def get_mutual_balances(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить взаимные балансы долгов между парами контрибуторов.
+    """Получить взаимные балансы долгов между парами пользователей.
     
     Показывает ОТДЕЛЬНЫЕ строки для:
     1. Долговых отношений (кредиты/авансы из категории 'debt')
     2. Неоплаченных платежей (зарплаты, бонусы и т.д.)
     """
     
-    # Автофильтрация для не-админов
-    user_contributor_id = None
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            user_contributor_id = user_contributor.id
+    # Автофильтрация — пользователи без view_all_reports видят только свои данные
+    user_filter_id = None
+    if not current_user.has_permission('view_all_reports'):
+        user_filter_id = current_user.id
     
     balances = []
     
@@ -611,15 +675,15 @@ async def get_mutual_balances(
     ).where(
         and_(
             Payment.recipient_id != None,
-            PaymentCategoryGroup.code == 'debt',
+            PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value,
             Payment.payment_status == 'paid'  # Только выданные кредиты
         )
     ).distinct()
     
-    if user_contributor_id:
+    if user_filter_id:
         debt_pairs_query = debt_pairs_query.where(
-            (Payment.payer_id == user_contributor_id) | 
-            (Payment.recipient_id == user_contributor_id)
+            (Payment.payer_id == user_filter_id) | 
+            (Payment.recipient_id == user_filter_id)
         )
     
     result = await db.execute(debt_pairs_query)
@@ -637,7 +701,12 @@ async def get_mutual_balances(
         Payment.payer_id,
         Payment.recipient_id,
         Payment.currency,
-        func.sum(Payment.amount).label("total")
+        func.sum(Payment.amount).label("total"),
+        PaymentCategoryGroup.code.label("group_code")
+    ).select_from(Payment).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(
         and_(
             Payment.recipient_id != None,
@@ -646,13 +715,14 @@ async def get_mutual_balances(
     ).group_by(
         Payment.payer_id,
         Payment.recipient_id,
-        Payment.currency
+        Payment.currency,
+        PaymentCategoryGroup.code
     )
     
-    if user_contributor_id:
+    if user_filter_id:
         unpaid_pairs_query = unpaid_pairs_query.where(
-            (Payment.payer_id == user_contributor_id) | 
-            (Payment.recipient_id == user_contributor_id)
+            (Payment.payer_id == user_filter_id) | 
+            (Payment.recipient_id == user_filter_id)
         )
     
     result = await db.execute(unpaid_pairs_query)
@@ -664,13 +734,13 @@ async def get_mutual_balances(
             contributor_ids.add(row.recipient_id)
     
     # Получаем имена
-    contributor_names = {}
+    user_names = {}
     if contributor_ids:
         result = await db.execute(
-            select(Contributor).where(Contributor.id.in_(contributor_ids))
+            select(User).where(User.id.in_(contributor_ids))
         )
-        for c in result.scalars().all():
-            contributor_names[c.id] = c.name
+        for u in result.scalars().all():
+            user_names[u.id] = u.full_name
     
     # === Обрабатываем долговые отношения ===
     processed_debt_pairs = set()
@@ -688,8 +758,14 @@ async def get_mutual_balances(
         a_id = pair_key[0]
         b_id = pair_key[1]
         
-        # Кредит A→B
-        credit_a_to_b_query = select(func.sum(Payment.amount)).select_from(
+        # === ЛОГИКА ВЗАИМНЫХ РАСЧЁТОВ ===
+        # Долг (группа 'debt') создаёт задолженность работника
+        # Зарплата (группа 'salary') погашает задолженность / создаёт обратный долг
+        # Расходы (группа 'expense') погашают задолженность / создают обратный долг
+        # Премия (группа 'bonus') НЕ учитывается
+        
+        # Долги A→B (группа 'debt') — создаёт долг B перед A
+        debt_a_to_b_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
             PaymentCategory, Payment.category_id == PaymentCategory.id
@@ -700,15 +776,15 @@ async def get_mutual_balances(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'paid',
-                PaymentCategoryGroup.code == 'debt'
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
-        result = await db.execute(credit_a_to_b_query)
-        credit_a_to_b = float(result.scalar() or 0)
+        result = await db.execute(debt_a_to_b_query)
+        debt_a_to_b = float(result.scalar() or 0)
         
-        # Кредит B→A
-        credit_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+        # Долги B→A (группа 'debt') — возврат долга (уменьшает долг B)
+        debt_b_to_a_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
             PaymentCategory, Payment.category_id == PaymentCategory.id
@@ -719,108 +795,326 @@ async def get_mutual_balances(
                 Payment.payer_id == b_id,
                 Payment.recipient_id == a_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'paid',
-                PaymentCategoryGroup.code == 'debt'
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
-        result = await db.execute(credit_b_to_a_query)
-        credit_b_to_a = float(result.scalar() or 0)
+        result = await db.execute(debt_b_to_a_query)
+        debt_b_to_a = float(result.scalar() or 0)
         
-        # Погашено A→B (A платит B → уменьшает долг A перед B, т.е. credit_b_to_a)
-        offset_a_to_b_query = select(func.sum(Payment.amount)).where(
+        # Зарплата A→B (группа 'salary') — погашает долг B / создаёт долг A
+        salary_a_to_b_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
             and_(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'offset'
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
             )
         )
-        result = await db.execute(offset_a_to_b_query)
-        offset_a_to_b = float(result.scalar() or 0)
+        result = await db.execute(salary_a_to_b_query)
+        salary_a_to_b = float(result.scalar() or 0)
         
-        # Погашено B→A (B платит A → уменьшает долг B перед A, т.е. credit_a_to_b)
-        offset_b_to_a_query = select(func.sum(Payment.amount)).where(
+        # Зарплата B→A (не типично, но на всякий случай)
+        salary_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
             and_(
                 Payment.payer_id == b_id,
                 Payment.recipient_id == a_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'offset'
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
             )
         )
-        result = await db.execute(offset_b_to_a_query)
-        offset_b_to_a = float(result.scalar() or 0)
+        result = await db.execute(salary_b_to_a_query)
+        salary_b_to_a = float(result.scalar() or 0)
         
-        # Общий offset для отображения
-        offset_amount = offset_a_to_b + offset_b_to_a
+        # Расходы A→B (группа 'expense') — погашает долг B / создаёт долг A
+        expense_a_to_b_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == a_id,
+                Payment.recipient_id == b_id,
+                Payment.currency == currency,
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
+            )
+        )
+        result = await db.execute(expense_a_to_b_query)
+        expense_a_to_b = float(result.scalar() or 0)
+        
+        # Расходы B→A (работник потратил, работодатель компенсирует)
+        expense_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == b_id,
+                Payment.recipient_id == a_id,
+                Payment.currency == currency,
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
+            )
+        )
+        result = await db.execute(expense_b_to_a_query)
+        expense_b_to_a = float(result.scalar() or 0)
+        
+        # Погашения A→B (группа 'repayment') — прямой возврат долга
+        repayment_a_to_b_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == a_id,
+                Payment.recipient_id == b_id,
+                Payment.currency == currency,
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
+            )
+        )
+        result = await db.execute(repayment_a_to_b_query)
+        repayment_a_to_b = float(result.scalar() or 0)
+        
+        # Погашения B→A (группа 'repayment') — возврат долга работником
+        repayment_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == b_id,
+                Payment.recipient_id == a_id,
+                Payment.currency == currency,
+                Payment.payment_status.in_(['paid', 'offset']),
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
+            )
+        )
+        result = await db.execute(repayment_b_to_a_query)
+        repayment_b_to_a = float(result.scalar() or 0)
+        
+        # === НЕОПЛАЧЕННЫЕ РАСХОДЫ (создают долг) ===
+        # Unpaid expense A→B: A потратил, B должен ему — увеличивает долг B перед A
+        unpaid_expense_a_to_b_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == a_id,
+                Payment.recipient_id == b_id,
+                Payment.currency == currency,
+                Payment.payment_status == 'unpaid',
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
+            )
+        )
+        result = await db.execute(unpaid_expense_a_to_b_query)
+        unpaid_expense_a_to_b = float(result.scalar() or 0)
+        
+        # Unpaid expense B→A: B потратил, A должен ему — увеличивает долг A перед B
+        unpaid_expense_b_to_a_query = select(func.sum(Payment.amount)).select_from(
+            Payment
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payer_id == b_id,
+                Payment.recipient_id == a_id,
+                Payment.currency == currency,
+                Payment.payment_status == 'unpaid',
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
+            )
+        )
+        result = await db.execute(unpaid_expense_b_to_a_query)
+        unpaid_expense_b_to_a = float(result.scalar() or 0)
         
         # Чистый баланс:
-        # - credit_a_to_b: A дал B кредит → B должен A
-        # - credit_b_to_a: B дал A кредит → A должен B
-        # - Все offset-ы (в любом направлении) уменьшают долг получателя кредита
-        #   (зачёт зарплаты от employer→worker также уменьшает долг worker)
-        #
-        # net_balance = (credit_a_to_b - total_offset) - credit_b_to_a
-        #
-        # Но если оба дали друг другу кредиты, нужно вычислить кто основной кредитор:
-        # Если credit_a_to_b > credit_b_to_a, основной долг у B перед A
-        # Offset уменьшает основной долг
+        # debt = создаёт долг
+        # salary = погашает долг (работа)
+        # repayment = погашает долг (прямая выплата)
+        # unpaid_expense = создаёт долг (непогашенные расходы)
+        # ВАЖНО: paid expense НЕ вычитается — оплаченные расходы просто "уже возмещены"
+        # positive = B owes A, negative = A owes B
         
-        if credit_a_to_b >= credit_b_to_a:
-            # B основной должник → offset уменьшает его долг
-            net_balance = credit_a_to_b - credit_b_to_a - offset_amount
+        balance_b_owes_a = debt_a_to_b - salary_a_to_b - repayment_b_to_a + unpaid_expense_a_to_b
+        balance_a_owes_b = debt_b_to_a - salary_b_to_a - repayment_a_to_b + unpaid_expense_b_to_a
+        net_balance = balance_b_owes_a - balance_a_owes_b
+        
+        # Для отображения: используем ФАКТИЧЕСКИЙ долг из более крупного направления
+        if debt_a_to_b >= debt_b_to_a:
+            # A дал больше долга B (или равно)
+            main_debt = debt_a_to_b
+            main_offset = salary_a_to_b + expense_a_to_b + repayment_b_to_a
         else:
-            # A основной должник → offset уменьшает его долг  
-            net_balance = credit_a_to_b - credit_b_to_a + offset_amount
-        
-        # Показываем кредит как максимальный из двух направлений (основной кредит)
-        main_credit = max(credit_a_to_b, credit_b_to_a)
+            # B дал больше долга A
+            main_debt = debt_b_to_a
+            main_offset = salary_b_to_a + expense_b_to_a + repayment_a_to_b
         
         if abs(net_balance) > 0.01:
             if net_balance > 0:
-                # net_balance > 0: B должен A
+                # B должен A
                 balances.append(MutualBalance(
                     creditor_id=a_id,
-                    creditor_name=contributor_names.get(a_id, f"ID:{a_id}"),
+                    creditor_name=user_names.get(a_id, f"ID:{a_id}"),
                     debtor_id=b_id,
-                    debtor_name=contributor_names.get(b_id, f"ID:{b_id}"),
-                    credit=round(main_credit, 2),
-                    offset=round(offset_amount, 2),
+                    debtor_name=user_names.get(b_id, f"ID:{b_id}"),
+                    credit=round(main_debt, 2),
+                    offset=round(main_offset, 2),
                     remaining=round(net_balance, 2),
                     currency=currency
                 ))
             else:
-                # net_balance < 0: A должен B
+                # A должен B
                 balances.append(MutualBalance(
                     creditor_id=b_id,
-                    creditor_name=contributor_names.get(b_id, f"ID:{b_id}"),
+                    creditor_name=user_names.get(b_id, f"ID:{b_id}"),
                     debtor_id=a_id,
-                    debtor_name=contributor_names.get(a_id, f"ID:{a_id}"),
-                    credit=round(main_credit, 2),
-                    offset=round(offset_amount, 2),
+                    debtor_name=user_names.get(a_id, f"ID:{a_id}"),
+                    credit=round(main_debt, 2),
+                    offset=round(main_offset, 2),
                     remaining=round(-net_balance, 2),
                     currency=currency
                 ))
     
-    # === Обрабатываем неоплаченные платежи как отдельные строки ===
-    for row in unpaid_pairs:
-        payer_id = row.payer_id
-        recipient_id = row.recipient_id
-        currency = row.currency
-        unpaid_amount = float(row.total or 0)
-        
-        if unpaid_amount < 0.01:
-            continue
-        
-        # Неоплаченный платеж: payer должен recipient
-        balances.append(MutualBalance(
-            creditor_id=recipient_id,
-            creditor_name=contributor_names.get(recipient_id, f"ID:{recipient_id}"),
-            debtor_id=payer_id,
-            debtor_name=contributor_names.get(payer_id, f"ID:{payer_id}"),
-            credit=0,  # Это не кредит, а неоплаченная работа
-            offset=0,
-            remaining=round(unpaid_amount, 2),
-            currency=currency
+    return balances
+
+
+@router.get("/debug", response_model=DebugExport)
+async def get_debug_export(
+    employer_id: Optional[int] = Query(None),
+    worker_id: Optional[int] = Query(None),
+    months: int = Query(6, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Полный экспорт всех данных Dashboard для отладки (только для пользователей с правами)
+    """
+    from datetime import datetime
+    
+    if not current_user.has_permission('view_all_reports'):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Нет прав на экспорт данных")
+    
+    # Получаем все данные
+    summary = await get_balance_summary(
+        employer_id=employer_id,
+        worker_id=worker_id,
+        db=db,
+        current_user=current_user
+    )
+    
+    monthly = await get_monthly_summary(
+        employer_id=employer_id,
+        worker_id=worker_id,
+        months=months,
+        db=db,
+        current_user=current_user
+    )
+    
+    # Фильтруем пустые периоды для экономии токенов
+    monthly = [
+        m for m in monthly 
+        if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
+           m.paid > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0
+    ]
+    
+    mutual = await get_mutual_balances(
+        db=db,
+        current_user=current_user
+    )
+    
+    # Получаем все платежи с категориями и именами
+    from sqlalchemy.orm import aliased
+    PayerUser = aliased(User)
+    RecipientUser = aliased(User)
+    
+    payments_query = select(
+        Payment.id,
+        Payment.tracking_nr,
+        Payment.payer_id,
+        PayerUser.full_name.label("payer_name"),
+        Payment.recipient_id,
+        RecipientUser.full_name.label("recipient_name"),
+        Payment.amount,
+        Payment.currency,
+        Payment.payment_status,
+        Payment.payment_date,
+        PaymentCategory.name.label("category_name"),
+        PaymentCategoryGroup.name.label("category_group"),
+        Payment.description
+    ).select_from(Payment).join(
+        PayerUser, Payment.payer_id == PayerUser.id
+    ).outerjoin(
+        RecipientUser, Payment.recipient_id == RecipientUser.id
+    ).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).order_by(Payment.payment_date.desc())
+    
+    result = await db.execute(payments_query)
+    payments_data = []
+    for row in result.all():
+        payments_data.append(PaymentDebug(
+            id=row.id,
+            tracking_nr=row.tracking_nr,
+            payer_id=row.payer_id,
+            payer_name=row.payer_name,
+            recipient_id=row.recipient_id,
+            recipient_name=row.recipient_name or "—",
+            amount=float(row.amount),
+            currency=row.currency,
+            payment_status=row.payment_status,
+            payment_date=row.payment_date.isoformat() if row.payment_date else "",
+            category_name=row.category_name,
+            category_group=row.category_group,
+            description=row.description
         ))
     
-    return balances
+    # Формируем структуру как на GUI
+    cards = CardsSummary(
+        salary=summary.total_salary,
+        expenses=summary.total_expenses,
+        credits=summary.total_credits,
+        repayment=-summary.total_repayment,  # Показываем как отрицательное (как на GUI)
+        to_pay=summary.total_unpaid,
+        bonus=summary.total_bonus,
+        total=summary.total,
+        currency=summary.currency
+    )
+    
+    return DebugExport(
+        cards=cards,
+        mutual_balances=mutual,
+        monthly=monthly,
+        payments=payments_data,
+        export_timestamp=datetime.now().isoformat()
+    )

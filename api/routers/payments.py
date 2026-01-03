@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Contributor, Currency, Assignment
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment, Role
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -122,7 +122,7 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    payment_data = payment.dict()
+    payment_data = payment.model_dump()
     
     # Устанавливаем валюту по умолчанию если не указана
     if not payment_data.get('currency'):
@@ -143,9 +143,29 @@ async def create_payment(
     if not payment_data.get('payer_id'):
         raise HTTPException(status_code=400, detail="payer_id is required")
     
+    # Single-employer модель: автоматически устанавливаем recipient_id
+    # Если worker платит → recipient = employer (первый admin)
+    # Если admin платит worker'у → recipient уже должен быть указан
+    if not payment_data.get('recipient_id'):
+        payer_id = payment_data['payer_id']
+        # Проверяем, является ли payer админом
+        payer_result = await db.execute(
+            select(User).options(selectinload(User.roles)).where(User.id == payer_id)
+        )
+        payer = payer_result.scalar_one_or_none()
+        
+        if payer and not payer.is_admin:
+            # Worker платит → recipient = первый admin (employer)
+            admin_result = await db.execute(
+                select(User).join(User.roles).where(Role.name == 'admin').limit(1)
+            )
+            admin_user = admin_result.scalar_one_or_none()
+            if admin_user:
+                payment_data['recipient_id'] = admin_user.id
+    
     # Обрабатываем payment_status и paid_at
     payment_status = payment_data.get('payment_status', 'unpaid')
-    if payment_status in ['paid', 'offset']:
+    if payment_status == 'paid':
         payment_data['paid_at'] = now_server()
     else:
         payment_data['paid_at'] = None
@@ -156,23 +176,33 @@ async def create_payment(
     db_payment = Payment(**payment_data)
     db.add(db_payment)
     await db.flush()  # Получаем ID
+    
     db_payment.tracking_nr = format_payment_tracking_nr(db_payment.id)
     await db.commit()
     await db.refresh(db_payment)
     
-    # Загружаем связанные объекты с вложенной category_group
     result = await db.execute(
         select(Payment)
         .options(
             joinedload(Payment.category).joinedload(PaymentCategory.category_group),
+            joinedload(Payment.payer),
             joinedload(Payment.recipient),
-            joinedload(Payment.payer)
+            joinedload(Payment.assignment)
         )
         .where(Payment.id == db_payment.id)
     )
     db_payment = result.unique().scalar_one()
     
-    return PaymentSchema.from_orm(db_payment)
+    # WebSocket broadcast: уведомляем всех (кроме создателя)
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_created",
+        "payment_id": db_payment.id,
+        "payer_id": db_payment.payer_id,
+        "recipient_id": db_payment.recipient_id
+    }, exclude_user_id=current_user.id)
+    
+    return PaymentSchema.model_validate(db_payment)
 
 
 @router.get("/", response_model=List[PaymentSchema])
@@ -187,14 +217,20 @@ async def get_payments(
 ) -> List[PaymentSchema]:
     query = select(Payment).options(
         joinedload(Payment.category).joinedload(PaymentCategory.category_group),
-        joinedload(Payment.recipient),
         joinedload(Payment.payer),
+        joinedload(Payment.recipient),
         joinedload(Payment.assignment)
     )
     
-    # TODO: Обновить логику прав доступа. Пока показываем все платежи.
-    # if current_user.role != "admin":
-    #     query = query.where(Payment.user_id == current_user.id)
+    # RBAC: workers видят только свои платежи (где они payer или recipient)
+    if not current_user.is_admin:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                Payment.payer_id == current_user.id,
+                Payment.recipient_id == current_user.id
+            )
+        )
     
     if category_id:
         query = query.where(Payment.category_id == category_id)
@@ -207,44 +243,7 @@ async def get_payments(
     result = await db.execute(query)
     payments = result.scalars().all()
     
-    # Формируем ответ вручную
-    response = []
-    for payment in payments:
-        payment_dict = {
-            "id": payment.id,
-            "tracking_nr": payment.tracking_nr,
-            "category_id": payment.category_id,
-            "recipient_id": payment.recipient_id,
-            "amount": str(payment.amount),
-            "currency": payment.currency,
-            "description": payment.description,
-            "payment_date": payment.payment_date.isoformat(),
-            "payer_id": payment.payer_id,
-            "created_at": payment.created_at.isoformat(),
-            "payment_status": payment.payment_status,
-            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
-            "assignment_id": payment.assignment_id,
-            "assignment_tracking_nr": payment.assignment.tracking_nr if payment.assignment else None,
-            "category": {
-                "id": payment.category.id,
-                "name": payment.category.name,
-                "description": payment.category.description,
-                "created_at": payment.category.created_at.isoformat()
-            } if payment.category else None,
-            "recipient": {
-                "id": payment.recipient.id,
-                "name": payment.recipient.name,
-                "type": payment.recipient.type
-            } if payment.recipient else None,
-            "payer": {
-                "id": payment.payer.id,
-                "name": payment.payer.name,
-                "type": payment.payer.type
-            } if payment.payer else None
-        }
-        response.append(payment_dict)
-    
-    return response
+    return [PaymentSchema.from_orm(p) for p in payments]
 
 
 @router.get("/reports")
@@ -269,10 +268,10 @@ async def get_payment_reports(
         end_date = now_server()
     
     # Получаем детальные платежи
-    query = select(Payment, PaymentCategory.name, Contributor.name).join(
+    query = select(Payment, PaymentCategory.name, User.full_name).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).outerjoin(
-        Contributor, Payment.recipient_id == Contributor.id
+        User, Payment.payer_id == User.id
     ).where(
         and_(
             Payment.payment_date >= start_date,
@@ -284,13 +283,13 @@ async def get_payment_reports(
     payments = []
     totals_by_currency = {}
     
-    for payment, category_name, recipient_name in result:
+    for payment, category_name, payer_name in result:
         payments.append({
             "id": payment.id,
             "amount": float(payment.amount),
             "currency": payment.currency,
             "category_name": category_name,
-            "recipient_name": recipient_name,
+            "payer_name": payer_name,
             "description": payment.description,
             "payment_date": payment.payment_date.isoformat(),
             "created_at": payment.created_at.isoformat()
@@ -354,9 +353,7 @@ async def update_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Админ может редактировать любые платежи, пользователи только свои
-    # Админ может редактировать любые платежи, пользователи только свои
-    # TODO: Обновить права доступа
+    """Обновить платёж. Админ может редактировать любые, пользователи — только свои."""
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     
     db_payment = result.scalar_one_or_none()
@@ -368,7 +365,7 @@ async def update_payment(
     # Если указан payment_status, обновляем paid_at
     if 'payment_status' in payment_data:
         status = payment_data['payment_status']
-        if status in ['paid', 'offset'] and not db_payment.paid_at:
+        if status == 'paid' and not db_payment.paid_at:
             payment_data['paid_at'] = now_server()
         elif status == 'unpaid':
             payment_data['paid_at'] = None
@@ -383,6 +380,14 @@ async def update_payment(
     
     await db.commit()
     await db.refresh(db_payment)
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_updated",
+        "payment_id": db_payment.id
+    }, exclude_user_id=current_user.id)
+    
     return {"id": db_payment.id, "message": "Payment updated successfully"}
 
 
@@ -392,19 +397,25 @@ async def delete_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Админ может удалять любые платежи, пользователи только свои
-    # Админ может удалять любые платежи, пользователи только свои
-    # TODO: Обновить права доступа
+    """Удалить платёж. Админ может удалять любые, пользователи — только свои."""
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     
     db_payment = result.scalar_one_or_none()
     if not db_payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Проверяем права доступа
-    # if current_user.role != 'admin' and db_payment.user_id != current_user.id:
-    #     raise HTTPException(status_code=403, detail="Not enough permissions")
+    # Проверяем права доступа: админ или владелец платежа
+    if not current_user.is_admin and db_payment.payer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
     
     await db.delete(db_payment)
     await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager
+    await manager.broadcast({
+        "type": "payment_deleted",
+        "payment_id": payment_id
+    }, exclude_user_id=current_user.id)
+    
     return {"message": "Payment deleted"}

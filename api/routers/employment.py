@@ -1,5 +1,6 @@
 """
-API роутер для трудовых отношений
+API роутер для трудовых отношений (RBAC версия)
+В single-employer модели: EmploymentRelation связывает user с hourly_rate.
 """
 import sys
 from pathlib import Path
@@ -13,15 +14,14 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, EmploymentRelation, Contributor
+from database.models import User, EmploymentRelation
 from api.auth.oauth import get_current_user, get_admin_user
 
 router = APIRouter(prefix="/employment", tags=["employment"])
 
 
 class EmploymentCreate(BaseModel):
-    employer_id: int
-    employee_id: int
+    user_id: int
     hourly_rate: float
     currency: str = "UAH"
 
@@ -34,44 +34,36 @@ class EmploymentUpdate(BaseModel):
 
 class EmploymentResponse(BaseModel):
     id: int
-    employer_id: int
-    employee_id: int
+    user_id: int
     hourly_rate: float
     currency: str
     is_active: bool
-    employer_name: Optional[str] = None
+    user_name: Optional[str] = None
+    employee_id: Optional[int] = None
     employee_name: Optional[str] = None
+    employer_id: Optional[int] = None
+    employer_name: Optional[str] = None
 
 
 @router.get("/", response_model=List[EmploymentResponse])
 async def get_employment_relations(
-    employer_id: Optional[int] = None,
-    employee_id: Optional[int] = None,
+    user_id: Optional[int] = None,
     is_active: Optional[bool] = True,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Получить список трудовых отношений"""
-    from database.models import UserRole
-    from api.auth.oauth import get_user_contributor
     
     query = select(EmploymentRelation).options(
-        joinedload(EmploymentRelation.employer),
-        joinedload(EmploymentRelation.employee)
+        joinedload(EmploymentRelation.user)
     )
     
     # Для обычного пользователя — только его трудовые отношения
-    if current_user.role != UserRole.ADMIN:
-        user_contributor = await get_user_contributor(current_user, db)
-        if user_contributor:
-            query = query.where(EmploymentRelation.employee_id == user_contributor.id)
-        else:
-            return []  # Нет contributor — нет трудовых отношений
+    if not current_user.is_admin:
+        query = query.where(EmploymentRelation.user_id == current_user.id)
+    elif user_id:
+        query = query.where(EmploymentRelation.user_id == user_id)
     
-    if employer_id:
-        query = query.where(EmploymentRelation.employer_id == employer_id)
-    if employee_id:
-        query = query.where(EmploymentRelation.employee_id == employee_id)
     if is_active is not None:
         query = query.where(EmploymentRelation.is_active == is_active)
     
@@ -81,13 +73,15 @@ async def get_employment_relations(
     return [
         EmploymentResponse(
             id=r.id,
-            employer_id=r.employer_id,
-            employee_id=r.employee_id,
+            user_id=r.user_id,
             hourly_rate=float(r.hourly_rate),
             currency=r.currency,
             is_active=r.is_active,
-            employer_name=r.employer.name if r.employer else None,
-            employee_name=r.employee.name if r.employee else None
+            user_name=r.user.full_name if r.user else None,
+            employee_id=r.user_id,
+            employee_name=r.user.full_name if r.user else None,
+            employer_id=current_user.id,  # Single employer model
+            employer_name=current_user.full_name  # Single employer model
         )
         for r in relations
     ]
@@ -100,19 +94,25 @@ async def create_employment_relation(
     current_user: User = Depends(get_admin_user)
 ):
     """Создать трудовые отношения"""
-    # Проверяем, что участники существуют
-    for contributor_id in [data.employer_id, data.employee_id]:
-        result = await db.execute(
-            select(Contributor).where(Contributor.id == contributor_id)
+    # Проверяем, что пользователь существует и активен
+    result = await db.execute(
+        select(User).where(User.id == data.user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Пользователь {data.user_id} не найден")
+    
+    # Проверяем статус пользователя
+    if user.status != 'active':
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Невозможно создать трудовые отношения для пользователя со статусом '{user.status}'"
         )
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail=f"Участник {contributor_id} не найден")
     
     # Проверяем, нет ли уже активных отношений
     result = await db.execute(
         select(EmploymentRelation).where(
-            EmploymentRelation.employer_id == data.employer_id,
-            EmploymentRelation.employee_id == data.employee_id,
+            EmploymentRelation.user_id == data.user_id,
             EmploymentRelation.is_active == True
         )
     )
@@ -120,8 +120,7 @@ async def create_employment_relation(
         raise HTTPException(status_code=400, detail="Активные трудовые отношения уже существуют")
     
     relation = EmploymentRelation(
-        employer_id=data.employer_id,
-        employee_id=data.employee_id,
+        user_id=data.user_id,
         hourly_rate=data.hourly_rate,
         currency=data.currency
     )
@@ -130,23 +129,25 @@ async def create_employment_relation(
     await db.commit()
     await db.refresh(relation)
     
-    # Загружаем имена участников
+    # Загружаем имя пользователя
     result = await db.execute(
         select(EmploymentRelation)
-        .options(joinedload(EmploymentRelation.employer), joinedload(EmploymentRelation.employee))
+        .options(joinedload(EmploymentRelation.user))
         .where(EmploymentRelation.id == relation.id)
     )
     relation = result.scalar_one()
     
     return EmploymentResponse(
         id=relation.id,
-        employer_id=relation.employer_id,
-        employee_id=relation.employee_id,
+        user_id=relation.user_id,
         hourly_rate=float(relation.hourly_rate),
         currency=relation.currency,
         is_active=relation.is_active,
-        employer_name=relation.employer.name if relation.employer else None,
-        employee_name=relation.employee.name if relation.employee else None
+        user_name=relation.user.full_name if relation.user else None,
+        employee_id=relation.user_id,
+        employee_name=relation.user.full_name if relation.user else None,
+        employer_id=current_user.id,  # Single employer model
+        employer_name=current_user.full_name  # Single employer model
     )
 
 
@@ -160,7 +161,7 @@ async def update_employment_relation(
     """Обновить трудовые отношения"""
     result = await db.execute(
         select(EmploymentRelation)
-        .options(joinedload(EmploymentRelation.employer), joinedload(EmploymentRelation.employee))
+        .options(joinedload(EmploymentRelation.user))
         .where(EmploymentRelation.id == relation_id)
     )
     relation = result.scalar_one_or_none()
@@ -180,13 +181,15 @@ async def update_employment_relation(
     
     return EmploymentResponse(
         id=relation.id,
-        employer_id=relation.employer_id,
-        employee_id=relation.employee_id,
+        user_id=relation.user_id,
         hourly_rate=float(relation.hourly_rate),
         currency=relation.currency,
         is_active=relation.is_active,
-        employer_name=relation.employer.name if relation.employer else None,
-        employee_name=relation.employee.name if relation.employee else None
+        user_name=relation.user.full_name if relation.user else None,
+        employee_id=relation.user_id,
+        employee_name=relation.user.full_name if relation.user else None,
+        employer_id=current_user.id,  # Single employer model
+        employer_name=current_user.full_name  # Single employer model
     )
 
 

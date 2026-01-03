@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
 
 
@@ -42,7 +42,7 @@ class UserResponse(BaseModel):
     username: str
     full_name: str
     email: Optional[str]
-    role: str
+    roles: List[str]
     status: str
     created_at: datetime
 

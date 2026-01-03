@@ -9,10 +9,24 @@ from sqlalchemy import select, update
 import hashlib
 from database.core import get_db
 from database.models import User, RegistrationRequest
+from pydantic import BaseModel
+from database.models import User, RegistrationRequest, Role
 from api.schemas.auth import RegistrationRequestResponse
 from api.auth.oauth import get_admin_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+class ApproveRequest(BaseModel):
+    role: str = "worker"
+
+@router.get("/roles")
+async def get_roles(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Получить список доступных ролей"""
+    result = await db.execute(select(Role))
+    return result.scalars().all()
 
 @router.get("/registration-requests", response_model=List[RegistrationRequestResponse])
 async def get_registration_requests(
@@ -27,6 +41,7 @@ async def get_registration_requests(
 @router.post("/registration-requests/{request_id}/approve")
 async def approve_registration(
     request_id: int,
+    approval_data: ApproveRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
@@ -38,15 +53,21 @@ async def approve_registration(
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
+    # Получаем роль
+    role_result = await db.execute(select(Role).where(Role.name == approval_data.role))
+    role = role_result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=400, detail=f"Role '{approval_data.role}' not found")
+
     # Создаем пользователя
     user = User(
         username=request.username,
         password_hash=request.password_hash,
         email=request.email,
         full_name=request.full_name,
-        role="user",
         status="active"
     )
+    user.roles.append(role)
     
     db.add(user)
     

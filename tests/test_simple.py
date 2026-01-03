@@ -45,10 +45,3 @@ def test_currencies_unauthorized(client):
     response = client.get("/api/currencies/")
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
-
-def test_contributors_unauthorized(client):
-    """Тест получения участников без авторизации"""
-    # GET /contributors/ uses get_current_user -> 401
-    response = client.get("/api/contributors/")
-    assert response.status_code == 401
-    assert "Not authenticated" in response.json()["detail"]

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import {
   Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
@@ -15,7 +16,6 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
-import ContributorForm from '../components/ContributorForm';
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -60,8 +60,6 @@ function PaymentsPage() {
   const [filteredList, setFilteredList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
-  const [showContributorForm, setShowContributorForm] = useState(false);
-  const [editingContributor, setEditingContributor] = useState(null);
   const [sortField, setSortField] = useState('tracking_nr');
   const [sortDirection, setSortDirection] = useState('desc');
 
@@ -169,15 +167,9 @@ function PaymentsPage() {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(storageData));
   }, [filters, dateRange, setSearchParams]);
 
-  useEffect(() => {
-    loadPayments();
-  }, []);
+  const { subscribe } = useWebSocket();
 
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [paymentList, filters, dateRange, sortField, sortDirection]);
-
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       const [paymentsRes, categoriesRes, userRes] = await Promise.all([
         payments.list(),
@@ -203,13 +195,13 @@ function PaymentsPage() {
       setPaymentList(paymentsWithRowNumbers);
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
-      setIsAdmin(userRes.data.role === 'admin');
+      setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
     } catch (error) {
       console.error('Failed to load payments:', error);
     }
-  };
+  }, []);
 
-  const applyFiltersAndSort = () => {
+  const applyFiltersAndSort = useCallback(() => {
     let filtered = [...paymentList];
 
     // Применяем фильтры
@@ -221,12 +213,11 @@ function PaymentsPage() {
           payment.amount?.toString(),
           payment.currency,
           payment.category?.name,
-          payment.recipient?.name,
-          payment.payer?.name,
+          '-',
+          payment.payer?.name || payment.payer?.full_name,
           payment.description,
           new Date(payment.payment_date).toLocaleDateString(),
-          payment.payment_status === 'paid' ? 'оплачено' :
-            payment.payment_status === 'offset' ? 'зачтено' : 'к оплате'
+          payment.payment_status === 'paid' ? 'оплачено' : 'к оплате'
         ];
 
         return searchFields.some(field =>
@@ -257,8 +248,6 @@ function PaymentsPage() {
       filtered = filtered.filter(payment => {
         if (filters.paymentStatus === 'paid') {
           return payment.payment_status === 'paid';
-        } else if (filters.paymentStatus === 'offset') {
-          return payment.payment_status === 'offset';
         } else if (filters.paymentStatus === 'unpaid') {
           return payment.payment_status === 'unpaid' || !payment.payment_status;
         }
@@ -297,15 +286,15 @@ function PaymentsPage() {
           bVal = b.category?.name || '';
           break;
         case 'recipient':
-          aVal = a.recipient?.name || '';
-          bVal = b.recipient?.name || '';
+          aVal = a.recipient?.full_name || '';
+          bVal = b.recipient?.full_name || '';
           break;
         case 'payer':
           aVal = a.payer?.name || '';
           bVal = b.payer?.name || '';
           break;
         case 'payment_status':
-          const statusOrder = { 'paid': 2, 'offset': 1, 'unpaid': 0 };
+          const statusOrder = { 'paid': 1, 'unpaid': 0 };
           aVal = statusOrder[a.payment_status] || 0;
           bVal = statusOrder[b.payment_status] || 0;
           break;
@@ -346,7 +335,7 @@ function PaymentsPage() {
 
       newTotals[currency] += amount;
 
-      if (payment.payment_status === 'paid' || payment.payment_status === 'offset') {
+      if (payment.payment_status === 'paid') {
         paidTotals[currency] += amount;
       } else {
         unpaidTotals[currency] += amount;
@@ -354,7 +343,26 @@ function PaymentsPage() {
     });
 
     setTotals({ all: newTotals, paid: paidTotals, unpaid: unpaidTotals });
-  };
+  }, [paymentList, filters, dateRange, sortField, sortDirection]);
+
+  // Initialize data on mount
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
+  // Subscribe to payment WebSocket events
+  useEffect(() => {
+    const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
+      console.log('Payment changed, reloading...');
+      loadPayments();
+    });
+    return unsubscribe;
+  }, [subscribe, loadPayments]);
+
+  // Apply filters when data or filters change
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [applyFiltersAndSort]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -406,7 +414,6 @@ function PaymentsPage() {
       amount: payment.amount,
       currency: payment.currency,
       category_id: payment.category_id || '',
-      recipient_id: payment.recipient_id,
       payer_id: payment.payer_id || '',
       payment_date: today,
       description: payment.description || '',
@@ -449,16 +456,6 @@ function PaymentsPage() {
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
-  const handleContributorClick = (contributor) => {
-    if (contributor && isAdmin) {
-      setEditingContributor(contributor);
-      setShowContributorForm(true);
-    }
-  };
-
-  const handleContributorFormSuccess = () => {
-    loadPayments(); // Перезагружаем платежи, чтобы обновить имена участников
-  };
 
   return (
     <Box>
@@ -476,7 +473,7 @@ function PaymentsPage() {
       {/* Summary Cards */}
       {(() => {
         const totalCount = filteredList.length;
-        const paidPayments = filteredList.filter(p => p.payment_status === 'paid' || p.payment_status === 'offset');
+        const paidPayments = filteredList.filter(p => p.payment_status === 'paid');
         const unpaidPayments = filteredList.filter(p => p.payment_status === 'unpaid' || !p.payment_status);
         const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
         const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -596,7 +593,6 @@ function PaymentsPage() {
             >
               <MenuItem value="all">Все</MenuItem>
               <MenuItem value="paid">Оплачено</MenuItem>
-              <MenuItem value="offset">Зачтено</MenuItem>
               <MenuItem value="unpaid">Не оплачено</MenuItem>
             </TextField>
           )}
@@ -754,34 +750,32 @@ function PaymentsPage() {
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.payer?.name && isAdmin ? 'pointer' : 'default'
+                    cursor: 'default'
                   }}
-                  onClick={() => isAdmin && handleContributorClick(payment.payer)}
                 >
                   <span
                     style={{
-                      textDecoration: payment.payer?.name && isAdmin ? 'underline' : 'none',
+                      textDecoration: payment.payer?.name || payment.payer?.full_name && isAdmin ? 'underline' : 'none',
                       textDecorationStyle: 'dotted',
                       textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
                   >
-                    {payment.payer?.name || '-'}
+                    {payment.payer?.name || payment.payer?.full_name || '-'}
                   </span>
                 </TableCell>
                 <TableCell
                   sx={{
-                    cursor: payment.recipient?.name && isAdmin ? 'pointer' : 'default'
+                    cursor: 'default'
                   }}
-                  onClick={() => handleContributorClick(payment.recipient)}
                 >
                   <span
                     style={{
-                      textDecoration: payment.recipient?.name && isAdmin ? 'underline' : 'none',
+                      textDecoration: payment.recipient?.full_name && isAdmin ? 'underline' : 'none',
                       textDecorationStyle: 'dotted',
                       textDecorationColor: 'rgba(25, 118, 210, 0.5)'
                     }}
                   >
-                    {payment.recipient?.name || '-'}
+                    {payment.recipient?.full_name || '-'}
                   </span>
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
@@ -819,12 +813,12 @@ function PaymentsPage() {
                 {isAdmin && (
                   <TableCell>
                     <Chip
-                      label={payment.payment_status === 'paid' ? 'Оплачено' : payment.payment_status === 'offset' ? 'Зачтено' : 'К оплате'}
-                      color={payment.payment_status === 'paid' ? 'success' : payment.payment_status === 'offset' ? 'info' : 'warning'}
+                      label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
+                      color={payment.payment_status === 'paid' ? 'success' : 'warning'}
                       size="small"
                       clickable
                       onClick={() => {
-                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : payment.payment_status === 'paid' ? 'offset' : 'unpaid';
+                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
                         handlePaymentToggle(payment.id, nextStatus);
                       }}
                       icon={<Payment />}
@@ -865,16 +859,6 @@ function PaymentsPage() {
         payment={editingPayment}
         initialData={repeatTemplate}
         onClose={() => { setRepeatTemplate(null); handleFormClose(); }}
-      />
-
-      <ContributorForm
-        open={showContributorForm}
-        contributor={editingContributor}
-        onClose={() => {
-          setShowContributorForm(false);
-          setEditingContributor(null);
-        }}
-        onSuccess={handleContributorFormSuccess}
       />
 
       <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>

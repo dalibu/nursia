@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, TextField, Button, MenuItem,
   DialogContentText, TablePagination, Chip, Alert, Tooltip
 } from '@mui/material';
-import { Edit, Delete, Check, Close, PersonAdd, ContentCopy } from '@mui/icons-material';
+import { Edit, Delete, Check, Close, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
 
 function UsersPage() {
@@ -17,7 +17,7 @@ function UsersPage() {
     username: '',
     full_name: '',
     email: '',
-    role: 'user',
+    role: 'worker',
     status: 'active'
   });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null, userName: '' });
@@ -25,6 +25,8 @@ function UsersPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [searchFilter, setSearchFilter] = useState('');
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [roles, setRoles] = useState([]);
 
   const [message, setMessage] = useState('');
 
@@ -34,7 +36,7 @@ function UsersPage() {
     username: '',
     full_name: '',
     email: '',
-    role: 'user'
+    role: 'worker'
   });
   const [createdUserInfo, setCreatedUserInfo] = useState(null);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -42,11 +44,27 @@ function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+    loadRoles();
   }, []);
+
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('/api/admin/roles', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setRoles(data);
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+    }
+  };
 
   const loadUsers = async () => {
     try {
-      const response = await fetch('/api/users/', {
+      const url = showDeleted ? '/api/users/?include_deleted=true' : '/api/users/';
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -150,7 +168,7 @@ function UsersPage() {
       username: user.username,
       full_name: user.full_name,
       email: user.email || '',
-      role: user.role,
+      role: user.roles && user.roles.length > 0 ? user.roles[0] : 'worker',
       status: user.status
     });
     setShowForm(true);
@@ -205,8 +223,34 @@ function UsersPage() {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingUser(null);
-    setFormData({ username: '', full_name: '', email: '', role: 'user', status: 'active' });
+    setFormData({ username: '', full_name: '', email: '', role: 'worker', status: 'active' });
   };
+
+  const handleRestoreUser = async (userId) => {
+    try {
+      const response = await fetch(`/api/users/${userId}/restore`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        setMessage('Пользователь восстановлен');
+        loadUsers();
+      } else {
+        const error = await response.json();
+        setMessage(`Ошибка: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Failed to restore user:', error);
+      setMessage('Ошибка при восстановлении пользователя');
+    }
+  };
+
+  // Reload users when showDeleted changes
+  useEffect(() => {
+    loadUsers();
+  }, [showDeleted]);
 
   const filteredUsers = users.filter(user => {
     if (!searchFilter) return true;
@@ -215,7 +259,7 @@ function UsersPage() {
       user.username.toLowerCase().includes(search) ||
       user.full_name.toLowerCase().includes(search) ||
       (user.email && user.email.toLowerCase().includes(search)) ||
-      user.role.toLowerCase().includes(search) ||
+      (user.roles && user.roles.join(', ').toLowerCase().includes(search)) ||
       user.status.toLowerCase().includes(search) ||
       user.id.toString().includes(search)
     );
@@ -233,9 +277,20 @@ function UsersPage() {
 
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
-          Пользователи ({users.length})
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="h6">
+            Пользователи ({users.length})
+          </Typography>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              style={{ marginRight: 4 }}
+            />
+            <Typography variant="body2" color="text.secondary">Показать удалённых</Typography>
+          </label>
+        </Box>
         <Button
           variant="contained"
           startIcon={<PersonAdd />}
@@ -278,28 +333,38 @@ function UsersPage() {
             {filteredUsers
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} sx={{ opacity: user.status === 'deleted' ? 0.5 : 1, bgcolor: user.status === 'deleted' ? 'action.hover' : 'inherit' }}>
                   <TableCell>{user.id}</TableCell>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.full_name}</TableCell>
                   <TableCell>{user.email || '-'}</TableCell>
-                  <TableCell>{user.role}</TableCell>
+                  <TableCell>{user.roles ? user.roles.join(', ') : '-'}</TableCell>
                   <TableCell>
                     <Chip
-                      label={user.status}
-                      color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : 'error'}
+                      label={user.status === 'deleted' ? 'удалён' : user.status}
+                      color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : user.status === 'deleted' ? 'default' : 'error'}
                       size="small"
                     />
                   </TableCell>
                   <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>{user.updated_at ? new Date(user.updated_at).toLocaleDateString() : '-'}</TableCell>
                   <TableCell>
-                    <IconButton onClick={() => handleEdit(user)}>
-                      <Edit />
-                    </IconButton>
-                    <IconButton onClick={() => handleDeleteClick(user)}>
-                      <Delete />
-                    </IconButton>
+                    {user.status === 'deleted' ? (
+                      <Tooltip title="Восстановить">
+                        <IconButton onClick={() => handleRestoreUser(user.id)} color="primary">
+                          <Restore />
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <>
+                        <IconButton onClick={() => handleEdit(user)}>
+                          <Edit />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(user)}>
+                          <Delete />
+                        </IconButton>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -358,8 +423,11 @@ function UsersPage() {
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
-              <MenuItem value="user">Пользователь</MenuItem>
-              <MenuItem value="admin">Администратор</MenuItem>
+              {roles.map((role) => (
+                <MenuItem key={role.id} value={role.name}>
+                  {role.name}
+                </MenuItem>
+              ))}
             </TextField>
             <TextField
               fullWidth
@@ -387,7 +455,7 @@ function UsersPage() {
           <DialogContentText>
             Вы уверены, что хотите удалить пользователя "{deleteDialog.userName}"?
             <br /><br />
-            Это действие нельзя отменить.
+            Пользователь будет деактивирован. Вы сможете восстановить его позже.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -454,8 +522,11 @@ function UsersPage() {
               value={createFormData.role}
               onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value })}
             >
-              <MenuItem value="user">Пользователь</MenuItem>
-              <MenuItem value="admin">Администратор</MenuItem>
+              {roles.map((role) => (
+                <MenuItem key={role.id} value={role.name}>
+                  {role.name}
+                </MenuItem>
+              ))}
             </TextField>
           </DialogContent>
           <DialogActions>

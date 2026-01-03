@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+// Determine API base URL
+// In development on localhost, connect to localhost:8000
+// In production, use relative URL (same host as frontend)
+const getApiBaseUrl = () => {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:8000/api';
+  }
+  // For production or other environments, use relative URL
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' }
 });
 
@@ -54,13 +66,12 @@ export const payments = {
   getUserInfo: () => api.get('/auth/me'),
 };
 
-export const contributors = {
-  list: () => api.get('/contributors/'),
-  listAdmin: () => api.get('/contributors/admin'),
-  create: (data) => api.post('/contributors/', data),
-  update: (id, data) => api.put(`/contributors/${id}`, data),
-  delete: (id) => api.delete(`/contributors/${id}`),
-  validateDelete: (id) => api.get(`/contributors/${id}/validate-delete`),
+// New users API for RBAC
+export const usersApi = {
+  list: () => api.get('/users/'),
+  create: (data) => api.post('/admin/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 export const currencies = {
@@ -93,7 +104,8 @@ export const employment = {
 export const balances = {
   getSummary: (params) => api.get('/balances/summary', { params }),
   getMonthly: (params) => api.get('/balances/monthly', { params }),
-  getMutual: (params) => api.get('/balances/mutual', { params })
+  getMutual: (params) => api.get('/balances/mutual', { params }),
+  getDebug: (params) => api.get('/balances/debug', { params })
 };
 
 export default api;

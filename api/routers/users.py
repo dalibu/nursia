@@ -4,11 +4,12 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from database.core import get_db
-from database.models import User
+from database.models import User, Role
 from api.auth.oauth import get_current_user, get_admin_user
 from pydantic import BaseModel
 
@@ -37,7 +38,7 @@ class AdminUserCreate(BaseModel):
     username: str
     full_name: str
     email: str = None
-    role: str = "user"
+    role: str = "worker"
 
 def generate_password(length: int = 12) -> str:
     """Генерирует безопасный пароль"""
@@ -58,15 +59,25 @@ def generate_password(length: int = 12) -> str:
 @router.get("/all")
 async def get_all_users(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
-    """Получить список всех пользователей (для выбора в формах)"""
+    """Получить список всех активных пользователей (для выбора в формах)"""
     result = await db.execute(
-        select(User).where(User.status == "active").order_by(User.full_name)
+        select(User)
+        .options(selectinload(User.roles))
+        .where(User.status == "active")
+        .order_by(User.full_name)
     )
     users = result.scalars().all()
     return [
-        {"id": u.id, "username": u.username, "full_name": u.full_name}
+        {
+            "id": u.id, 
+            "username": u.username, 
+            "full_name": u.full_name,
+            "name": u.full_name,   # Backwards compatibility
+            "type": "user",        # Backwards compatibility
+            "roles": [r.name for r in u.roles]  # For filtering admins vs workers
+        }
         for u in users
     ]
 
@@ -80,7 +91,7 @@ async def get_current_user_profile(
         "username": current_user.username,
         "full_name": current_user.full_name,
         "email": current_user.email,
-        "role": current_user.role,
+        "roles": [role.name for role in current_user.roles],
         "status": current_user.status,
         "created_at": current_user.created_at,
         "updated_at": current_user.updated_at
@@ -104,10 +115,8 @@ async def update_current_user_profile(
     if user_data.email:
         current_user.email = user_data.email
     
-    # Админы могут изменять свою роль и статус
-    if current_user.role == "admin":
-        if user_data.role:
-            current_user.role = user_data.role
+    # Админы могут изменять статус (роли управляются через отдельный API)
+    if current_user.is_admin:
         if user_data.status:
             current_user.status = user_data.status
     
@@ -121,11 +130,16 @@ async def update_current_user_profile(
 
 @router.get("/")
 async def get_all_users_admin(
+    include_deleted: bool = Query(False, description="Включить удалённых пользователей"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
     """Получить всех пользователей (только для админов)"""
-    result = await db.execute(select(User))
+    query = select(User).options(selectinload(User.roles))
+    if not include_deleted:
+        query = query.where(User.status != "deleted")
+    
+    result = await db.execute(query)
     users = result.scalars().all()
     
     return [
@@ -134,7 +148,7 @@ async def get_all_users_admin(
             "username": user.username,
             "full_name": user.full_name,
             "email": user.email,
-            "role": user.role,
+            "roles": [role.name for role in user.roles],
             "status": user.status,
             "created_at": user.created_at,
             "updated_at": user.updated_at
@@ -155,11 +169,18 @@ async def create_user(
     """
     import hashlib
     from utils.password_utils import hash_password
+    # from database.models import Role # Removed local import, now imported globally
     
     # Проверяем уникальность username
     result = await db.execute(select(User).where(User.username == user_data.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Получаем роль из БД
+    role_result = await db.execute(select(Role).where(Role.name == user_data.role))
+    role = role_result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=400, detail=f"Role '{user_data.role}' not found")
     
     # Генерируем пароль
     plain_password = generate_password()
@@ -174,14 +195,14 @@ async def create_user(
         full_name=user_data.full_name,
         email=user_data.email,
         password_hash=password_hash,
-        role=user_data.role,
         status="active",
         force_password_change=True  # Требуем смену пароля при первом входе
     )
+    new_user.roles.append(role)
     
     db.add(new_user)
     await db.commit()
-    await db.refresh(new_user)
+    await db.refresh(new_user, attribute_names=["roles"]) # Changed
     
     return {
         "message": "User created successfully",
@@ -190,7 +211,7 @@ async def create_user(
             "username": new_user.username,
             "full_name": new_user.full_name,
             "email": new_user.email,
-            "role": new_user.role,
+            "roles": [r.name for r in new_user.roles],
             "status": new_user.status
         },
         "generated_password": plain_password  # Показываем пароль администратору
@@ -204,7 +225,9 @@ async def update_user(
     current_user: User = Depends(get_admin_user)
 ):
     """Обновить пользователя (только для админов)"""
-    result = await db.execute(select(User).where(User.id == user_id))
+    # from database.models import Role # Removed local import, now imported globally
+    
+    result = await db.execute(select(User).where(User.id == user_id).options(selectinload(User.roles))) # Changed
     user = result.scalar_one_or_none()
     
     if not user:
@@ -220,7 +243,15 @@ async def update_user(
     user.full_name = user_data.full_name
     if user_data.email:
         user.email = user_data.email
-    user.role = user_data.role
+    
+    # Обновляем роли (очищаем и добавляем новую)
+    if user_data.role:
+        role_result = await db.execute(select(Role).where(Role.name == user_data.role))
+        role = role_result.scalar_one_or_none()
+        if role:
+            user.roles.clear()
+            user.roles.append(role)
+    
     user.status = user_data.status
     user.updated_at = datetime.now(timezone.utc)
     
@@ -235,7 +266,11 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    """Удалить пользователя (только для админов)"""
+    """Удалить пользователя (soft delete - только для админов).
+    
+    Устанавливает статус 'deleted' вместо физического удаления,
+    чтобы сохранить ссылочную целостность с платежами и другими данными.
+    """
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     
@@ -245,10 +280,48 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    await db.delete(user)
+    if user.status == "deleted":
+        raise HTTPException(status_code=400, detail="User already deleted")
+    
+    # Деактивируем трудовые отношения пользователя
+    from database.models import EmploymentRelation
+    emp_result = await db.execute(
+        select(EmploymentRelation).where(
+            EmploymentRelation.user_id == user_id,
+            EmploymentRelation.is_active == True
+        )
+    )
+    for emp in emp_result.scalars().all():
+        emp.is_active = False
+    
+    # Soft delete: меняем статус вместо физического удаления
+    user.status = "deleted"
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     
     return {"message": "User deleted successfully"}
+
+@router.post("/{user_id}/restore")
+async def restore_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """Восстановить удалённого пользователя (только для админов)"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.status != "deleted":
+        raise HTTPException(status_code=400, detail="User is not deleted")
+    
+    user.status = "active"
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    
+    return {"message": "User restored successfully"}
 
 @router.put("/me/password")
 async def change_password(

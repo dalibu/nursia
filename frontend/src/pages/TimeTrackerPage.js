@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
@@ -17,7 +18,7 @@ import {
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange
 } from '@mui/icons-material';
-import { assignments as assignmentsService, employment as employmentService, contributors as contributorsService, payments as paymentsService } from '../services/api';
+import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
 
 // Russian localized static ranges for DateRangePicker
@@ -40,11 +41,78 @@ const toLocalDateString = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// Символы валют
 const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
     'USD': '$'
+};
+
+// LiveTimer component for displaying real-time elapsed time in table rows
+const LiveTimer = ({ assignment, currentTime }) => {
+    // For active sessions, calculate live elapsed time
+    if (!assignment.is_active) {
+        // Completed session - static display
+        const totalMinutes = Math.floor(assignment.total_work_seconds / 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        const hours = (assignment.total_work_seconds / 3600).toFixed(2).replace('.', ',');
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
+    }
+
+    // Find active segment
+    const activeSegment = assignment.segments?.find(s => !s.end_time);
+    const isPaused = activeSegment?.session_type === 'pause';
+
+    // Calculate elapsed time since segment started
+    const segmentStart = new Date(`${assignment.assignment_date}T${activeSegment?.start_time || assignment.start_time}`);
+    const nowMs = currentTime?.getTime() || Date.now();
+    const currentSegmentSeconds = Math.max(0, Math.floor((nowMs - segmentStart.getTime()) / 1000));
+
+    // Add to existing totals
+    let workSeconds = assignment.total_work_seconds || 0;
+    let pauseSeconds = assignment.total_pause_seconds || 0;
+
+    if (isPaused) {
+        pauseSeconds += currentSegmentSeconds;
+    } else {
+        workSeconds += currentSegmentSeconds;
+    }
+
+    // Format work time
+    const totalMinutes = Math.floor(workSeconds / 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    const sec = workSeconds % 60;
+    const hours = (workSeconds / 3600).toFixed(2).replace('.', ',');
+
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                color: isPaused ? 'warning.main' : 'success.main',
+                '@keyframes pulse': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.6 }
+                },
+                animation: isPaused ? 'none' : 'pulse 1s ease-in-out infinite'
+            }}>
+                {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(sec).padStart(2, '0')}
+            </Box>
+            <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                ({hours} ч.)
+            </Box>
+            {isPaused && (
+                <Chip
+                    icon={<Coffee sx={{ fontSize: '0.8rem !important' }} />}
+                    label="пауза"
+                    size="small"
+                    color="warning"
+                    sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+            )}
+        </Box>
+    );
 };
 
 // Helper to parse date from URL string
@@ -64,7 +132,6 @@ function TimeTrackerPage() {
     const [groupedAssignments, setGroupedAssignments] = useState([]);
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
-    const [contributorsList, setContributorsList] = useState([]);
     const [summary, setSummary] = useState([]);
     const [period, setPeriod] = useState('month');
     const [isAdmin, setIsAdmin] = useState(false);
@@ -159,6 +226,7 @@ function TimeTrackerPage() {
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
     const [newTaskDescription, setNewTaskDescription] = useState('');
+    const [newTaskAssignmentId, setNewTaskAssignmentId] = useState(null); // Which assignment to add task to
 
     // Edit session dialog
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -236,51 +304,29 @@ function TimeTrackerPage() {
         loadData();
     }, []);
 
-    useEffect(() => {
-        loadData();
-        loadSummary();
-    }, [period]);
+    const { subscribe } = useWebSocket();
 
-    // Smart sync: reload table when activeSession changes (started/stopped by any client)
-    useEffect(() => {
-        const currentSessionId = activeSession?.id ?? null;
-        const prevSessionId = prevSessionIdRef.current;
-
-        // If session ID changed (started, stopped, or switched), reload data
-        if (currentSessionId !== prevSessionId) {
-            const isInitialRender = prevSessionId === undefined;
-            prevSessionIdRef.current = currentSessionId;
-
-            // Reload data when session state changes (but not on initial render)
-            if (!isInitialRender) {
-                loadData(true); // Silent refresh - no loading spinner
-                loadSummary();
-            }
-        }
-    }, [activeSession?.id]);
-
-    const loadData = async (silent = false) => {
+    const loadData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const [groupedRes, activeRes, empRes, contribRes, userRes] = await Promise.all([
+            const [groupedRes, activeRes, empRes, userRes] = await Promise.all([
                 assignmentsService.getGrouped({ period }),
                 assignmentsService.getActive(),
                 employmentService.list({ is_active: true }),
-                contributorsService.list(),
                 paymentsService.getUserInfo()
             ]);
             setGroupedAssignments(groupedRes.data);
             setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
+            console.log('Employment data loaded:', empRes.data);
             setEmploymentList(empRes.data);
-            setContributorsList(contribRes.data);
-            setIsAdmin(userRes.data.role === 'admin');
+            setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
             if (!silent) setLoading(false);
         }
-    };
+    }, [period]);
 
     // Apply filters to assignments
     useEffect(() => {
@@ -385,14 +431,47 @@ function TimeTrackerPage() {
         }
     };
 
-    const loadSummary = async () => {
+    const loadSummary = useCallback(async () => {
         try {
             const res = await assignmentsService.getSummary({ period });
             setSummary(res.data);
         } catch (error) {
             console.error('Failed to load summary:', error);
         }
-    };
+    }, [period]);
+
+    useEffect(() => {
+        loadData();
+        loadSummary();
+    }, [period, loadData, loadSummary]);
+
+    // Subscribe to WebSocket events for assignment changes
+    useEffect(() => {
+        const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
+            console.log('Assignment data changed, reloading...');
+            loadData(true); // Silent refresh - no loading spinner
+            loadSummary();
+        });
+        return unsubscribe;
+    }, [subscribe, loadData, loadSummary]);
+
+    // Smart sync: reload table when activeSession changes (started/stopped by any client)
+    useEffect(() => {
+        const currentSessionId = activeSession?.id ?? null;
+        const prevSessionId = prevSessionIdRef.current;
+
+        // If session ID changed (started, stopped, or switched), reload data
+        if (currentSessionId !== prevSessionId) {
+            const isInitialRender = prevSessionId === undefined;
+            prevSessionIdRef.current = currentSessionId;
+
+            // Reload data when session state changes (but not on initial render)
+            if (!isInitialRender) {
+                loadData(true); // Silent refresh - no loading spinner
+                loadSummary();
+            }
+        }
+    }, [activeSession?.id, loadData, loadSummary]);
 
     const handleStartClick = async () => {
         // Pre-select employment if user has only one
@@ -407,14 +486,17 @@ function TimeTrackerPage() {
         if (!selectedEmployment) return;
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
+        const selectedWorkerId = emp.employee_id || emp.user_id;
+
         try {
-            // If there's an active session, stop it first
-            if (activeSession) {
-                await assignmentsService.stop(activeSession.id);
+            // If the SELECTED worker has an active session, stop it first
+            const workerActiveSession = activeSessions.find(s => s.worker_id === selectedWorkerId);
+            if (workerActiveSession) {
+                await assignmentsService.stop(workerActiveSession.id);
             }
 
             await assignmentsService.start({
-                worker_id: emp.employee_id,
+                worker_id: selectedWorkerId,
                 employer_id: emp.employer_id,
                 description: startDescription || null,
                 task_description: startTaskDescription || startDescription || null
@@ -431,21 +513,75 @@ function TimeTrackerPage() {
         }
     };
 
-    // Handle new task creation (switch to new task in current session)
+    // Handle new task creation (switch to new task in current or specified session)
     const handleNewTask = async () => {
-        if (!activeSession) return;
+        // Use newTaskAssignmentId if set, otherwise fall back to active session
+        const assignmentId = newTaskAssignmentId || activeSession?.assignment_id;
+        if (!assignmentId) return;
         try {
-            await assignmentsService.switchTask(activeSession.assignment_id, {
+            await assignmentsService.switchTask(assignmentId, {
                 description: newTaskDescription || null
             });
             setNewTaskOpen(false);
             setNewTaskDescription('');
+            setNewTaskAssignmentId(null);
             loadData();
             fetchActiveSession();
             notifySessionChange();
         } catch (error) {
             console.error('Failed to switch task:', error);
             showError(error.response?.data?.detail || 'Ошибка при создании задания');
+        }
+    };
+
+    // Open new task dialog for a specific assignment (admin feature)
+    const handleNewTaskForAssignment = (assignment, e) => {
+        if (e) e.stopPropagation();
+        setNewTaskAssignmentId(assignment.assignment_id);
+        setNewTaskDescription('');
+        setNewTaskOpen(true);
+    };
+
+    // Pause/resume for a specific assignment (by assignment object)
+    const handlePauseResumeAssignment = async (assignment, e) => {
+        if (e) e.stopPropagation();
+        try {
+            // Find the active segment (task without end_time) - its ID is needed for API
+            const activeSegment = assignment.segments?.find(s => !s.end_time);
+            if (!activeSegment) {
+                showError('Не найден активный сегмент');
+                return;
+            }
+            const isPaused = activeSegment.session_type === 'pause';
+            const endpoint = isPaused ? 'resume' : 'pause';
+            await assignmentsService[endpoint](activeSegment.id);  // Use Task ID
+            loadData();
+            fetchActiveSession();
+            notifySessionChange();
+        } catch (error) {
+            console.error('Failed to toggle pause:', error);
+            showError(error.response?.data?.detail || 'Ошибка при переключении паузы');
+        }
+    };
+
+    // Stop a specific assignment session
+    const handleStopAssignment = async (assignment, e) => {
+        if (e) e.stopPropagation();
+        try {
+            // Find the active segment (task without end_time) - its ID is needed for API
+            const activeSegment = assignment.segments?.find(s => !s.end_time);
+            if (!activeSegment) {
+                showError('Не найден активный сегмент');
+                return;
+            }
+            await assignmentsService.stop(activeSegment.id);  // Use Task ID
+            loadData();
+            loadSummary();
+            fetchActiveSession();
+            notifySessionChange();
+        } catch (error) {
+            console.error('Failed to stop session:', error);
+            showError(error.response?.data?.detail || 'Ошибка при остановке сессии');
         }
     };
 
@@ -713,7 +849,7 @@ function TimeTrackerPage() {
                         color="success"
                         startIcon={<PlayArrow />}
                         onClick={handleStartClick}
-                        disabled={!!activeSession}
+                        disabled={!isAdmin && !!activeSession}
                     >
                         Начать смену
                     </Button>
@@ -757,7 +893,7 @@ function TimeTrackerPage() {
                 const totalHours = filteredAssignments.reduce((sum, a) => sum + (a.total_work_seconds || 0), 0) / 3600;
                 const activeSessions = filteredAssignments.filter(a => a.is_active).length;
                 const completedSessions = filteredAssignments.filter(a => !a.is_active).length;
-                const paidSessions = filteredAssignments.filter(a => a.payment_status === 'paid' || a.payment_status === 'offset').length;
+                const paidSessions = filteredAssignments.filter(a => a.payment_status === 'paid').length;
                 const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_status === 'unpaid').length;
 
                 return (
@@ -866,15 +1002,15 @@ function TimeTrackerPage() {
                     {isAdmin && (
                         <TextField
                             select
-                            label="Работник"
+                            label="Клиент"
                             size="small"
                             value={filters.worker}
                             onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
                             sx={{ minWidth: 150 }}
                         >
                             <MenuItem value="">Все</MenuItem>
-                            {contributorsList.map(c => (
-                                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                            {employmentList.map(emp => (
+                                <MenuItem key={emp.id} value={emp.employer_id}>{emp.employer_name}</MenuItem>
                             ))}
                         </TextField>
                     )}
@@ -1044,13 +1180,7 @@ function TimeTrackerPage() {
                                             {formatTime(assignment.start_time)} — {assignment.end_time ? formatTime(assignment.end_time) : '...'}
                                         </TableCell>
                                         <TableCell align="right">
-                                            {(() => {
-                                                const totalMinutes = Math.floor(assignment.total_work_seconds / 60);
-                                                const h = Math.floor(totalMinutes / 60);
-                                                const m = totalMinutes % 60;
-                                                const hours = (assignment.total_work_seconds / 3600).toFixed(2).replace('.', ',');
-                                                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
-                                            })()}
+                                            <LiveTimer assignment={assignment} currentTime={currentTime} />
                                         </TableCell>
                                         <Tooltip title={assignment.description || ''} arrow placement="top">
                                             <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1069,7 +1199,7 @@ function TimeTrackerPage() {
                                                 <Chip
                                                     label={assignment.payment_tracking_nr}
                                                     size="small"
-                                                    color={assignment.payment_status === 'paid' ? "success" : assignment.payment_status === 'offset' ? "info" : "warning"}
+                                                    color={assignment.payment_status === 'paid' ? "success" : "warning"}
                                                     clickable
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1083,21 +1213,66 @@ function TimeTrackerPage() {
                                         </TableCell>
                                         <TableCell align="center">
                                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => handleEditAssignment(assignment, e)}
-                                                    title="Редактировать"
-                                                >
-                                                    <Edit fontSize="small" />
-                                                </IconButton>
-                                                {!assignment.is_active && (
+                                                {/* Session control buttons for active sessions */}
+                                                {assignment.is_active && (
+                                                    <>
+                                                        <Tooltip title={(() => {
+                                                            const activeSegment = assignment.segments?.find(s => !s.end_time);
+                                                            return activeSegment?.session_type === 'pause' ? 'Продолжить' : 'Пауза';
+                                                        })()}>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handlePauseResumeAssignment(assignment, e)}
+                                                                sx={{
+                                                                    color: (() => {
+                                                                        const activeSegment = assignment.segments?.find(s => !s.end_time);
+                                                                        return activeSegment?.session_type === 'pause' ? 'success.main' : 'warning.main';
+                                                                    })()
+                                                                }}
+                                                            >
+                                                                {(() => {
+                                                                    const activeSegment = assignment.segments?.find(s => !s.end_time);
+                                                                    return activeSegment?.session_type === 'pause' ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />;
+                                                                })()}
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Завершить">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handleStopAssignment(assignment, e)}
+                                                                sx={{ color: 'error.main' }}
+                                                            >
+                                                                <Stop fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Новое задание">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handleNewTaskForAssignment(assignment, e)}
+                                                                sx={{ color: 'primary.main' }}
+                                                            >
+                                                                <Add fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </>
+                                                )}
+                                                <Tooltip title="Редактировать">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={(e) => handleDeleteAssignment(assignment, e)}
-                                                        title="Удалить"
+                                                        onClick={(e) => handleEditAssignment(assignment, e)}
                                                     >
-                                                        <Delete fontSize="small" />
+                                                        <Edit fontSize="small" />
                                                     </IconButton>
+                                                </Tooltip>
+                                                {!assignment.is_active && (
+                                                    <Tooltip title="Удалить">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => handleDeleteAssignment(assignment, e)}
+                                                        >
+                                                            <Delete fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
                                                 )}
                                             </Box>
                                         </TableCell>
@@ -1172,12 +1347,17 @@ function TimeTrackerPage() {
                         </Alert>
                     ) : (
                         <>
-                            {/* Warning if there's an active session */}
-                            {activeSession && (
-                                <Alert severity="warning" sx={{ mt: 2 }}>
-                                    Текущая смена будет завершена и создастся новая.
-                                </Alert>
-                            )}
+                            {/* Warning if selected worker already has an active session */}
+                            {(() => {
+                                const selectedEmp = employmentList.find(e => e.id === selectedEmployment);
+                                const selectedWorkerId = selectedEmp?.user_id || selectedEmp?.employee_id;
+                                const hasActiveSession = selectedWorkerId && activeSessions.some(s => s.worker_id === selectedWorkerId);
+                                return hasActiveSession ? (
+                                    <Alert severity="warning" sx={{ mt: 2 }}>
+                                        У этого работника есть активная смена. Она будет завершена и создастся новая.
+                                    </Alert>
+                                ) : null;
+                            })()}
                             {/* Show employer selection only if admin or user has multiple employers */}
                             {(isAdmin || employmentList.length > 1) && (
                                 <TextField

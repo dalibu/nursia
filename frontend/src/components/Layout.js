@@ -51,7 +51,8 @@ function Layout({ onLogout }) {
       const response = await axios.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const isAdminUser = response.data.role === 'admin';
+      const roles = response.data.roles || [];
+      const isAdminUser = roles.includes('admin');
       setIsAdmin(isAdminUser);
       setUserName(response.data.full_name || response.data.username);
 
@@ -152,14 +153,8 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/requests" onClick={() => setSettingsAnchor(null)}>
                     Заявки {hasRequests && '⚠️'}
                   </MenuItem>
-                  <MenuItem component={Link} to="/user-status" onClick={() => setSettingsAnchor(null)}>
-                    Статусы пользователей
-                  </MenuItem>
                   <MenuItem component={Link} to="/categories" onClick={() => setSettingsAnchor(null)}>
                     Категории
-                  </MenuItem>
-                  <MenuItem component={Link} to="/contributors" onClick={() => setSettingsAnchor(null)}>
-                    Участники
                   </MenuItem>
                   <MenuItem component={Link} to="/employment" onClick={() => setSettingsAnchor(null)}>
                     👔 Трудовые отношения

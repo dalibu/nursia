@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useWebSocket } from '../contexts/WebSocketContext';
 
 const ActiveSessionContext = createContext();
 
@@ -9,8 +10,12 @@ export function useActiveSession() {
 
 export function ActiveSessionProvider({ children }) {
     const [activeSession, setActiveSession] = useState(null);
+    const [activeSessions, setActiveSessions] = useState([]); // ALL active sessions for admin
     const [currentTime, setCurrentTime] = useState(new Date());
     const [loading, setLoading] = useState(true);
+
+    // WebSocket for real-time updates
+    const { subscribe, isConnected } = useWebSocket();
 
     // Callback ref for session change notifications
     const sessionChangeCallback = useRef(null);
@@ -27,20 +32,23 @@ export function ActiveSessionProvider({ children }) {
         }
     }, []);
 
-    // Fetch active session
+    // Fetch active sessions (all of them for admin) - used for initial load and fallback
     const fetchActiveSession = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) {
                 setActiveSession(null);
+                setActiveSessions([]);
                 return;
             }
             const response = await axios.get('/api/assignments/active', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            // API returns array, take first active session
-            const sessions = response.data;
-            if (sessions && sessions.length > 0) {
+            // API returns array of active sessions
+            const sessions = response.data || [];
+            setActiveSessions(sessions);
+            // Keep first session for backwards compatibility
+            if (sessions.length > 0) {
                 setActiveSession(sessions[0]);
             } else {
                 setActiveSession(null);
@@ -48,23 +56,54 @@ export function ActiveSessionProvider({ children }) {
         } catch (error) {
             console.error('Failed to fetch active session:', error);
             setActiveSession(null);
+            setActiveSessions([]);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Initial fetch and polling every 5 seconds for real-time timer updates
+    // Subscribe to WebSocket timer updates
+    useEffect(() => {
+        if (!isConnected) return;
+
+        const unsubscribe = subscribe('timer_update', (data) => {
+            // Update sessions from WebSocket data
+            const sessions = data.sessions || [];
+            setActiveSessions(sessions);
+            if (sessions.length > 0) {
+                setActiveSession(sessions[0]);
+            } else {
+                setActiveSession(null);
+            }
+            // Update current time from server timestamp
+            if (data.timestamp) {
+                setCurrentTime(new Date(data.timestamp));
+            }
+        });
+
+        return unsubscribe;
+    }, [subscribe, isConnected]);
+
+    // Initial fetch (WebSocket will take over for updates)
     useEffect(() => {
         fetchActiveSession();
-        const interval = setInterval(fetchActiveSession, 5000);
-        return () => clearInterval(interval);
     }, [fetchActiveSession]);
 
-    // Update current time every second for timer display
+    // Fallback polling only if WebSocket is not connected
     useEffect(() => {
+        if (isConnected) return; // WebSocket handles updates
+
+        const interval = setInterval(fetchActiveSession, 5000);
+        return () => clearInterval(interval);
+    }, [fetchActiveSession, isConnected]);
+
+    // Update current time every second for timer display (fallback when no WS)
+    useEffect(() => {
+        if (isConnected) return; // WebSocket provides timestamp
+
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
-    }, []);
+    }, [isConnected]);
 
     // Calculate elapsed times based on current time
     // NOTE: API's total_work_seconds already includes elapsed time for the active segment
@@ -166,6 +205,7 @@ export function ActiveSessionProvider({ children }) {
 
     const value = {
         activeSession,
+        activeSessions, // All active sessions for admin multi-view
         loading,
         currentTime,
         getElapsedTimes,

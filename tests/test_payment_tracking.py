@@ -21,7 +21,6 @@ def test_payment_status_filter_exists():
     payments = [
         {"id": 1, "payment_status": "paid", "amount": 100},
         {"id": 2, "payment_status": "unpaid", "amount": 200},
-        {"id": 3, "payment_status": "offset", "amount": 300}
     ]
     
     # Фильтр "оплачено"
@@ -33,11 +32,6 @@ def test_payment_status_filter_exists():
     unpaid = [e for e in payments if e.get("payment_status") == "unpaid"]
     assert len(unpaid) == 1
     assert unpaid[0]["id"] == 2
-    
-    # Фильтр "зачтено"
-    offset = [e for e in payments if e.get("payment_status") == "offset"]
-    assert len(offset) == 1
-    assert offset[0]["id"] == 3
 
 def test_payment_totals_calculation():
     """Тест расчета сумм по статусу оплаты"""
@@ -45,7 +39,7 @@ def test_payment_totals_calculation():
         {"currency": "UAH", "amount": 100, "payment_status": "paid"},
         {"currency": "UAH", "amount": 200, "payment_status": "unpaid"},
         {"currency": "USD", "amount": 50, "payment_status": "paid"},
-        {"currency": "USD", "amount": 75, "payment_status": "offset"}
+        {"currency": "USD", "amount": 75, "payment_status": "unpaid"}
     ]
     
     totals = {"all": {}, "paid": {}, "unpaid": {}}
@@ -61,7 +55,7 @@ def test_payment_totals_calculation():
         
         totals["all"][currency] += amount
         
-        if payment["payment_status"] in ["paid", "offset"]:
+        if payment["payment_status"] == "paid":
             totals["paid"][currency] += amount
         else:
             totals["unpaid"][currency] += amount
@@ -72,38 +66,31 @@ def test_payment_totals_calculation():
     assert totals["unpaid"]["UAH"] == 200
     
     assert totals["all"]["USD"] == 125
-    assert totals["paid"]["USD"] == 125  # 50 paid + 75 offset
-    assert totals["unpaid"]["USD"] == 0
+    assert totals["paid"]["USD"] == 50
+    assert totals["unpaid"]["USD"] == 75
 
 def test_payment_status_display():
     """Тест отображения статуса оплаты"""
     # Тест логики отображения статуса
     paid_payment = {"payment_status": "paid"}
     unpaid_payment = {"payment_status": "unpaid"}
-    offset_payment = {"payment_status": "offset"}
     
     def get_label(status):
         if status == "paid":
             return "Оплачено"
-        elif status == "offset":
-            return "Зачтено"
         return "К оплате"
     
     assert get_label(paid_payment["payment_status"]) == "Оплачено"
     assert get_label(unpaid_payment["payment_status"]) == "К оплате"
-    assert get_label(offset_payment["payment_status"]) == "Зачтено"
     
     # Проверяем цвета
     def get_color(status):
         if status == "paid":
             return "success"
-        elif status == "offset":
-            return "info"
         return "warning"
     
     assert get_color(paid_payment["payment_status"]) == "success"
     assert get_color(unpaid_payment["payment_status"]) == "warning"
-    assert get_color(offset_payment["payment_status"]) == "info"
 
 def test_admin_only_payment_features():
     """Тест что функции оплаты доступны только админам"""

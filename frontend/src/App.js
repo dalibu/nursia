@@ -6,11 +6,11 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/ru';
 import { ActiveSessionProvider } from './context/ActiveSessionContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import Layout from './components/Layout';
 import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import CurrenciesPage from './pages/CurrenciesPage';
-import ContributorsPage from './pages/ContributorsPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -23,7 +23,6 @@ import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import RequestsPage from './pages/RequestsPage';
-import UserStatusPage from './pages/UserStatusPage';
 
 const theme = createTheme({
   palette: {
@@ -60,9 +59,11 @@ function App() {
             } />
             <Route path="/" element={
               isAuthenticated ? (
-                <ActiveSessionProvider>
-                  <Layout onLogout={() => setIsAuthenticated(false)} />
-                </ActiveSessionProvider>
+                <WebSocketProvider>
+                  <ActiveSessionProvider>
+                    <Layout onLogout={() => setIsAuthenticated(false)} />
+                  </ActiveSessionProvider>
+                </WebSocketProvider>
               ) : <Navigate to="/login" replace />
             }>
               <Route index element={<DashboardPage />} />
@@ -72,12 +73,10 @@ function App() {
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="currencies" element={<CurrenciesPage />} />
-              <Route path="contributors" element={<ContributorsPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="requests" element={<RequestsPage />} />
-              <Route path="user-status" element={<UserStatusPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="change-password" element={<ChangePasswordPage />} />
             </Route>
