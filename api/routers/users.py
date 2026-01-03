@@ -283,6 +283,17 @@ async def delete_user(
     if user.status == "deleted":
         raise HTTPException(status_code=400, detail="User already deleted")
     
+    # Деактивируем трудовые отношения пользователя
+    from database.models import EmploymentRelation
+    emp_result = await db.execute(
+        select(EmploymentRelation).where(
+            EmploymentRelation.user_id == user_id,
+            EmploymentRelation.is_active == True
+        )
+    )
+    for emp in emp_result.scalars().all():
+        emp.is_active = False
+    
     # Soft delete: меняем статус вместо физического удаления
     user.status = "deleted"
     user.updated_at = datetime.now(timezone.utc)

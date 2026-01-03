@@ -288,7 +288,75 @@ async def init_admin(session):
     )
     session.add(admin_status)
     
-    print("Администратор создан (admin + employer). Статус: Активен. Требуется смена пароля при входе.")
+    print("Администратор создан (admin + employer). Статус: Активен. Требуется смена пароля при входе.") 
+    
+    # Create EmploymentRelation for admin so they can also track work time
+    from database.models import EmploymentRelation
+    from decimal import Decimal
+    
+    result = await session.execute(
+        select(EmploymentRelation).where(EmploymentRelation.user_id == admin.id)
+    )
+    if not result.scalar_one_or_none():
+        admin_employment = EmploymentRelation(
+            user_id=admin.id,
+            hourly_rate=Decimal("100.00"),
+            currency="UAH"
+        )
+        session.add(admin_employment)
+        print("Создано трудовое отношение для администратора (ставка 100 UAH/час).")
+
+
+async def init_employment_relations(session):
+    """Создаёт EmploymentRelation для всех пользователей с ролью worker или admin, у кого её нет"""
+    from database.models import EmploymentRelation
+    from sqlalchemy.orm import joinedload
+    from decimal import Decimal
+    
+    # Получаем всех пользователей с их ролями
+    result = await session.execute(
+        select(User).options(joinedload(User.roles))
+    )
+    users = result.unique().scalars().all()
+    
+    created = 0
+    for user in users:
+        # Пропускаем неактивных пользователей
+        if user.status != 'active':
+            continue
+            
+        # Проверяем роли
+        role_names = [r.name for r in user.roles]
+        should_have_employment = 'admin' in role_names or 'worker' in role_names or 'employer' in role_names
+        
+        if not should_have_employment:
+            continue
+            
+        # Проверяем есть ли уже EmploymentRelation
+        result = await session.execute(
+            select(EmploymentRelation).where(
+                EmploymentRelation.user_id == user.id,
+                EmploymentRelation.is_active == True
+            )
+        )
+        if result.scalar_one_or_none():
+            continue
+        
+        # Создаём EmploymentRelation
+        # Admin/Employer получает ставку 100, Worker - 50
+        rate = Decimal("100.00") if 'admin' in role_names or 'employer' in role_names else Decimal("50.00")
+        
+        employment = EmploymentRelation(
+            user_id=user.id,
+            hourly_rate=rate,
+            currency="UAH"
+        )
+        session.add(employment)
+        created += 1
+        print(f"  Создано трудовое отношение для {user.full_name} (ставка {rate} UAH/час)")
+    
+    if created > 0:
+        print(f"Всего создано {created} трудовых отношений.")
 
 
 async def main():
@@ -307,6 +375,7 @@ async def main():
         await init_categories(session)
         await init_currencies(session)
         await init_admin(session)
+        await init_employment_relations(session)  # Ensure all workers have employment
         await session.commit()
     
     await engine.dispose()

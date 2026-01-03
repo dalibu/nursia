@@ -55,6 +55,21 @@ app.include_router(employment.router, prefix="/api")
 app.include_router(balances.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
 
+
+# Startup/shutdown events for background tasks
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on app startup."""
+    from api.routers.websocket import start_timer_broadcast
+    start_timer_broadcast()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background tasks on app shutdown."""
+    from api.routers.websocket import stop_timer_broadcast
+    stop_timer_broadcast()
+
 # React статические файлы
 if os.path.exists("frontend/build/static"):
     app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")

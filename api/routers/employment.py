@@ -94,12 +94,20 @@ async def create_employment_relation(
     current_user: User = Depends(get_admin_user)
 ):
     """Создать трудовые отношения"""
-    # Проверяем, что пользователь существует
+    # Проверяем, что пользователь существует и активен
     result = await db.execute(
         select(User).where(User.id == data.user_id)
     )
-    if not result.scalar_one_or_none():
+    user = result.scalar_one_or_none()
+    if not user:
         raise HTTPException(status_code=404, detail=f"Пользователь {data.user_id} не найден")
+    
+    # Проверяем статус пользователя
+    if user.status != 'active':
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Невозможно создать трудовые отношения для пользователя со статусом '{user.status}'"
+        )
     
     # Проверяем, нет ли уже активных отношений
     result = await db.execute(
