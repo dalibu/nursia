@@ -165,7 +165,7 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Погашения</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(-(summary?.total_repayment || 0), summary?.currency)}
+                                {formatCurrency(summary?.total_repayment ? -summary.total_repayment : 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -191,7 +191,7 @@ function DashboardPage() {
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
-                        color: '#333',
+                        color: 'white',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>

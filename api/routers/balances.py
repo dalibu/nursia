@@ -195,20 +195,24 @@ async def get_balance_summary(
     # Кредиты = выданные (сумма кредитов)
     total_credits = credits_given
     
-    # 4. К оплате — чистый остаток к оплате (кредиты - offset + unpaid)
-    # Неоплаченные платежи
-    unpaid_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'unpaid')
+    # 4. К оплате — чистый непогашенный долг (кредиты - погашения)
+    # Неоплаченные платежи (исключая группу repayment — это намерение погасить, не долг)
+    unpaid_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            Payment.payment_status == 'unpaid',
+            PaymentCategoryGroup.code != PaymentGroupCode.REPAYMENT.value
+        )
+    )
     if user_filter_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(unpaid_query)
     unpaid_amount = float(result.one().total or 0)
-    
-    # Чистый остаток: (кредиты - offset) + unpaid
-    # Если offset > credit, разница показывается как положительный остаток (нам должны)
-    net_debt = credits_given - credits_offset  # может быть отрицательным
-    total_unpaid = unpaid_amount + max(0, -net_debt)  # добавляем переплату как "к оплате"
     
     # 5. Премии — оплаченные платежи из группы "bonus"
     bonus_query = select(func.sum(Payment.amount).label("total")).join(
@@ -235,6 +239,9 @@ async def get_balance_summary(
         repayment_query = repayment_query.where(Payment.payer_id == worker_id)
     result = await db.execute(repayment_query)
     total_repayment = float(result.one().total or 0)
+    
+    # К оплате = непогашенные кредиты + неоплаченные платежи
+    total_unpaid = max(0, total_credits - total_repayment) + unpaid_amount
     
     # 7. Всего = Зарплата + Кредиты + Премии + Расходы - Погашено
     total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
@@ -446,7 +453,8 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
-                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value,
+                Payment.payment_status == 'paid'  # Only count confirmed repayments
             )
         )
         
@@ -496,7 +504,8 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date < next_month_start,
-                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value
+                PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value,
+                Payment.payment_status == 'paid'  # Only count confirmed repayments
             )
         )
         
@@ -610,9 +619,9 @@ async def get_monthly_summary(
         )
         
         if worker_id:
-            unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
+            unpaid_query = unpaid_query.where(Payment.payer_id == worker_id)
         elif employer_id:
-            unpaid_query = unpaid_query.where(Payment.payer_id == employer_id)
+            unpaid_query = unpaid_query.where(Payment.recipient_id == employer_id)
         
         result = await db.execute(unpaid_query)
         unpaid_amount = float(result.one().total or 0)
