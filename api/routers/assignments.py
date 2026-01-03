@@ -304,7 +304,7 @@ async def stop_work_session(
 
         # Generate tracking number for payment
         from utils.tracking import format_payment_tracking_nr
-        from database.models import Role
+        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
         
         # Get employer (user with employer role)
         employer_result = await db.execute(
@@ -312,11 +312,21 @@ async def stop_work_session(
         )
         employer = employer_result.scalar_one_or_none()
         payer_id = employer.id if employer else assignment.user_id  # fallback
+        
+        # Find salary category by group code (more reliable than name)
+        salary_cat_result = await db.execute(
+            select(PaymentCategory).join(PaymentCategoryGroup).where(
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
+            )
+        )
+        salary_category = salary_cat_result.scalar_one_or_none()
+        if not salary_category:
+            raise HTTPException(status_code=500, detail="Категория зарплаты не найдена")
 
         payment = Payment(
             payer_id=payer_id,
             recipient_id=assignment.user_id,  # Работник — получатель
-            category_id=3,  # Зарплата
+            category_id=salary_category.id,
             amount=total_amount,
             currency=assignment.currency,
             description=full_description,

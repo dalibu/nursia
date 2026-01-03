@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useWebSocket } from '../contexts/WebSocketContext';
+import React, { useState, useEffect } from 'react';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -46,10 +45,12 @@ function DashboardPage() {
         }
     };
 
-    const { subscribe } = useWebSocket();
+    useEffect(() => {
+        loadData();
+    }, [months]);
 
-    const loadData = useCallback(async (silent = false) => {
-        if (!silent) setLoading(true);
+    const loadData = async () => {
+        setLoading(true);
         try {
             const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
                 balances.getSummary({}),
@@ -64,22 +65,9 @@ function DashboardPage() {
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
-            if (!silent) setLoading(false);
+            setLoading(false);
         }
-    }, [months]);
-
-    useEffect(() => {
-        loadData();
-    }, [months]);
-
-    // Subscribe to WebSocket events for data updates
-    useEffect(() => {
-        const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'], () => {
-            console.log('Dashboard data changed, reloading...');
-            loadData(true); // Silent refresh - no loading spinner
-        });
-        return unsubscribe;
-    }, [subscribe, loadData]);
+    };
 
     const formatCurrency = (amount, currency = 'UAH', showAbsolute = false, hideZero = false) => {
         const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
@@ -102,7 +90,7 @@ function DashboardPage() {
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     Обозрение
                 </Typography>
-                {user?.roles?.includes('admin') && (
+                {user?.role === 'admin' && (
                     <Tooltip title="Экспорт всех данных в JSON">
                         <Button
                             variant="outlined"
@@ -177,7 +165,7 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Погашения</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_repayment ? -summary.total_repayment : 0, summary?.currency)}
+                                {formatCurrency(-(summary?.total_repayment || 0), summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -203,7 +191,7 @@ function DashboardPage() {
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
-                        color: 'white',
+                        color: '#333',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
@@ -401,7 +389,7 @@ function DashboardPage() {
                                             <Chip
                                                 icon={<CardGiftcard />}
                                                 label={formatCurrency(row.bonus, row.currency)}
-                                                sx={{ backgroundColor: '#FFD700', color: 'white' }}
+                                                sx={{ backgroundColor: '#FFD700', color: '#333' }}
                                                 size="small"
                                             />
                                         )}
@@ -411,7 +399,7 @@ function DashboardPage() {
                                         {row.total > 0 && (
                                             <Chip
                                                 label={formatCurrency(row.total, row.currency)}
-                                                sx={{ backgroundColor: '#00f2fe', color: 'white' }}
+                                                sx={{ backgroundColor: '#00f2fe', color: '#333' }}
                                                 size="small"
                                             />
                                         )}

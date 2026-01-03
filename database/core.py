@@ -1,5 +1,9 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from config.settings import settings
+import logging
+
+# Disable aiosqlite debug spam
+logging.getLogger('aiosqlite').setLevel(logging.WARNING)
 
 engine = create_async_engine(settings.DB_URL, echo=False)
 

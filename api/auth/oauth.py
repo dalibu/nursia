@@ -51,9 +51,12 @@ async def get_current_user(
     except JWTError:
         raise unauthorized_exception
 
-    # Загружаем пользователя с ролями
+    # Загружаем пользователя с ролями и их permissions
+    from database.models import Role
     result = await db.execute(
-        select(User).options(selectinload(User.roles)).where(User.id == user_id)
+        select(User).options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        ).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
     if user is None:
@@ -82,9 +85,12 @@ async def get_admin_user(
     except JWTError:
         raise forbidden_exception
 
-    # Загружаем пользователя с ролями
+    # Загружаем пользователя с ролями и их permissions
+    from database.models import Role
     result = await db.execute(
-        select(User).options(selectinload(User.roles)).where(User.id == user_id)
+        select(User).options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        ).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
     if user is None:

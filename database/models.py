@@ -175,6 +175,14 @@ class RegistrationRequest(Base):
 # Payment Categories
 # ================================
 
+class PaymentGroupCode(str, Enum):
+    """Коды групп категорий платежей"""
+    SALARY = "salary"      # Зарплата
+    EXPENSE = "expense"    # Расходы
+    BONUS = "bonus"        # Премии
+    DEBT = "debt"          # Долги
+    REPAYMENT = "repayment"  # Погашения
+
 class PaymentCategoryGroup(Base):
     """Группы категорий платежей (Зарплата, Расходы, Премии, Долги и т.д.)"""
     __tablename__ = "payment_category_groups"
