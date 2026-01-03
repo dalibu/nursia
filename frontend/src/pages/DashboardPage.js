@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Typography, Paper, Box, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -9,6 +9,7 @@ import {
     AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz, Download
 } from '@mui/icons-material';
 import { balances, payments } from '../services/api';
+import { useWebSocket } from '../contexts/WebSocketContext';
 
 // Символы валют
 const currencySymbols = {
@@ -25,6 +26,8 @@ function DashboardPage() {
     const [mutual, setMutual] = useState([]);
     const [months, setMonths] = useState(6);
     const [exporting, setExporting] = useState(false);
+
+    const { subscribe } = useWebSocket();
 
     const handleExportJSON = async () => {
         setExporting(true);
@@ -45,12 +48,8 @@ function DashboardPage() {
         }
     };
 
-    useEffect(() => {
-        loadData();
-    }, [months]);
-
-    const loadData = async () => {
-        setLoading(true);
+    const loadData = useCallback(async (showLoading = true) => {
+        if (showLoading) setLoading(true);
         try {
             const [summaryRes, monthlyRes, mutualRes, userRes] = await Promise.all([
                 balances.getSummary({}),
@@ -65,9 +64,26 @@ function DashboardPage() {
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
-    };
+    }, [months]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    // Subscribe to WebSocket events for real-time updates (silent refresh)
+    useEffect(() => {
+        const unsubscribe = subscribe(
+            ['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'],
+            (event) => {
+                console.log('[Dashboard] WebSocket event received:', event.type);
+                // Silent reload - no loading spinner
+                loadData(false);
+            }
+        );
+        return () => unsubscribe();
+    }, [subscribe, loadData]);
 
     const formatCurrency = (amount, currency = 'UAH', showAbsolute = false, hideZero = false) => {
         const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
