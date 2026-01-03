@@ -90,7 +90,7 @@ function DashboardPage() {
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     Обозрение
                 </Typography>
-                {user?.role === 'admin' && (
+                {user?.roles?.includes('admin') && (
                     <Tooltip title="Экспорт всех данных в JSON">
                         <Button
                             variant="outlined"
@@ -328,7 +328,7 @@ function DashboardPage() {
                                     <TableCell>
                                         <strong>{row.period.split('-').reverse().join('.')}</strong>
                                     </TableCell>
-                                    <TableCell align="center">{row.visits || ''}</TableCell>
+                                    <TableCell align="center">{row.sessions || ''}</TableCell>
                                     <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
                                     {/* Зарплата - зелёный */}
                                     <TableCell align="right">

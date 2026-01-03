@@ -33,7 +33,7 @@ class BalanceItem(BaseModel):
 class MonthlySummary(BaseModel):
     """Месячная сводка (как в Übersicht)"""
     period: str  # "2025-09"
-    visits: int  # Количество посещений (сессий)
+    sessions: int  # Количество посещений (сессий)
     hours: float  # Часы работы
     salary: float  # Зарплата (из work_sessions)
     paid: float  # Кредит (выданные авансы)
@@ -334,7 +334,7 @@ async def get_monthly_summary(
         
         # Рабочие сессии за месяц (из Assignment + Task)
         sessions_query = select(
-            func.count(func.distinct(Assignment.id)).label("visits"),
+            func.count(func.distinct(Assignment.id)).label("sessions"),
             Assignment.currency
         ).select_from(Assignment).join(Task).where(
             and_(
@@ -353,7 +353,7 @@ async def get_monthly_summary(
         result = await db.execute(sessions_query)
         session_row = result.first()
         
-        visits = session_row.visits if session_row else 0
+        sessions = session_row.sessions if session_row else 0
         currency = session_row.currency if session_row else "UAH"
         
         # Подсчёт часов и суммы отдельным запросом
@@ -626,7 +626,7 @@ async def get_monthly_summary(
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
-            visits=visits,
+            sessions=sessions,
             hours=round(hours, 2),
             salary=round(salary, 2),
             paid=round(credits_given, 2),  # Кредит: выданные авансы
@@ -1038,6 +1038,13 @@ async def get_debug_export(
         db=db,
         current_user=current_user
     )
+    
+    # Фильтруем пустые периоды для экономии токенов
+    monthly = [
+        m for m in monthly 
+        if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
+           m.paid > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0
+    ]
     
     mutual = await get_mutual_balances(
         db=db,
