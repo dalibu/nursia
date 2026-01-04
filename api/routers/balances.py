@@ -153,25 +153,33 @@ async def get_balance_summary(
     result = await db.execute(salary_query)
     total_salary = float(result.one().total or 0)
     
-    # 2. Расходы для карточек — только UNPAID (невозмещённые)
-    # Карточка показывает "активную" сумму расходов, которые ещё не вернули
-    # В помесячной таблице показываются все расходы и компенсации отдельно
-    expenses_unpaid_query = select(func.sum(Payment.amount).label("total")).join(
-        PaymentCategory, Payment.category_id == PaymentCategory.id
-    ).join(
-        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(
-        and_(
-            PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
-            Payment.payment_status == 'unpaid'
-        )
-    )
+    # 2. Расходы для карточек:
+    # - Worker (user_filter_id): только UNPAID (что ему должны вернуть)
+    # - Admin/Employer: ВСЕ расходы (общая сумма расходов работников)
     if user_filter_id:
-        expenses_unpaid_query = expenses_unpaid_query.where(Payment.payer_id == user_filter_id)
-    elif worker_id:
-        expenses_unpaid_query = expenses_unpaid_query.where(Payment.payer_id == worker_id)
-    result = await db.execute(expenses_unpaid_query)
+        # Worker видит только неоплаченные расходы
+        expenses_query = select(func.sum(Payment.amount).label("total")).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
+                Payment.payment_status == 'unpaid'
+            )
+        ).where(Payment.payer_id == user_filter_id)
+    else:
+        # Admin/Employer видит все расходы работников
+        expenses_query = select(func.sum(Payment.amount).label("total")).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value)
+        if worker_id:
+            expenses_query = expenses_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(expenses_query)
     total_expenses = float(result.one().total or 0)
+
 
 
     
@@ -270,11 +278,15 @@ async def get_balance_summary(
     # К оплате = непогашенные кредиты + неоплаченные платежи
     total_unpaid = max(0, total_credits - total_repayment) + unpaid_amount
     
-    # 7. Всего (чистый доход для Worker):
-    # = Зарплата + Кредиты + Премии - Погашения - Невозмещённые расходы
-    # Оплаченные расходы не влияют на доход (это просто возврат своих денег)
-    # Неоплаченные расходы уменьшают доход, пока их не возместят
-    total = total_salary + total_credits + total_bonus - total_repayment - total_expenses
+    # 7. Всего:
+    # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашения - Невозмещённые расходы
+    # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Расходы работников - Погашения
+    if user_filter_id:
+        # Worker: доход минус невозмещённые расходы
+        total = total_salary + total_credits + total_bonus - total_repayment - total_expenses
+    else:
+        # Employer: сумма всех расходов на работников
+        total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
 
     
     # Балансы (неоплаченные долги)
@@ -343,14 +355,18 @@ async def get_monthly_summary(
     logger = logging.getLogger(__name__)
     
     # Автофильтрация — пользователи без view_all_reports видят только свои данные
+    is_worker_view = False
     try:
         has_perm = current_user.has_permission('view_all_reports')
         logger.info(f"[monthly] User {current_user.id} has_permission('view_all_reports') = {has_perm}")
         if not has_perm:
             worker_id = current_user.id
+            is_worker_view = True
     except Exception as e:
         logger.error(f"[monthly] Error checking permission for user {current_user.id}: {e}", exc_info=True)
         worker_id = current_user.id
+        is_worker_view = True
+
     
     now = now_server()
     summaries = []
@@ -662,8 +678,14 @@ async def get_monthly_summary(
         cumulative_to_pay = cumulative_credits - cumulative_offset
         
         remaining = expenses - expenses_paid
-        # Итого (чистый доход) = Зарплата + Кредиты + Премии - Погашено - Невозмещённые расходы
-        total = salary + credits_given + bonus - credits_offset - remaining
+        # Итого:
+        # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашено - Невозмещённые расходы
+        # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Расходы - Погашено
+        if is_worker_view:
+            total = salary + credits_given + bonus - credits_offset - remaining
+        else:
+            total = salary + credits_given + bonus + expenses - credits_offset
+
 
         
         summaries.append(MonthlySummary(

@@ -1,0 +1,89 @@
+{
+  "cards": {
+    "salary": 0,
+    "expenses": 50,
+    "credits": 500,
+    "repayment": -300,
+    "to_pay": 250,
+    "bonus": 0,
+    "total": 250,
+    "currency": "UAH"
+  },
+  "mutual_balances": [
+    {
+      "creditor_id": 1,
+      "creditor_name": "Administrator",
+      "debtor_id": 2,
+      "debtor_name": "Евгения",
+      "credit": 500,
+      "offset": 300,
+      "remaining": 200,
+      "currency": "UAH"
+    }
+  ],
+  "monthly": [
+    {
+      "period": "2026-01",
+      "sessions": 0,
+      "hours": 0,
+      "salary": 0,
+      "paid": 500,
+      "offset": -300,
+      "to_pay": 50,
+      "expenses": 50,
+      "expenses_paid": 0,
+      "bonus": 0,
+      "remaining": 50,
+      "total": 250,
+      "currency": "UAH"
+    }
+  ],
+  "payments": [
+    {
+      "id": 9,
+      "tracking_nr": "P9",
+      "payer_id": 2,
+      "payer_name": "Евгения",
+      "recipient_id": 1,
+      "recipient_name": "Administrator",
+      "amount": 50,
+      "currency": "UAH",
+      "payment_status": "unpaid",
+      "payment_date": "2026-01-03T22:21:39",
+      "category_name": "Продукты",
+      "category_group": "Расходы",
+      "description": "АТБ"
+    },
+    {
+      "id": 8,
+      "tracking_nr": "P8",
+      "payer_id": 2,
+      "payer_name": "Евгения",
+      "recipient_id": 1,
+      "recipient_name": "Administrator",
+      "amount": 300,
+      "currency": "UAH",
+      "payment_status": "paid",
+      "payment_date": "2026-01-03T21:36:11",
+      "category_name": "Возврат долга",
+      "category_group": "Погашения",
+      "description": "Спасибо!"
+    },
+    {
+      "id": 6,
+      "tracking_nr": "P6",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 500,
+      "currency": "UAH",
+      "payment_status": "paid",
+      "payment_date": "2026-01-01T20:19:02",
+      "category_name": "Аванс",
+      "category_group": "Долги",
+      "description": ""
+    }
+  ],
+  "export_timestamp": "2026-01-04T09:01:18.996273"
+}
