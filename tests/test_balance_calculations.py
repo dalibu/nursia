@@ -275,20 +275,21 @@ async def test_balance_calculation(fixture_path: Path):
         # Compare cards
         fields_to_check = ["salary", "expenses", "credits", "repayment", "bonus", "to_pay", "total"]
         
-        errors = []
+        card_errors = []
         for field in fields_to_check:
             expected = expected_cards.get(field, 0)
             actual = calculated["cards"].get(field, 0)
             
             if abs(expected - actual) > 0.01:  # Allow small float precision errors
-                errors.append(f"cards.{field}: expected {expected}, got {actual}")
+                card_errors.append(f"  {field:12} expected {expected:10.2f}, got {actual:10.2f}")
         
         # Compare mutual_balances
+        mutual_errors = []
         if expected_mutual:
             actual_mutual = calculated.get("mutual_balances", [])
             
             if len(expected_mutual) != len(actual_mutual):
-                errors.append(f"mutual_balances count: expected {len(expected_mutual)}, got {len(actual_mutual)}")
+                mutual_errors.append(f"  Count mismatch: expected {len(expected_mutual)}, got {len(actual_mutual)}")
             else:
                 for i, (exp_mb, act_mb) in enumerate(zip(expected_mutual, actual_mutual)):
                     # Compare each field
@@ -298,11 +299,12 @@ async def test_balance_calculation(fixture_path: Path):
                         
                         if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
                             if abs(exp_val - act_val) > 0.01:
-                                errors.append(f"mutual_balances[{i}].{field}: expected {exp_val}, got {act_val}")
+                                mutual_errors.append(f"  [{i}].{field:12} expected {exp_val:10.2f}, got {act_val:10.2f}")
                         elif exp_val != act_val:
-                            errors.append(f"mutual_balances[{i}].{field}: expected {exp_val}, got {act_val}")
+                            mutual_errors.append(f"  [{i}].{field:12} expected {exp_val}, got {act_val}")
         
         # Compare monthly data
+        monthly_errors = []
         expected_monthly = fixture_data.get("monthly", [])
         if expected_monthly:
             actual_monthly = calculated.get("monthly", [])
@@ -313,7 +315,7 @@ async def test_balance_calculation(fixture_path: Path):
             for i, exp_m in enumerate(expected_monthly):
                 period = exp_m.get("period")
                 if period not in actual_monthly_dict:
-                    errors.append(f"monthly period {period} not found in actual data")
+                    monthly_errors.append(f"  Period {period} not found in actual data")
                     continue
                 
                 act_m = actual_monthly_dict[period]
@@ -327,12 +329,25 @@ async def test_balance_calculation(fixture_path: Path):
                     
                     if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
                         if abs(exp_val - act_val) > 0.01:
-                            errors.append(f"monthly[{period}].{field}: expected {exp_val}, got {act_val}")
+                            monthly_errors.append(f"  [{period}].{field:15} expected {exp_val:10.2f}, got {act_val:10.2f}")
                     elif exp_val != act_val:
-                        errors.append(f"monthly[{period}].{field}: expected {exp_val}, got {act_val}")
+                        monthly_errors.append(f"  [{period}].{field:15} expected {exp_val}, got {act_val}")
         
-        if errors:
-            pytest.fail(f"Balance mismatch in {fixture_path.name}:\n" + "\n".join(errors))
+        # Build final error message with sections
+        if card_errors or mutual_errors or monthly_errors:
+            error_msg = f"\n{'='*70}\n❌ BALANCE MISMATCH: {fixture_path.name}\n{'='*70}\n"
+            
+            if card_errors:
+                error_msg += "\n📊 CARDS (Dashboard Summary):\n" + "\n".join(card_errors) + "\n"
+            
+            if mutual_errors:
+                error_msg += "\n💰 MUTUAL BALANCES:\n" + "\n".join(mutual_errors) + "\n"
+            
+            if monthly_errors:
+                error_msg += "\n📅 MONTHLY DATA:\n" + "\n".join(monthly_errors) + "\n"
+            
+            error_msg += f"{'='*70}\n"
+            pytest.fail(error_msg)
     
     finally:
         await engine.dispose()
