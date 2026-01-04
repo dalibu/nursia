@@ -193,14 +193,16 @@ async def create_payment(
     )
     db_payment = result.unique().scalar_one()
     
-    # WebSocket broadcast: уведомляем всех (кроме создателя)
-    from api.routers.websocket import manager
+    # WebSocket broadcast: уведомляем плательщика, получателя и всех админов
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    
     await manager.broadcast({
         "type": "payment_created",
         "payment_id": db_payment.id,
         "payer_id": db_payment.payer_id,
         "recipient_id": db_payment.recipient_id
-    }, exclude_user_id=current_user.id)
+    }, user_ids=target_users)
     
     return PaymentSchema.model_validate(db_payment)
 
@@ -382,11 +384,13 @@ async def update_payment(
     await db.refresh(db_payment)
     
     # WebSocket broadcast
-    from api.routers.websocket import manager
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    
     await manager.broadcast({
         "type": "payment_updated",
         "payment_id": db_payment.id
-    }, exclude_user_id=current_user.id)
+    }, user_ids=target_users)
     
     return {"id": db_payment.id, "message": "Payment updated successfully"}
 
@@ -412,10 +416,13 @@ async def delete_payment(
     await db.commit()
     
     # WebSocket broadcast
-    from api.routers.websocket import manager
+    from api.routers.websocket import manager, get_admin_ids
+    # For deleted payment, we use IDs from the db_payment object before it was fully detached
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    
     await manager.broadcast({
         "type": "payment_deleted",
         "payment_id": payment_id
-    }, exclude_user_id=current_user.id)
+    }, user_ids=target_users)
     
     return {"message": "Payment deleted"}
