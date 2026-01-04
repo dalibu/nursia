@@ -254,16 +254,20 @@ async def test_balance_calculation(fixture_path: Path):
         pytest.skip(f"No 'cards' section in fixture {fixture_path.name}")
     
     # Determine worker_id from fixture if available
-    # Check for explicit worker_id in fixture, or auto-detect from payments
+    # For employer fixtures, we DON'T filter by worker (to see all data)
+    # For worker fixtures, we filter by specific worker
     worker_id = fixture_data.get("worker_id")
     
     if worker_id is None:
-        # Auto-detect: find recipient of debt/credit payments (they are the worker)
-        payments = fixture_data.get("payments", [])
-        for p in payments:
-            if p.get("category_group") == "Долги" and p.get("recipient_id"):
-                worker_id = p.get("recipient_id")
-                break
+        # Check filename to determine if this is worker or employer view
+        if "worker" in fixture_path.stem.lower():
+            # Auto-detect: find recipient of debt/credit payments (they are the worker)
+            payments = fixture_data.get("payments", [])
+            for p in payments:
+                if p.get("category_group") == "Долги" and p.get("recipient_id"):
+                    worker_id = p.get("recipient_id")
+                    break
+        # else: for employer view, leave worker_id as None
     
     # Setup async test database
     engine, async_session = await setup_async_test_db(fixture_data)
