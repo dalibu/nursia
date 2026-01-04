@@ -51,6 +51,7 @@ async def init_permissions(session):
         {"name": "create_salary_payments", "description": "Создание зарплатных платежей"},
         {"name": "create_expense_payments", "description": "Создание расходных платежей"},
         {"name": "manage_categories", "description": "Управление категориями платежей"},
+        {"name": "manage_payment_status", "description": "Изменение статуса платежей"},
     ]
     
     created = 0
@@ -86,7 +87,7 @@ async def init_role_permissions(session):
         mappings.append({"role_id": roles["admin"], "permission_id": perm_id})
     
     # Employer
-    for perm_name in ["create_salary_payments", "view_all_reports"]:
+    for perm_name in ["create_salary_payments", "view_all_reports", "manage_payment_status"]:
         if perm_name in perms:
             mappings.append({"role_id": roles["employer"], "permission_id": perms[perm_name]})
     

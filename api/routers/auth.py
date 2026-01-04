@@ -170,10 +170,17 @@ async def change_password(
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
+    # Collect all unique permissions from all roles
+    permissions = set()
+    for role in current_user.roles:
+        for permission in role.permissions:
+            permissions.add(permission.name)
+    
     return {
         "id": current_user.id,
         "username": current_user.username,
         "full_name": current_user.full_name,
         "roles": [role.name for role in current_user.roles],  # RBAC roles array
+        "permissions": list(permissions),  # All permissions from all roles
         "force_password_change": current_user.force_password_change
     }

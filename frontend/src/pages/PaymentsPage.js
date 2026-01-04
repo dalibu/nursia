@@ -131,6 +131,7 @@ function PaymentsPage() {
   const [categories, setCategories] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canManagePaymentStatus, setCanManagePaymentStatus] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, paymentId: null, paymentName: '' });
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
@@ -196,6 +197,12 @@ function PaymentsPage() {
       setCategories(categoriesRes.data);
       setCurrencies(currenciesData.details || []);
       setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
+
+      // Check if user has manage_payment_status permission
+      const hasPermission = userRes.data.permissions?.includes('manage_payment_status') ||
+        userRes.data.roles?.includes('employer') ||
+        userRes.data.role === 'employer';
+      setCanManagePaymentStatus(hasPermission);
     } catch (error) {
       console.error('Failed to load payments:', error);
     }
@@ -716,17 +723,15 @@ function PaymentsPage() {
                   <strong>Смена</strong>
                 </TableSortLabel>
               </TableCell>
-              {isAdmin && (
-                <TableCell sx={{ width: 130 }}>
-                  <TableSortLabel
-                    active={sortField === 'payment_status'}
-                    direction={sortField === 'payment_status' ? sortDirection : 'asc'}
-                    onClick={() => handleSort('payment_status')}
-                  >
-                    <strong>Статус</strong>
-                  </TableSortLabel>
-                </TableCell>
-              )}
+              <TableCell sx={{ width: 130 }}>
+                <TableSortLabel
+                  active={sortField === 'payment_status'}
+                  direction={sortField === 'payment_status' ? sortDirection : 'asc'}
+                  onClick={() => handleSort('payment_status')}
+                >
+                  <strong>Статус</strong>
+                </TableSortLabel>
+              </TableCell>
               <TableCell sx={{ width: 130, minWidth: 130 }}><strong>Действия</strong></TableCell>
             </TableRow>
           </TableHead>
@@ -734,7 +739,7 @@ function PaymentsPage() {
 
             {filteredList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 11 : 9} align="center">
+                <TableCell colSpan={10} align="center">
                   Нет данных для отображения
                 </TableCell>
               </TableRow>
@@ -810,25 +815,23 @@ function PaymentsPage() {
                     <Typography variant="caption" color="text.secondary">—</Typography>
                   )}
                 </TableCell>
-                {isAdmin && (
-                  <TableCell>
-                    <Chip
-                      label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
-                      color={payment.payment_status === 'paid' ? 'success' : 'warning'}
-                      size="small"
-                      clickable
-                      onClick={() => {
-                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
-                        handlePaymentToggle(payment.id, nextStatus);
-                      }}
-                      icon={<Payment />}
-                      sx={{
-                        cursor: 'pointer',
-                        '&:hover': { opacity: 0.8 }
-                      }}
-                    />
-                  </TableCell>
-                )}
+                <TableCell>
+                  <Chip
+                    label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
+                    color={payment.payment_status === 'paid' ? 'success' : 'warning'}
+                    size="small"
+                    clickable={canManagePaymentStatus}
+                    onClick={canManagePaymentStatus ? () => {
+                      const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
+                      handlePaymentToggle(payment.id, nextStatus);
+                    } : undefined}
+                    icon={<Payment />}
+                    sx={{
+                      cursor: canManagePaymentStatus ? 'pointer' : 'default',
+                      '&:hover': canManagePaymentStatus ? { opacity: 0.8 } : {}
+                    }}
+                  />
+                </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
                     <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
