@@ -1024,13 +1024,18 @@ async def get_debug_export(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Полный экспорт всех данных Dashboard для отладки (только для пользователей с правами)
+    Полный экспорт всех данных Dashboard для отладки.
+    Админы видят всё, работники - только свои данные.
     """
     from datetime import datetime
     
+    # Workers can only export their own data
     if not current_user.has_permission('view_all_reports'):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Нет прав на экспорт данных")
+        if not current_user.is_worker:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Нет прав на экспорт данных")
+        # Force worker to see only their own data
+        worker_id = current_user.id
     
     # Получаем все данные
     summary = await get_balance_summary(
@@ -1087,7 +1092,16 @@ async def get_debug_export(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).order_by(Payment.payment_date.desc())
+    )
+    
+    # Filter payments for workers - only show their own payments
+    if worker_id:
+        from sqlalchemy import or_
+        payments_query = payments_query.where(
+            or_(Payment.payer_id == worker_id, Payment.recipient_id == worker_id)
+        )
+    
+    payments_query = payments_query.order_by(Payment.payment_date.desc())
     
     result = await db.execute(payments_query)
     payments_data = []
