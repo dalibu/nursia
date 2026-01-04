@@ -153,18 +153,37 @@ async def get_balance_summary(
     result = await db.execute(salary_query)
     total_salary = float(result.one().total or 0)
     
-    # 2. Расходы — платежи из группы "expense"
-    expenses_query = select(func.sum(Payment.amount).label("total")).join(
+    # 2. Расходы — ДВА запроса:
+    # 2a. Все расходы (для карточки "Расходы")
+    expenses_all_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value)
     if user_filter_id:
-        expenses_query = expenses_query.where(Payment.payer_id == user_filter_id)
+        expenses_all_query = expenses_all_query.where(Payment.payer_id == user_filter_id)
     elif worker_id:
-        expenses_query = expenses_query.where(Payment.payer_id == worker_id)
-    result = await db.execute(expenses_query)
+        expenses_all_query = expenses_all_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(expenses_all_query)
     total_expenses = float(result.one().total or 0)
+    
+    # 2b. Только оплаченные расходы (для расчета "Итого")
+    expenses_paid_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
+            Payment.payment_status.in_(['paid', 'offset'])
+        )
+    )
+    if user_filter_id:
+        expenses_paid_query = expenses_paid_query.where(Payment.payer_id == user_filter_id)
+    elif worker_id:
+        expenses_paid_query = expenses_paid_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(expenses_paid_query)
+    total_expenses_paid = float(result.one().total or 0)
     
     # 3. Кредиты — всего выданных (без вычитания offset)
     credits_given_query = select(func.sum(Payment.amount).label("total")).join(
@@ -243,8 +262,9 @@ async def get_balance_summary(
     # К оплате = непогашенные кредиты + неоплаченные платежи
     total_unpaid = max(0, total_credits - total_repayment) + unpaid_amount
     
-    # 7. Всего = Зарплата + Кредиты + Премии + Расходы - Погашено
-    total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
+    # 7. Всего = Зарплата + Кредиты + Премии + Расходы (ТОЛЬКО ОПЛАЧЕННЫЕ) - Погашено
+    # Это соответствует сумме колонки "Итого" в помесячном обзоре
+    total = total_salary + total_credits + total_bonus + total_expenses_paid - total_repayment
     
     # Балансы (неоплаченные долги)
     balances = []
@@ -968,12 +988,12 @@ async def get_mutual_balances(
         # debt = создаёт долг
         # salary = погашает долг (работа)
         # repayment = погашает долг (прямая выплата)
-        # unpaid_expense = создаёт долг (непогашенные расходы)
+        # ВАЖНО: unpaid_expense НЕ учитывается - неоплаченные расходы не влияют на баланс
         # ВАЖНО: paid expense НЕ вычитается — оплаченные расходы просто "уже возмещены"
         # positive = B owes A, negative = A owes B
         
-        balance_b_owes_a = debt_a_to_b - salary_a_to_b - repayment_b_to_a + unpaid_expense_a_to_b
-        balance_a_owes_b = debt_b_to_a - salary_b_to_a - repayment_a_to_b + unpaid_expense_b_to_a
+        balance_b_owes_a = debt_a_to_b - salary_a_to_b - repayment_b_to_a
+        balance_a_owes_b = debt_b_to_a - salary_b_to_a - repayment_a_to_b
         net_balance = balance_b_owes_a - balance_a_owes_b
         
         # Для отображения: используем ФАКТИЧЕСКИЙ долг из более крупного направления

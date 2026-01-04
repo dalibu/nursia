@@ -4,7 +4,7 @@
     "expenses": 50,
     "credits": 500,
     "repayment": -300,
-    "to_pay": 200,
+    "to_pay": 250,
     "bonus": 0,
     "total": 200,
     "currency": "UAH"
@@ -85,5 +85,5 @@
       "description": ""
     }
   ],
-  "export_timestamp": "2026-01-03T23:44:32.090315"
+  "export_timestamp": "2026-01-04T09:01:18.996273"
 }
