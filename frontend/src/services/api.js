@@ -112,4 +112,37 @@ export const settings = {
   getDebug: () => api.get('/settings/debug')
 };
 
+// Admin API for RBAC management
+export const admin = {
+  // Roles
+  getRoles: () => api.get('/admin/roles'),
+  createRole: (data) => api.post('/admin/roles', data),
+  updateRole: (id, data) => api.put(`/admin/roles/${id}`, data),
+  deleteRole: (id) => api.delete(`/admin/roles/${id}`),
+
+  // Permissions
+  getPermissions: () => api.get('/admin/permissions'),
+  createPermission: (data) => api.post('/admin/permissions', data),
+  updatePermission: (id, data) => api.put(`/admin/permissions/${id}`, data),
+  deletePermission: (id) => api.delete(`/admin/permissions/${id}`),
+
+  // Role-Permission management
+  setRolePermissions: (roleId, permissionIds) => api.put(`/admin/roles/${roleId}/permissions`, { permission_ids: permissionIds }),
+  addPermissionToRole: (roleId, permissionId) => api.post(`/admin/roles/${roleId}/permissions/${permissionId}`),
+  removePermissionFromRole: (roleId, permissionId) => api.delete(`/admin/roles/${roleId}/permissions/${permissionId}`),
+
+  // User-Role management
+  getUserRoles: (userId) => api.get(`/admin/users/${userId}/roles`),
+  setUserRoles: (userId, roleIds) => api.put(`/admin/users/${userId}/roles`, { role_ids: roleIds }),
+  addRoleToUser: (userId, roleId) => api.post(`/admin/users/${userId}/roles/${roleId}`),
+  removeRoleFromUser: (userId, roleId) => api.delete(`/admin/users/${userId}/roles/${roleId}`),
+
+  // Registration requests (existing)
+  getRegistrationRequests: () => api.get('/admin/registration-requests'),
+  approveRegistration: (id, data) => api.post(`/admin/registration-requests/${id}/approve`, data),
+  rejectRegistration: (id) => api.post(`/admin/registration-requests/${id}/reject`),
+  deleteRegistrationRequest: (id) => api.delete(`/admin/registration-requests/${id}`)
+};
+
+
 export default api;

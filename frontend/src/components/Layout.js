@@ -150,6 +150,9 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/users" onClick={() => setSettingsAnchor(null)}>
                     Пользователи
                   </MenuItem>
+                  <MenuItem component={Link} to="/roles" onClick={() => setSettingsAnchor(null)}>
+                    🔐 Роли и права
+                  </MenuItem>
                   <MenuItem component={Link} to="/requests" onClick={() => setSettingsAnchor(null)}>
                     Заявки {hasRequests && '⚠️'}
                   </MenuItem>
@@ -165,6 +168,7 @@ function Layout({ onLogout }) {
                   <MenuItem component={Link} to="/settings" onClick={() => setSettingsAnchor(null)}>
                     Параметры
                   </MenuItem>
+
                 </Menu>
               </>
             )}

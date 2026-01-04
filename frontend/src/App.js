@@ -23,6 +23,7 @@ import ProfilePage from './pages/ProfilePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import RequestsPage from './pages/RequestsPage';
+import RolesPage from './pages/RolesPage';
 
 const theme = createTheme({
   palette: {
@@ -77,6 +78,7 @@ function App() {
               <Route path="users" element={<UsersPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="requests" element={<RequestsPage />} />
+              <Route path="roles" element={<RolesPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="change-password" element={<ChangePasswordPage />} />
             </Route>
