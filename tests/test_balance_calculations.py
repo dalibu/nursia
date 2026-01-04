@@ -156,6 +156,8 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
     Call the ACTUAL balance calculation function from api/routers/balances.py
     This is the DRY approach - we test the real business logic!
     """
+    from api.routers.balances import get_mutual_balances, get_monthly_summary
+    
     async with async_session() as db:
         # Create a mock user with admin permissions to see all data
         mock_user = MagicMock()
@@ -163,7 +165,22 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
         mock_user.has_permission = MagicMock(return_value=True)  # Admin can see everything
         
         # If worker_id is specified, limit to that worker
-        result = await get_balance_summary(
+        summary_result = await get_balance_summary(
+            employer_id=None,
+            worker_id=worker_id,
+            db=db,
+            current_user=mock_user
+        )
+        
+        # Also get mutual balances
+        mutual_result = await get_mutual_balances(
+            db=db,
+            current_user=mock_user
+        )
+        
+        # Get monthly summary (all months)
+        monthly_result = await get_monthly_summary(
+            months=24,  # Get maximum available months
             employer_id=None,
             worker_id=worker_id,
             db=db,
@@ -173,13 +190,44 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
         # Convert DashboardSummary to the format expected by tests
         # Note: repayment is inverted to negative (as shown in GUI/debug export)
         return {
-            "salary": result.total_salary,
-            "expenses": result.total_expenses,
-            "credits": result.total_credits,
-            "repayment": -result.total_repayment,  # Invert to match GUI format
-            "bonus": result.total_bonus,
-            "to_pay": result.total_unpaid,
-            "total": result.total
+            "cards": {
+                "salary": summary_result.total_salary,
+                "expenses": summary_result.total_expenses,
+                "credits": summary_result.total_credits,
+                "repayment": -summary_result.total_repayment,  # Invert to match GUI format
+                "bonus": summary_result.total_bonus,
+                "to_pay": summary_result.total_unpaid,
+                "total": summary_result.total
+            },
+            "mutual_balances": [
+                {
+                    "creditor_id": mb.creditor_id,
+                    "debtor_id": mb.debtor_id,
+                    "credit": mb.credit,
+                    "offset": mb.offset,
+                    "remaining": mb.remaining,
+                    "currency": mb.currency
+                }
+                for mb in mutual_result
+            ],
+            "monthly": [
+                {
+                    "period": ms.period,
+                    "sessions": ms.sessions,
+                    "hours": ms.hours,
+                    "salary": ms.salary,
+                    "paid": ms.paid,
+                    "offset": ms.offset,
+                    "to_pay": ms.to_pay,
+                    "expenses": ms.expenses,
+                    "expenses_paid": ms.expenses_paid,
+                    "bonus": ms.bonus,
+                    "remaining": ms.remaining,
+                    "total": ms.total,
+                    "currency": ms.currency
+                }
+                for ms in monthly_result
+            ]
         }
 
 
@@ -200,6 +248,7 @@ async def test_balance_calculation(fixture_path: Path):
     """
     fixture_data = load_fixture(fixture_path)
     expected_cards = fixture_data.get("cards", {})
+    expected_mutual = fixture_data.get("mutual_balances", [])
     
     if not expected_cards:
         pytest.skip(f"No 'cards' section in fixture {fixture_path.name}")
@@ -223,16 +272,64 @@ async def test_balance_calculation(fixture_path: Path):
         # Call the REAL balance calculation function
         calculated = await calculate_balance_using_real_function(engine, async_session, worker_id=worker_id)
         
-        # Compare each field
+        # Compare cards
         fields_to_check = ["salary", "expenses", "credits", "repayment", "bonus", "to_pay", "total"]
         
         errors = []
         for field in fields_to_check:
             expected = expected_cards.get(field, 0)
-            actual = calculated.get(field, 0)
+            actual = calculated["cards"].get(field, 0)
             
             if abs(expected - actual) > 0.01:  # Allow small float precision errors
-                errors.append(f"{field}: expected {expected}, got {actual}")
+                errors.append(f"cards.{field}: expected {expected}, got {actual}")
+        
+        # Compare mutual_balances
+        if expected_mutual:
+            actual_mutual = calculated.get("mutual_balances", [])
+            
+            if len(expected_mutual) != len(actual_mutual):
+                errors.append(f"mutual_balances count: expected {len(expected_mutual)}, got {len(actual_mutual)}")
+            else:
+                for i, (exp_mb, act_mb) in enumerate(zip(expected_mutual, actual_mutual)):
+                    # Compare each field
+                    for field in ["creditor_id", "debtor_id", "credit", "offset", "remaining"]:
+                        exp_val = exp_mb.get(field, 0)
+                        act_val = act_mb.get(field, 0)
+                        
+                        if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
+                            if abs(exp_val - act_val) > 0.01:
+                                errors.append(f"mutual_balances[{i}].{field}: expected {exp_val}, got {act_val}")
+                        elif exp_val != act_val:
+                            errors.append(f"mutual_balances[{i}].{field}: expected {exp_val}, got {act_val}")
+        
+        # Compare monthly data
+        expected_monthly = fixture_data.get("monthly", [])
+        if expected_monthly:
+            actual_monthly = calculated.get("monthly", [])
+            
+            # Create a dict of actual monthly data by period
+            actual_monthly_dict = {m["period"]: m for m in actual_monthly}
+            
+            for i, exp_m in enumerate(expected_monthly):
+                period = exp_m.get("period")
+                if period not in actual_monthly_dict:
+                    errors.append(f"monthly period {period} not found in actual data")
+                    continue
+                
+                act_m = actual_monthly_dict[period]
+                
+                # Compare each field
+                monthly_fields = ["sessions", "hours", "salary", "paid", "offset",
+                                 "to_pay", "expenses", "expenses_paid", "bonus", "remaining", "total"]
+                for field in monthly_fields:
+                    exp_val = exp_m.get(field, 0)
+                    act_val = act_m.get(field, 0)
+                    
+                    if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
+                        if abs(exp_val - act_val) > 0.01:
+                            errors.append(f"monthly[{period}].{field}: expected {exp_val}, got {act_val}")
+                    elif exp_val != act_val:
+                        errors.append(f"monthly[{period}].{field}: expected {exp_val}, got {act_val}")
         
         if errors:
             pytest.fail(f"Balance mismatch in {fixture_path.name}:\n" + "\n".join(errors))
