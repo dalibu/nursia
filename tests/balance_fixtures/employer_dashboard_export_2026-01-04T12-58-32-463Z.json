@@ -43,9 +43,9 @@
       "expenses": 50,
       "expenses_paid": 50,
       "bonus": 0,
-      "remaining": 0,
       "total": 250,
-      "currency": "UAH"
+      "currency": "UAH",
+      "expenses_unpaid": 0
     },
     {
       "period": "2025-11",
@@ -58,9 +58,9 @@
       "expenses": 0,
       "expenses_paid": 0,
       "bonus": 0,
-      "remaining": 0,
       "total": 1000,
-      "currency": "UAH"
+      "currency": "UAH",
+      "expenses_unpaid": 0
     }
   ],
   "payments": [

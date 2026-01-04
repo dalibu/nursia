@@ -234,7 +234,7 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
                     "expenses": ms.expenses,
                     "expenses_paid": ms.expenses_paid,
                     "bonus": ms.bonus,
-                    "remaining": ms.remaining,
+                    "expenses_unpaid": ms.expenses_unpaid,
                     "total": ms.total,
                     "currency": ms.currency
                 }
@@ -343,7 +343,7 @@ async def test_balance_calculation(fixture_path: Path):
                 
                 # Compare each field
                 monthly_fields = ["sessions", "hours", "salary", "paid", "offset",
-                                 "to_pay", "expenses", "expenses_paid", "bonus", "remaining", "total"]
+                                 "to_pay", "expenses", "expenses_paid", "bonus", "expenses_unpaid", "total"]
                 for field in monthly_fields:
                     exp_val = exp_m.get(field, 0)
                     act_val = act_m.get(field, 0)

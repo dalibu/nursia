@@ -382,9 +382,9 @@ function DashboardPage() {
                                     </TableCell>
                                     {/* К оплате (расходы) - красный */}
                                     <TableCell align="right">
-                                        {row.remaining > 0 && (
+                                        {row.expenses_unpaid > 0 && (
                                             <Chip
-                                                label={formatCurrency(row.remaining, row.currency)}
+                                                label={formatCurrency(row.expenses_unpaid, row.currency)}
                                                 sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
                                                 size="small"
                                             />

@@ -1,12 +1,12 @@
 {
   "cards": {
     "salary": 0,
-    "expenses": 50,
-    "credits": 500,
+    "expenses": 0,
+    "credits": 1500,
     "repayment": -300,
-    "to_pay": 200,
+    "to_pay": 1250,
     "bonus": 0,
-    "total": 150,
+    "total": 1200,
     "currency": "UAH"
   },
   "mutual_balances": [
@@ -18,6 +18,16 @@
       "credit": 500,
       "offset": 300,
       "remaining": 200,
+      "currency": "UAH"
+    },
+    {
+      "creditor_id": 1,
+      "creditor_name": "Administrator",
+      "debtor_id": 4,
+      "debtor_name": "Татьяна",
+      "credit": 1000,
+      "offset": 0,
+      "remaining": 1000,
       "currency": "UAH"
     }
   ],
@@ -33,9 +43,24 @@
       "expenses": 50,
       "expenses_paid": 0,
       "bonus": 0,
-      "total": 150,
+      "total": 200,
       "currency": "UAH",
       "expenses_unpaid": 50
+    },
+    {
+      "period": "2025-11",
+      "sessions": 0,
+      "hours": 0,
+      "salary": 0,
+      "paid": 1000,
+      "offset": 0,
+      "to_pay": 0,
+      "expenses": 0,
+      "expenses_paid": 0,
+      "bonus": 0,
+      "total": 1000,
+      "currency": "UAH",
+      "expenses_unpaid": 0
     }
   ],
   "payments": [
@@ -83,7 +108,22 @@
       "category_name": "Аванс",
       "category_group": "Долги",
       "description": ""
+    },
+    {
+      "id": 10,
+      "tracking_nr": "P10",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 4,
+      "recipient_name": "Татьяна",
+      "amount": 1000,
+      "currency": "UAH",
+      "payment_status": "paid",
+      "payment_date": "2025-11-20T13:02:42",
+      "category_name": "Аванс",
+      "category_group": "Долги",
+      "description": ""
     }
   ],
-  "export_timestamp": "2026-01-03T23:44:32.090315"
+  "export_timestamp": "2026-01-04T14:09:39.066281"
 }

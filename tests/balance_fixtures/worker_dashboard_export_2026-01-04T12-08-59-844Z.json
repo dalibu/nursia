@@ -33,9 +33,9 @@
       "expenses": 50,
       "expenses_paid": 50,
       "bonus": 0,
-      "remaining": 0,
       "total": 200,
-      "currency": "UAH"
+      "currency": "UAH",
+      "expenses_unpaid": 0
     }
   ],
   "payments": [

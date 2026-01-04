@@ -1,12 +1,12 @@
 {
   "cards": {
     "salary": 0,
-    "expenses": 50,
+    "expenses": 0,
     "credits": 500,
     "repayment": -300,
     "to_pay": 250,
     "bonus": 0,
-    "total": 250,
+    "total": 200,
     "currency": "UAH"
   },
   "mutual_balances": [
@@ -33,9 +33,9 @@
       "expenses": 50,
       "expenses_paid": 0,
       "bonus": 0,
-      "remaining": 50,
-      "total": 250,
-      "currency": "UAH"
+      "total": 200,
+      "currency": "UAH",
+      "expenses_unpaid": 50
     }
   ],
   "payments": [

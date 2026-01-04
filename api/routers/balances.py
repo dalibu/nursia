@@ -42,7 +42,7 @@ class MonthlySummary(BaseModel):
     expenses: float  # Потрачено (расходы)
     expenses_paid: float  # Возмещено расходов
     bonus: float  # Премии
-    remaining: float  # Остаток
+    expenses_unpaid: float  # Невозмещённые расходы
     total: float  # Итого (salary + expenses + bonus)
     currency: str
 
@@ -155,9 +155,9 @@ async def get_balance_summary(
     
     # 2. Расходы для карточек:
     # - Worker (user_filter_id): только UNPAID (что ему должны вернуть)
-    # - Admin/Employer: ВСЕ расходы (общая сумма расходов работников)
+    # - Admin/Employer: только PAID (уже компенсированные — реальные расходы работодателя)
     if user_filter_id:
-        # Worker видит только неоплаченные расходы
+        # Worker видит только неоплаченные расходы (его деньги, которые должны вернуть)
         expenses_query = select(func.sum(Payment.amount).label("total")).join(
             PaymentCategory, Payment.category_id == PaymentCategory.id
         ).join(
@@ -169,16 +169,22 @@ async def get_balance_summary(
             )
         ).where(Payment.payer_id == user_filter_id)
     else:
-        # Admin/Employer видит все расходы работников
+        # Employer видит только оплаченные расходы (уже компенсированные — его реальные траты)
         expenses_query = select(func.sum(Payment.amount).label("total")).join(
             PaymentCategory, Payment.category_id == PaymentCategory.id
         ).join(
             PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-        ).where(PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value)
+        ).where(
+            and_(
+                PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
+                Payment.payment_status.in_(['paid', 'offset'])
+            )
+        )
         if worker_id:
             expenses_query = expenses_query.where(Payment.payer_id == worker_id)
     result = await db.execute(expenses_query)
     total_expenses = float(result.one().total or 0)
+
 
 
 
@@ -680,12 +686,11 @@ async def get_monthly_summary(
         remaining = expenses - expenses_paid
         # Итого:
         # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашено - Невозмещённые расходы
-        # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Расходы - Погашено
+        # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Оплаченные расходы - Погашено
         if is_worker_view:
             total = salary + credits_given + bonus - credits_offset - remaining
         else:
-            total = salary + credits_given + bonus + expenses - credits_offset
-
+            total = salary + credits_given + bonus + expenses_paid - credits_offset
 
         
         summaries.append(MonthlySummary(
@@ -699,7 +704,7 @@ async def get_monthly_summary(
             expenses=round(expenses, 2),
             expenses_paid=round(expenses_paid, 2),
             bonus=round(bonus, 2),
-            remaining=round(remaining, 2),
+            expenses_unpaid=round(remaining, 2),
             total=round(total, 2),
             currency=currency
         ))
