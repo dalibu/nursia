@@ -255,18 +255,26 @@ async def get_balance_summary(
     result = await db.execute(unpaid_query)
     unpaid_amount = float(result.one().total or 0)
     
-    # 5. Премии — оплаченные платежи из группы "bonus"
+    # 5. Премии — только ОПЛАЧЕННЫЕ из группы "bonus"
+    # И для Worker, и для Employer: unpaid премия = ещё не получено/потрачено
     bonus_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.BONUS.value, Payment.payment_status.in_(['paid', 'offset'])))
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.BONUS.value,
+            Payment.payment_status.in_(['paid', 'offset'])
+        )
+    )
     if user_filter_id:
         bonus_query = bonus_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
         bonus_query = bonus_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(bonus_query)
     total_bonus = float(result.one().total or 0)
+
+
     
     # 6. Погашения (группа 'repayment')
     repayment_query = select(func.sum(Payment.amount).label("total")).join(
@@ -639,6 +647,8 @@ async def get_monthly_summary(
         expenses_paid = float(expenses_paid_row.total or 0)
         
         # Премии и бонусы (группа "bonus")
+        # Для Worker: все премии (ожидаемый доход)
+        # Для Employer: только PAID премии (реальные расходы)
         bonus_query = select(
             func.sum(Payment.amount).label("total")
         ).join(
@@ -652,6 +662,10 @@ async def get_monthly_summary(
                 PaymentCategoryGroup.code == PaymentGroupCode.BONUS.value
             )
         )
+        
+        # Только оплаченные премии (и для Worker, и для Employer)
+        bonus_query = bonus_query.where(Payment.payment_status.in_(['paid', 'offset']))
+
         
         if worker_id:
             bonus_query = bonus_query.where(Payment.recipient_id == worker_id)
