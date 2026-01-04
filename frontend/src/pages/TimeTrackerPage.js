@@ -195,8 +195,8 @@ function TimeTrackerPage() {
         } catch (e) { }
 
         return [{
-            startDate: startOfMonth(new Date()),
-            endDate: endOfMonth(new Date()),
+            startDate: null,
+            endDate: null,
             key: 'selection'
         }];
     });
