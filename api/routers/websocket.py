@@ -51,15 +51,28 @@ class ConnectionManager:
         """Get list of all connected user IDs"""
         return list(self.active_connections.keys())
     
-    async def broadcast(self, event: dict, exclude_user_id: Optional[int] = None):
-        """Send event to all connected users (optionally excluding one)"""
-        logger.info(f"Broadcasting event: {event}, exclude_user_id={exclude_user_id}, active_connections={list(self.active_connections.keys())}")
+    async def broadcast(self, event: dict, user_ids: Optional[List[int]] = None, exclude_user_id: Optional[int] = None):
+        """
+        Send event to connected users.
+        :param event: The message to send.
+        :param user_ids: If provided, send only to these users.
+        :param exclude_user_id: If provided, don't send to this user.
+        """
+        logger.info(f"Broadcasting event: {event.get('type')}, target_users={user_ids}, exclude={exclude_user_id}")
         message = json.dumps(event)
         disconnected = []
         
-        for user_id, connections in self.active_connections.items():
+        # Determine who to send to
+        recipients = user_ids if user_ids is not None else self.active_connections.keys()
+        
+        for user_id in list(recipients):
             if exclude_user_id and user_id == exclude_user_id:
                 continue
+            
+            connections = self.active_connections.get(user_id)
+            if not connections:
+                continue
+                
             for websocket in connections:
                 try:
                     await websocket.send_text(message)
@@ -104,6 +117,18 @@ def get_user_id_from_token(token: str) -> Optional[int]:
     except JWTError as e:
         logger.warning(f"JWT decode error: {e}")
     return None
+
+
+async def get_admin_ids() -> List[int]:
+    """Get IDs of all users with admin role"""
+    from database.core import AsyncSessionLocal
+    from database.models import User, Role
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as db:
+        query = select(User.id).join(User.roles).where(Role.name == 'admin')
+        result = await db.execute(query)
+        return result.scalars().all()
 
 
 @router.websocket("/ws")
@@ -165,16 +190,22 @@ async def broadcast_timer_updates():
     
     logger.info("Timer broadcast task started")
     
+    # Track users who received active sessions in the last tick
+    # user_id -> has_active
+    prev_active_users = set()
+    
     while True:
         try:
             await asyncio.sleep(1)
             
             # Skip if no connections
             if manager.get_total_connections() == 0:
+                prev_active_users.clear()
                 continue
             
             connected_users = manager.get_connected_user_ids()
             if not connected_users:
+                prev_active_users.clear()
                 continue
             
             async with AsyncSessionLocal() as db:
@@ -186,9 +217,6 @@ async def broadcast_timer_updates():
                 
                 result = await db.execute(query)
                 active_tasks = result.scalars().unique().all()
-                
-                if not active_tasks:
-                    continue
                 
                 now = now_server()
                 
@@ -205,56 +233,76 @@ async def broadcast_timer_updates():
                     if user and any(r.name == 'admin' for r in user.roles):
                         admin_users.add(user_id)
                 
-                for task in active_tasks:
-                    assignment = task.assignment
-                    
-                    # Calculate times
-                    total_work_seconds = 0
-                    total_pause_seconds = 0
-                    
-                    for t in assignment.tasks:
-                        if t.end_time:
-                            seg_seconds = t.duration_seconds
-                        elif t.id == task.id:
-                            start_dt = datetime.combine(assignment.assignment_date, t.start_time)
-                            seg_seconds = int((now - start_dt).total_seconds())
-                        else:
-                            seg_seconds = 0
+                if active_tasks:
+                    for task in active_tasks:
+                        assignment = task.assignment
                         
-                        if t.task_type == "work":
-                            total_work_seconds += seg_seconds
-                        else:
-                            total_pause_seconds += seg_seconds
-                    
-                    session_data = {
-                        "id": task.id,
-                        "assignment_id": assignment.id,
-                        "worker_id": assignment.user_id,
-                        "worker_name": assignment.worker.full_name if assignment.worker else None,
-                        "session_type": task.task_type,
-                        "total_work_seconds": total_work_seconds,
-                        "total_pause_seconds": total_pause_seconds,
-                        "is_active": True
-                    }
-                    sessions_data.append(session_data)
+                        # Calculate times
+                        total_work_seconds = 0
+                        total_pause_seconds = 0
+                        
+                        for t in assignment.tasks:
+                            if t.end_time:
+                                seg_seconds = t.duration_seconds
+                            elif t.id == task.id:
+                                start_dt = datetime.combine(assignment.assignment_date, t.start_time)
+                                seg_seconds = int((now - start_dt).total_seconds())
+                            else:
+                                seg_seconds = 0
+                            
+                            if t.task_type == "work":
+                                total_work_seconds += seg_seconds
+                            else:
+                                total_pause_seconds += seg_seconds
+                        
+                        session_data = {
+                            "id": task.id,
+                            "assignment_id": assignment.id,
+                            "worker_id": assignment.user_id,
+                            "worker_name": assignment.worker.full_name if assignment.worker else None,
+                            "session_type": task.task_type,
+                            "total_work_seconds": total_work_seconds,
+                            "total_pause_seconds": total_pause_seconds,
+                            "is_active": True
+                        }
+                        sessions_data.append(session_data)
                 
-                if sessions_data:
-                    # Send to appropriate users
-                    for user_id in connected_users:
-                        # Filter sessions for this user
-                        if user_id in admin_users:
-                            # Admin sees all sessions
-                            user_sessions = sessions_data
-                        else:
-                            # Regular user sees only their own
-                            user_sessions = [s for s in sessions_data if s["worker_id"] == user_id]
-                        
-                        if user_sessions:
-                            await manager.send_to_user(user_id, {
-                                "type": "timer_update",
-                                "sessions": user_sessions,
-                                "timestamp": now.isoformat()
-                            })
+                # Current tick active users
+                current_active_users = set()
+                
+                # Send to appropriate users
+                for user_id in connected_users:
+                    # Filter sessions for this user
+                    if user_id in admin_users:
+                        # Admin sees all sessions
+                        user_sessions = sessions_data
+                    else:
+                        # Regular user sees only their own
+                        user_sessions = [s for s in sessions_data if s["worker_id"] == user_id]
+                    
+                    if user_sessions:
+                        current_active_users.add(user_id)
+                        await manager.send_to_user(user_id, {
+                            "type": "timer_update",
+                            "sessions": user_sessions,
+                            "timestamp": now.isoformat()
+                        })
+                    elif user_id in prev_active_users:
+                        # User previously had sessions, but now none. Send empty list to clear UI.
+                        await manager.send_to_user(user_id, {
+                            "type": "timer_update",
+                            "sessions": [],
+                            "timestamp": now.isoformat()
+                        })
+                
+                prev_active_users = current_active_users
+        
+        except asyncio.CancelledError:
+            logger.info("Timer broadcast task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Timer broadcast error: {e}")
+            await asyncio.sleep(5)  # Wait before retrying after error
         
         except asyncio.CancelledError:
             logger.info("Timer broadcast task cancelled")

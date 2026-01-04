@@ -66,7 +66,7 @@ export function ActiveSessionProvider({ children }) {
     useEffect(() => {
         if (!isConnected) return;
 
-        const unsubscribe = subscribe('timer_update', (data) => {
+        const unsubscribeTimers = subscribe('timer_update', (data) => {
             // Update sessions from WebSocket data
             const sessions = data.sessions || [];
             setActiveSessions(sessions);
@@ -81,7 +81,19 @@ export function ActiveSessionProvider({ children }) {
             }
         });
 
-        return unsubscribe;
+        const unsubscribeActions = subscribe(
+            ['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'],
+            (event) => {
+                console.log('[ActiveSessionContext] Action event received:', event.type);
+                fetchActiveSession();
+                notifySessionChange();
+            }
+        );
+
+        return () => {
+            unsubscribeTimers();
+            unsubscribeActions();
+        };
     }, [subscribe, isConnected]);
 
     // Initial fetch (WebSocket will take over for updates)
