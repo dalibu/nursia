@@ -232,12 +232,14 @@ async def start_work_session(
     )
     
     # WebSocket broadcast
-    from api.routers.websocket import manager
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    
     await manager.broadcast({
         "type": "assignment_started",
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
-    }, exclude_user_id=current_user.id)
+    }, user_ids=target_users)
     
     return return_response
 
@@ -347,12 +349,23 @@ async def stop_work_session(
     )
     
     # WebSocket broadcast
-    from api.routers.websocket import manager
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    
+    # Notify about the new payment if it was created
+    if total_amount > 0:
+        await manager.broadcast({
+            "type": "payment_created",
+            "payment_id": payment.id,
+            "payer_id": payment.payer_id,
+            "recipient_id": payment.recipient_id
+        }, user_ids=target_users)
+
     await manager.broadcast({
         "type": "assignment_stopped",
         "assignment_id": assignment.id,
         "user_id": assignment.user_id
-    }, exclude_user_id=current_user.id)
+    }, user_ids=target_users)
     
     return return_response
 
@@ -412,6 +425,17 @@ async def switch_task(
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    
+    await manager.broadcast({
+        "type": "task_created",
+        "assignment_id": assignment_id,
+        "task_id": new_task.id,
+        "user_id": assignment.user_id
+    }, user_ids=target_users)
     
     return _task_to_response(
         new_task, assignment,
@@ -498,6 +522,16 @@ async def update_work_session(
     await db.commit()
     await db.refresh(task)
     
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    
+    await manager.broadcast({
+        "type": "payment_updated", # Re-using this to trigger refresh as it affects balances/times
+        "assignment_id": assignment.id,
+        "task_id": task.id
+    }, user_ids=target_users)
+    
     return _task_to_response(
         task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
@@ -559,6 +593,16 @@ async def delete_work_session(
     
     await db.commit()
     
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    
+    await manager.broadcast({
+        "type": "task_deleted",
+        "assignment_id": assignment.id,
+        "task_id": session_id
+    }, user_ids=target_users)
+    
     return {"message": "Сессия удалена"}
 
 
@@ -596,6 +640,14 @@ async def update_assignment(
         assignment.description = update_data.description
     
     await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    await manager.broadcast({
+        "type": "assignment_updated",
+        "assignment_id": assignment_id
+    }, user_ids=target_users)
     
     return {"message": "Assignment обновлён", "id": assignment_id}
 
@@ -646,6 +698,14 @@ async def delete_assignment(
     await db.delete(assignment)
     
     await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    await manager.broadcast({
+        "type": "assignment_deleted",
+        "assignment_id": assignment_id
+    }, user_ids=target_users)
     
     return {"message": "Assignment удалён", "id": assignment_id}
 
@@ -723,6 +783,15 @@ async def update_task(
         task.description = update_data.description
     
     await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    await manager.broadcast({
+        "type": "task_updated",
+        "assignment_id": assignment.id,
+        "task_id": task_id
+    }, user_ids=target_users)
     
     return {"message": "Task обновлён", "id": task_id}
 

@@ -445,10 +445,15 @@ function TimeTrackerPage() {
         loadSummary();
     }, [period, loadData, loadSummary]);
 
-    // Subscribe to WebSocket events for assignment changes
+    // Subscribe to WebSocket events for assignment and payment changes (synchronize table)
     useEffect(() => {
-        const unsubscribe = subscribe(['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'], () => {
-            console.log('Assignment data changed, reloading...');
+        const events = [
+            'assignment_started', 'assignment_stopped', 'assignment_updated', 'assignment_deleted',
+            'task_created', 'task_updated', 'task_deleted',
+            'payment_created', 'payment_updated', 'payment_deleted'
+        ];
+        const unsubscribe = subscribe(events, (event) => {
+            console.log('[TimeTracker] WebSocket event received:', event.type);
             loadData(true); // Silent refresh - no loading spinner
             loadSummary();
         });
