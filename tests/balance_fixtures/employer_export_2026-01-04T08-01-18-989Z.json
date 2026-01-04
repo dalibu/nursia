@@ -6,7 +6,7 @@
     "repayment": -300,
     "to_pay": 250,
     "bonus": 0,
-    "total": 200,
+    "total": 150,
     "currency": "UAH"
   },
   "mutual_balances": [
@@ -34,7 +34,7 @@
       "expenses_paid": 0,
       "bonus": 0,
       "remaining": 50,
-      "total": 200,
+      "total": 150,
       "currency": "UAH"
     }
   ],

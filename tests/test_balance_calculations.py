@@ -151,23 +151,35 @@ async def setup_async_test_db(fixture_data: dict):
     return engine, async_session
 
 
-async def calculate_balance_using_real_function(engine, async_session, worker_id=None):
+async def calculate_balance_using_real_function(engine, async_session, worker_id=None, is_worker_view=False):
     """
     Call the ACTUAL balance calculation function from api/routers/balances.py
     This is the DRY approach - we test the real business logic!
+    
+    Args:
+        is_worker_view: If True, simulate a worker (without admin permissions)
+                       If False, simulate admin who can see all data
     """
     from api.routers.balances import get_mutual_balances, get_monthly_summary
     
     async with async_session() as db:
-        # Create a mock user with admin permissions to see all data
+        # Create a mock user
         mock_user = MagicMock()
-        mock_user.id = 999  # Non-existent user to avoid filtering
-        mock_user.has_permission = MagicMock(return_value=True)  # Admin can see everything
         
-        # If worker_id is specified, limit to that worker
+        if is_worker_view and worker_id:
+            # Worker view: user sees only their own data
+            mock_user.id = worker_id
+            mock_user.has_permission = MagicMock(return_value=False)  # No admin perms
+        else:
+            # Admin view: can see all data
+            mock_user.id = 999  # Non-existent user to avoid filtering
+            mock_user.has_permission = MagicMock(return_value=True)  # Admin can see everything
+        
+        # If worker_id is specified and is_worker_view=False (admin), we pass worker_id to filter
+        # If is_worker_view=True, the filtering happens via user_filter_id in the function
         summary_result = await get_balance_summary(
             employer_id=None,
-            worker_id=worker_id,
+            worker_id=worker_id if not is_worker_view else None,  # Admin can filter by worker_id
             db=db,
             current_user=mock_user
         )
@@ -257,24 +269,29 @@ async def test_balance_calculation(fixture_path: Path):
     # For employer fixtures, we DON'T filter by worker (to see all data)
     # For worker fixtures, we filter by specific worker
     worker_id = fixture_data.get("worker_id")
+    is_worker_view = "worker" in fixture_path.stem.lower()
     
-    if worker_id is None:
-        # Check filename to determine if this is worker or employer view
-        if "worker" in fixture_path.stem.lower():
-            # Auto-detect: find recipient of debt/credit payments (they are the worker)
-            payments = fixture_data.get("payments", [])
-            for p in payments:
-                if p.get("category_group") == "Долги" and p.get("recipient_id"):
-                    worker_id = p.get("recipient_id")
-                    break
-        # else: for employer view, leave worker_id as None
+    if worker_id is None and is_worker_view:
+        # Auto-detect: find recipient of debt/credit payments (they are the worker)
+        payments = fixture_data.get("payments", [])
+        for p in payments:
+            if p.get("category_group") == "Долги" and p.get("recipient_id"):
+                worker_id = p.get("recipient_id")
+                break
     
     # Setup async test database
     engine, async_session = await setup_async_test_db(fixture_data)
     
     try:
         # Call the REAL balance calculation function
-        calculated = await calculate_balance_using_real_function(engine, async_session, worker_id=worker_id)
+        # For worker fixtures: simulate worker user (is_worker_view=True)
+        # For employer fixtures: simulate admin user
+        calculated = await calculate_balance_using_real_function(
+            engine, async_session, 
+            worker_id=worker_id,
+            is_worker_view=is_worker_view
+        )
+
         
         # Compare cards
         fields_to_check = ["salary", "expenses", "credits", "repayment", "bonus", "to_pay", "total"]

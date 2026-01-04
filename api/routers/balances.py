@@ -153,19 +153,27 @@ async def get_balance_summary(
     result = await db.execute(salary_query)
     total_salary = float(result.one().total or 0)
     
-    # 2. Расходы — ДВА запроса:
-    # 2a. Все расходы (для карточки "Расходы")
-    expenses_all_query = select(func.sum(Payment.amount).label("total")).join(
+    # 2. Расходы для карточек — только UNPAID (невозмещённые)
+    # Карточка показывает "активную" сумму расходов, которые ещё не вернули
+    # В помесячной таблице показываются все расходы и компенсации отдельно
+    expenses_unpaid_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value)
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
+            Payment.payment_status == 'unpaid'
+        )
+    )
     if user_filter_id:
-        expenses_all_query = expenses_all_query.where(Payment.payer_id == user_filter_id)
+        expenses_unpaid_query = expenses_unpaid_query.where(Payment.payer_id == user_filter_id)
     elif worker_id:
-        expenses_all_query = expenses_all_query.where(Payment.payer_id == worker_id)
-    result = await db.execute(expenses_all_query)
+        expenses_unpaid_query = expenses_unpaid_query.where(Payment.payer_id == worker_id)
+    result = await db.execute(expenses_unpaid_query)
     total_expenses = float(result.one().total or 0)
+
+
     
     # 2b. Только оплаченные расходы (для расчета "Итого")
     expenses_paid_query = select(func.sum(Payment.amount).label("total")).join(
@@ -262,9 +270,12 @@ async def get_balance_summary(
     # К оплате = непогашенные кредиты + неоплаченные платежи
     total_unpaid = max(0, total_credits - total_repayment) + unpaid_amount
     
-    # 7. Всего = Зарплата + Кредиты + Премии + Расходы (ТОЛЬКО ОПЛАЧЕННЫЕ) - Погашено
-    # Это соответствует сумме колонки "Итого" в помесячном обзоре
-    total = total_salary + total_credits + total_bonus + total_expenses_paid - total_repayment
+    # 7. Всего (чистый доход для Worker):
+    # = Зарплата + Кредиты + Премии - Погашения - Невозмещённые расходы
+    # Оплаченные расходы не влияют на доход (это просто возврат своих денег)
+    # Неоплаченные расходы уменьшают доход, пока их не возместят
+    total = total_salary + total_credits + total_bonus - total_repayment - total_expenses
+
     
     # Балансы (неоплаченные долги)
     balances = []
@@ -651,7 +662,9 @@ async def get_monthly_summary(
         cumulative_to_pay = cumulative_credits - cumulative_offset
         
         remaining = expenses - expenses_paid
-        total = salary + credits_given + bonus + expenses_paid - credits_offset  # Зарплата + Кредиты + Премии + Расходы - Погашено
+        # Итого (чистый доход) = Зарплата + Кредиты + Премии - Погашено - Невозмещённые расходы
+        total = salary + credits_given + bonus - credits_offset - remaining
+
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",

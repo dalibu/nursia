@@ -1,12 +1,12 @@
 {
   "cards": {
     "salary": 0,
-    "expenses": 50,
+    "expenses": 0,
     "credits": 500,
     "repayment": -300,
     "to_pay": 200,
     "bonus": 0,
-    "total": 150,
+    "total": 200,
     "currency": "UAH"
   },
   "mutual_balances": [
@@ -29,12 +29,12 @@
       "salary": 0,
       "paid": 500,
       "offset": -300,
-      "to_pay": 50,
+      "to_pay": 0,
       "expenses": 50,
-      "expenses_paid": 0,
+      "expenses_paid": 50,
       "bonus": 0,
-      "remaining": 50,
-      "total": 150,
+      "remaining": 0,
+      "total": 200,
       "currency": "UAH"
     }
   ],
@@ -48,7 +48,7 @@
       "recipient_name": "Administrator",
       "amount": 50,
       "currency": "UAH",
-      "payment_status": "unpaid",
+      "payment_status": "paid",
       "payment_date": "2026-01-03T22:21:39",
       "category_name": "Продукты",
       "category_group": "Расходы",
@@ -85,5 +85,5 @@
       "description": ""
     }
   ],
-  "export_timestamp": "2026-01-03T23:44:32.090315"
+  "export_timestamp": "2026-01-04T13:08:59.798568"
 }
