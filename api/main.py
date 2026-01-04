@@ -1,5 +1,11 @@
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress DeprecationWarnings from FastAPI and Starlette (e.g. on_event)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="fastapi")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="starlette")
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI

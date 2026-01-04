@@ -23,6 +23,8 @@ services:
     environment:
       - DB_URL=sqlite+aiosqlite:///./data/nursia.db
       - PYTHONPATH=/app
+      - PYTHONWARNINGS=ignore::DeprecationWarning
+
     command: ./scripts/startup.sh
     depends_on:
       - frontend
