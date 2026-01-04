@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from database.core import get_db
 from database.models import User, RegistrationRequest, Role, Permission, user_roles, role_permissions
 from api.schemas.auth import RegistrationRequestResponse
@@ -37,14 +37,13 @@ class RoleUpdate(BaseModel):
 
 
 class RoleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     type: str
     description: Optional[str] = None
     permissions: List[str] = []
-
-    class Config:
-        from_attributes = True
 
 
 class PermissionCreate(BaseModel):
@@ -53,12 +52,11 @@ class PermissionCreate(BaseModel):
 
 
 class PermissionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     description: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class UserRoleUpdate(BaseModel):
