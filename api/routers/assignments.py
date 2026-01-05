@@ -112,6 +112,35 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
 
 
+class ManualTaskCreate(BaseModel):
+    """Задание для ручного создания смены"""
+    start_time: time
+    end_time: time
+    task_type: str = "work"  # work или pause
+    description: Optional[str] = None
+
+
+class ManualAssignmentCreate(BaseModel):
+    """Ручное создание смены"""
+    worker_id: int
+    assignment_date: date
+    hourly_rate: Optional[float] = None  # Если не указано, берётся из EmploymentRelation
+    currency: Optional[str] = None
+    description: Optional[str] = None
+    tasks: List[ManualTaskCreate]
+
+
+class ManualAssignmentResponse(BaseModel):
+    """Ответ на ручное создание смены"""
+    assignment_id: int
+    tracking_nr: str
+    payment_id: Optional[int] = None
+    payment_tracking_nr: Optional[str] = None
+    total_hours: float
+    total_amount: float
+    currency: str
+
+
 def _task_to_response(task: Task, assignment: Assignment, 
                       worker_name: Optional[str] = None,
                       employer_name: Optional[str] = None,
@@ -242,6 +271,229 @@ async def start_work_session(
     }, user_ids=target_users)
     
     return return_response
+
+
+@router.post("/manual", response_model=ManualAssignmentResponse)
+async def create_manual_assignment(
+    data: ManualAssignmentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Создать смену вручную (завершённую) с автоматическим созданием платежа"""
+    
+    target_worker_id = data.worker_id
+    
+    # Проверка прав: работник может создать смену только для себя
+    if not current_user.is_admin:
+        if target_worker_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Вы можете создать смену только для себя")
+        target_worker_id = current_user.id
+    
+    # Проверяем наличие заданий
+    if not data.tasks or len(data.tasks) == 0:
+        raise HTTPException(status_code=400, detail="Необходимо указать хотя бы одно задание")
+    
+    # Валидация заданий: проверка времени
+    def to_minutes(t: time) -> int:
+        return t.hour * 60 + t.minute
+    
+    for i, task in enumerate(data.tasks):
+        if to_minutes(task.end_time) <= to_minutes(task.start_time):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Задание #{i+1}: время окончания должно быть позже времени начала"
+            )
+        if task.task_type not in ["work", "pause"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Задание #{i+1}: тип должен быть 'work' или 'pause'"
+            )
+    
+    # Проверка пересечений между заданиями внутри смены
+    for i, task1 in enumerate(data.tasks):
+        for j, task2 in enumerate(data.tasks):
+            if i >= j:
+                continue
+            t1_start, t1_end = to_minutes(task1.start_time), to_minutes(task1.end_time)
+            t2_start, t2_end = to_minutes(task2.start_time), to_minutes(task2.end_time)
+            # Пересечение: (start1 < end2) AND (end1 > start2)
+            if t1_start < t2_end and t1_end > t2_start:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Задания #{i+1} и #{j+1} пересекаются по времени"
+                )
+    
+    # Проверяем, есть ли активное трудовое отношение для работника
+    result = await db.execute(
+        select(EmploymentRelation).where(
+            and_(
+                EmploymentRelation.user_id == target_worker_id,
+                EmploymentRelation.is_active == True
+            )
+        )
+    )
+    employment = result.scalar_one_or_none()
+    
+    if not employment:
+        raise HTTPException(status_code=404, detail="Трудовые отношения не найдены")
+    
+    # Получаем ставку и валюту
+    hourly_rate = Decimal(str(data.hourly_rate)) if data.hourly_rate else employment.hourly_rate
+    currency = data.currency or employment.currency
+    
+    # Проверка пересечений с существующими сменами в тот же день
+    result = await db.execute(
+        select(Assignment)
+        .options(joinedload(Assignment.tasks))
+        .where(
+            and_(
+                Assignment.user_id == target_worker_id,
+                Assignment.assignment_date == data.assignment_date
+            )
+        )
+    )
+    existing_assignments = result.unique().scalars().all()
+    
+    # Диапазон новой смены
+    new_tasks_sorted = sorted(data.tasks, key=lambda t: to_minutes(t.start_time))
+    new_shift_start = to_minutes(new_tasks_sorted[0].start_time)
+    new_shift_end = to_minutes(new_tasks_sorted[-1].end_time)
+    
+    for existing in existing_assignments:
+        if not existing.tasks:
+            continue
+        # Находим границы существующей смены
+        existing_tasks_sorted = sorted(existing.tasks, key=lambda t: to_minutes(t.start_time))
+        existing_start = to_minutes(existing_tasks_sorted[0].start_time)
+        existing_end = to_minutes(existing_tasks_sorted[-1].end_time) if existing_tasks_sorted[-1].end_time else 24 * 60
+        
+        # Проверяем пересечение
+        if new_shift_start < existing_end and new_shift_end > existing_start:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Смена пересекается с существующей {existing.tracking_nr} ({existing_tasks_sorted[0].start_time.strftime('%H:%M')}-{existing_tasks_sorted[-1].end_time.strftime('%H:%M') if existing_tasks_sorted[-1].end_time else '...'})'"
+            )
+    
+    # Создаём Assignment (завершённую смену)
+    new_assignment = Assignment(
+        user_id=target_worker_id,
+        assignment_date=data.assignment_date,
+        hourly_rate=hourly_rate,
+        currency=currency,
+        description=data.description,
+        is_active=False  # Смена уже завершена
+    )
+    db.add(new_assignment)
+    await db.flush()
+    
+    # Generate tracking number
+    from utils.tracking import format_assignment_tracking_nr
+    new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
+    
+    # Создаём Tasks
+    total_work_seconds = 0
+    for task_data in data.tasks:
+        new_task = Task(
+            assignment_id=new_assignment.id,
+            start_time=task_data.start_time,
+            end_time=task_data.end_time,
+            task_type=task_data.task_type,
+            description=task_data.description
+        )
+        db.add(new_task)
+        
+        # Считаем рабочее время
+        if task_data.task_type == "work":
+            duration_seconds = (to_minutes(task_data.end_time) - to_minutes(task_data.start_time)) * 60
+            total_work_seconds += duration_seconds
+    
+    # Рассчитываем сумму
+    total_hours = total_work_seconds / 3600
+    total_amount = Decimal(str(total_hours)) * hourly_rate
+    
+    # Создаём платёж если сумма > 0
+    payment = None
+    if total_amount > 0:
+        # Собираем комментарии
+        comments = []
+        if data.description:
+            comments.append(data.description)
+        for task_data in data.tasks:
+            if task_data.description and task_data.description not in comments:
+                comments.append(task_data.description)
+        
+        joined_comments = ", ".join(comments)
+        full_description = f"Смена {new_assignment.tracking_nr}"
+        if joined_comments:
+            full_description += f": {joined_comments}"
+        if len(full_description) > 500:
+            full_description = full_description[:497] + "..."
+        
+        from utils.tracking import format_payment_tracking_nr
+        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
+        
+        # Get employer (user with employer role)
+        employer_result = await db.execute(
+            select(User).join(User.roles).where(Role.name == "employer")
+        )
+        employer = employer_result.scalar_one_or_none()
+        payer_id = employer.id if employer else target_worker_id
+        
+        # Find salary category
+        salary_cat_result = await db.execute(
+            select(PaymentCategory).join(PaymentCategoryGroup).where(
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
+            )
+        )
+        salary_category = salary_cat_result.scalar_one_or_none()
+        if not salary_category:
+            raise HTTPException(status_code=500, detail="Категория зарплаты не найдена")
+        
+        payment = Payment(
+            payer_id=payer_id,
+            recipient_id=target_worker_id,
+            category_id=salary_category.id,
+            amount=total_amount,
+            currency=currency,
+            description=full_description,
+            payment_date=datetime.combine(data.assignment_date, time(12, 0)),  # Полдень в день смены
+            payment_status='unpaid',
+            assignment_id=new_assignment.id
+        )
+        db.add(payment)
+        await db.flush()
+        payment.tracking_nr = format_payment_tracking_nr(payment.id)
+    
+    await db.commit()
+    await db.refresh(new_assignment)
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    
+    await manager.broadcast({
+        "type": "assignment_started",  # Используем существующий тип для триггера обновления
+        "assignment_id": new_assignment.id,
+        "user_id": target_worker_id
+    }, user_ids=target_users)
+    
+    if payment:
+        await manager.broadcast({
+            "type": "payment_created",
+            "payment_id": payment.id,
+            "payer_id": payment.payer_id,
+            "recipient_id": payment.recipient_id
+        }, user_ids=target_users)
+    
+    return ManualAssignmentResponse(
+        assignment_id=new_assignment.id,
+        tracking_nr=new_assignment.tracking_nr,
+        payment_id=payment.id if payment else None,
+        payment_tracking_nr=payment.tracking_nr if payment else None,
+        total_hours=total_hours,
+        total_amount=float(total_amount),
+        currency=currency
+    )
 
 
 @router.post("/{session_id}/stop", response_model=WorkSessionResponse)
@@ -857,7 +1109,7 @@ async def get_work_sessions(
 async def get_grouped_sessions(
     worker_id: Optional[int] = Query(None),
     employer_id: Optional[int] = Query(None),
-    period: str = Query("month", pattern="^(day|week|month|year)$"),
+    period: str = Query("month", pattern="^(all|day|week|month|year)$"),
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -866,15 +1118,17 @@ async def get_grouped_sessions(
     from utils.timezone import now_server
     now = now_server()
     
-    # Calculate date range
+    # Calculate date range (None = no filter)
+    start_date = None
     if period == "day":
         start_date = now.date()
     elif period == "week":
         start_date = now.date() - timedelta(days=7)
     elif period == "month":
         start_date = now.date().replace(day=1)
-    else:
+    elif period == "year":
         start_date = now.date().replace(month=1, day=1)
+    # period == "all" -> start_date remains None (no filter)
     
     # Get all assignments in date range
     query = select(Assignment).options(
@@ -882,9 +1136,13 @@ async def get_grouped_sessions(
         joinedload(Assignment.worker),
         joinedload(Assignment.tasks),
         joinedload(Assignment.payment)
-    ).where(
-        Assignment.assignment_date >= start_date
-    ).order_by(Assignment.assignment_date.desc(), Assignment.id.desc())
+    )
+    
+    # Apply date filter only if start_date is set
+    if start_date:
+        query = query.where(Assignment.assignment_date >= start_date)
+    
+    query = query.order_by(Assignment.assignment_date.desc(), Assignment.id.desc())
     
     if worker_id:
         query = query.where(Assignment.user_id == worker_id)
@@ -1030,7 +1288,7 @@ async def get_active_sessions(
 async def get_sessions_summary(
     worker_id: Optional[int] = Query(None),
     employer_id: Optional[int] = Query(None),
-    period: str = Query("month", pattern="^(day|week|month|year)$"),
+    period: str = Query("month", pattern="^(all|day|week|month|year)$"),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -1048,7 +1306,9 @@ async def get_sessions_summary(
     now = now_server()
     
     if not start_date:
-        if period == "day":
+        if period == "all":
+            start_date = date(2000, 1, 1)  # Very old date to include all records
+        elif period == "day":
             start_date = now.date()
         elif period == "week":
             start_date = now.date() - timedelta(days=7)

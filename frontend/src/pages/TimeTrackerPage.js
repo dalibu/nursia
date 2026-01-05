@@ -6,7 +6,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
-    Popover, Tooltip
+    Popover, Tooltip, Menu
 } from '@mui/material';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -16,10 +16,12 @@ import 'react-date-range/dist/theme/default.css';
 import {
     PlayArrow, Stop, AccessTime, Person, Work, Add,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
-    KeyboardArrowDown, KeyboardArrowUp, Search, DateRange
+    KeyboardArrowDown, KeyboardArrowUp, Search, DateRange,
+    ArrowDropDown, NoteAdd
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
+import ManualAssignmentDialog from '../components/ManualAssignmentDialog';
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -133,7 +135,7 @@ function TimeTrackerPage() {
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
     const [summary, setSummary] = useState([]);
-    const [period, setPeriod] = useState('month');
+    const [period, setPeriod] = useState('all');  // Show all shifts by default
     const [isAdmin, setIsAdmin] = useState(false);
 
     // Initialize filters from URL params or localStorage
@@ -222,6 +224,12 @@ function TimeTrackerPage() {
     const [selectedEmployment, setSelectedEmployment] = useState('');
     const [startDescription, setStartDescription] = useState('');
     const [startTaskDescription, setStartTaskDescription] = useState('');
+
+    // Dropdown menu for "Начать смену" button
+    const [startMenuAnchor, setStartMenuAnchor] = useState(null);
+
+    // Manual assignment dialog
+    const [manualDialogOpen, setManualDialogOpen] = useState(false);
 
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -516,6 +524,41 @@ function TimeTrackerPage() {
             console.error('Failed to start session:', error);
             showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
         }
+    };
+
+    // Handle dropdown menu
+    const handleStartMenuOpen = (event) => {
+        setStartMenuAnchor(event.currentTarget);
+    };
+
+    const handleStartMenuClose = () => {
+        setStartMenuAnchor(null);
+    };
+
+    const handleStartTimerClick = () => {
+        handleStartMenuClose();
+        handleStartClick();
+    };
+
+    const handleManualAddClick = () => {
+        handleStartMenuClose();
+        setManualDialogOpen(true);
+    };
+
+    // Handle saving manual assignment
+    const handleSaveManualAssignment = async (payload) => {
+        const result = await assignmentsService.createManual(payload);
+        loadData();
+        loadSummary();
+        showSuccess(`Смена ${result.data.tracking_nr} создана!`);
+        return result.data;
+    };
+
+    // Handle payment edit after manual assignment creation
+    const handlePaymentEditFromManual = (paymentId, assignmentResult) => {
+        // Navigate to payments page with the new payment
+        navigate(`/payments?search=${assignmentResult.payment_tracking_nr}`);
+        showSuccess(`Смена ${assignmentResult.tracking_nr} создана! Перейдите к платежу для редактирования.`);
     };
 
     // Handle new task creation (switch to new task in current or specified session)
@@ -849,15 +892,43 @@ function TimeTrackerPage() {
                     Учёт заданий
                 </Typography>
                 <Box display="flex" gap={1}>
+                    {/* Dropdown menu for "Начать смену" */}
                     <Button
                         variant="contained"
                         color="success"
-                        startIcon={<PlayArrow />}
-                        onClick={handleStartClick}
-                        disabled={!isAdmin && !!activeSession}
+                        endIcon={<ArrowDropDown />}
+                        onClick={handleStartMenuOpen}
+                        sx={{
+                            '& .MuiButton-endIcon': { ml: 0.5 }
+                        }}
                     >
                         Начать смену
                     </Button>
+                    <Menu
+                        anchorEl={startMenuAnchor}
+                        open={Boolean(startMenuAnchor)}
+                        onClose={handleStartMenuClose}
+                        anchorOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                        }}
+                        transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'left',
+                        }}
+                    >
+                        <MenuItem
+                            onClick={handleStartTimerClick}
+                            disabled={!isAdmin && !!activeSession}
+                        >
+                            <PlayArrow sx={{ mr: 1, color: 'success.main' }} />
+                            Запустить таймер
+                        </MenuItem>
+                        <MenuItem onClick={handleManualAddClick}>
+                            <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
+                            Добавить вручную
+                        </MenuItem>
+                    </Menu>
                     <Button
                         variant="contained"
                         color={activeSession?.session_type === 'pause' ? 'success' : 'warning'}
@@ -1627,6 +1698,16 @@ function TimeTrackerPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Manual Assignment Dialog */}
+            <ManualAssignmentDialog
+                open={manualDialogOpen}
+                onClose={() => setManualDialogOpen(false)}
+                onSave={handleSaveManualAssignment}
+                employmentList={employmentList}
+                isAdmin={isAdmin}
+                onPaymentEdit={handlePaymentEditFromManual}
+            />
 
             {/* Snackbar for notifications */}
             <Snackbar
