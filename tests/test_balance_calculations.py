@@ -230,7 +230,6 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
                     "salary": ms.salary,
                     "credit": ms.credit,
                     "offset": ms.offset,
-                    "paid": ms.paid,
                     "to_pay": ms.to_pay,
                     "expenses": ms.expenses,
                     "expenses_paid": ms.expenses_paid,
@@ -261,7 +260,6 @@ async def test_balance_calculation(fixture_path: Path):
     """
     fixture_data = load_fixture(fixture_path)
     expected_cards = fixture_data.get("cards", {})
-    expected_mutual = fixture_data.get("mutual_balances", [])
     
     if not expected_cards:
         pytest.skip(f"No 'cards' section in fixture {fixture_path.name}")
@@ -305,25 +303,25 @@ async def test_balance_calculation(fixture_path: Path):
             if abs(expected - actual) > 0.01:  # Allow small float precision errors
                 card_errors.append(f"  {field:12} expected {expected:10.2f}, got {actual:10.2f}")
         
-        # Compare mutual_balances
+        # Compare mutual_balances (mandatory - always compare even if fixture has empty list)
         mutual_errors = []
-        if expected_mutual:
-            actual_mutual = calculated.get("mutual_balances", [])
-            
-            if len(expected_mutual) != len(actual_mutual):
-                mutual_errors.append(f"  Count mismatch: expected {len(expected_mutual)}, got {len(actual_mutual)}")
-            else:
-                for i, (exp_mb, act_mb) in enumerate(zip(expected_mutual, actual_mutual)):
-                    # Compare each field
-                    for field in ["creditor_id", "debtor_id", "credit", "offset", "remaining"]:
-                        exp_val = exp_mb.get(field, 0)
-                        act_val = act_mb.get(field, 0)
-                        
-                        if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
-                            if abs(exp_val - act_val) > 0.01:
-                                mutual_errors.append(f"  [{i}].{field:12} expected {exp_val:10.2f}, got {act_val:10.2f}")
-                        elif exp_val != act_val:
-                            mutual_errors.append(f"  [{i}].{field:12} expected {exp_val}, got {act_val}")
+        expected_mutual = fixture_data.get("mutual_balances", [])
+        actual_mutual = calculated.get("mutual_balances", [])
+        
+        if len(expected_mutual) != len(actual_mutual):
+            mutual_errors.append(f"  Count mismatch: expected {len(expected_mutual)}, got {len(actual_mutual)}")
+        else:
+            for i, (exp_mb, act_mb) in enumerate(zip(expected_mutual, actual_mutual)):
+                # Compare each field
+                for field in ["creditor_id", "debtor_id", "credit", "offset", "remaining"]:
+                    exp_val = exp_mb.get(field, 0)
+                    act_val = act_mb.get(field, 0)
+                    
+                    if isinstance(exp_val, (int, float)) and isinstance(act_val, (int, float)):
+                        if abs(exp_val - act_val) > 0.01:
+                            mutual_errors.append(f"  [{i}].{field:12} expected {exp_val:10.2f}, got {act_val:10.2f}")
+                    elif exp_val != act_val:
+                        mutual_errors.append(f"  [{i}].{field:12} expected {exp_val}, got {act_val}")
         
         # Compare monthly data
         monthly_errors = []
@@ -343,7 +341,7 @@ async def test_balance_calculation(fixture_path: Path):
                 act_m = actual_monthly_dict[period]
                 
                 # Compare each field (excluding sessions/hours - they come from Assignment/Task data, not payments)
-                monthly_fields = ["salary", "credit", "offset", "paid",
+                monthly_fields = ["salary", "credit", "offset",
                                  "to_pay", "expenses", "expenses_paid", "bonus", "expenses_unpaid", "total"]
                 for field in monthly_fields:
                     exp_val = exp_m.get(field, 0)

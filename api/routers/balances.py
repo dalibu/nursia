@@ -35,16 +35,15 @@ class MonthlySummary(BaseModel):
     period: str  # "2025-09"
     sessions: int  # Количество посещений (сессий)
     hours: float  # Часы работы
-    salary: float  # Зарплата (из work_sessions)
-    credit: float  # Кредит (выданные авансы)
+    salary: float  # Зарплата (оплаченная)
+    credit: float  # Кредит (выданные авансы, оплаченные)
     offset: float  # Погашение (зачтённые в счёт долга)
-    paid: float  # Оплачено (все платежи со статусом paid)
     to_pay: float  # К оплате (все платежи со статусом unpaid)
-    expenses: float  # Потрачено (расходы)
+    expenses: float  # Расходы (оплаченные)
     expenses_paid: float  # Возмещено расходов
-    bonus: float  # Премии
+    bonus: float  # Премии (оплаченные)
     expenses_unpaid: float  # Невозмещённые расходы
-    total: float  # Итого (salary + expenses + bonus)
+    total: float  # Итого
     currency: str
 
 
@@ -290,8 +289,11 @@ async def get_balance_summary(
     result = await db.execute(repayment_query)
     total_repayment = float(result.one().total or 0)
     
-    # К оплате = непогашенные кредиты + неоплаченные платежи
-    total_unpaid = max(0, total_credits - total_repayment) + unpaid_amount
+    # К оплате = только неоплаченные платежи
+    # Долг работника (credits) автоматически погашается оплаченной зарплатой,
+    # поэтому НЕ добавляем credits в to_pay для работодателя.
+    # to_pay показывает сколько работодатель ещё должен выплатить (unpaid payments).
+    total_unpaid = unpaid_amount
     
     # 7. Всего:
     # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашения - Невозмещённые расходы
@@ -686,10 +688,12 @@ async def get_monthly_summary(
             )
         )
         
+        # Worker view: показывать неоплаченные платежи где worker = recipient (сколько ему должны)
+        # Employer view: показывать неоплаченные платежи где employer = payer (сколько он должен)
         if worker_id:
-            unpaid_query = unpaid_query.where(Payment.payer_id == worker_id)
+            unpaid_query = unpaid_query.where(Payment.recipient_id == worker_id)
         elif employer_id:
-            unpaid_query = unpaid_query.where(Payment.recipient_id == employer_id)
+            unpaid_query = unpaid_query.where(Payment.payer_id == employer_id)
         
         result = await db.execute(unpaid_query)
         unpaid_amount = float(result.one().total or 0)
@@ -715,7 +719,6 @@ async def get_monthly_summary(
             salary=round(salary, 2),
             credit=round(credits_given, 2),  # Кредит: выданные авансы
             offset=round(-credits_offset, 2),  # Погашено: отрицательное (возврат)
-            paid=round(total_paid, 2),  # Оплачено: все оплаченные платежи
             to_pay=round(unpaid_amount, 2),  # К оплате: все неоплаченные платежи
             expenses=round(expenses, 2),
             expenses_paid=round(expenses_paid, 2),
@@ -1046,47 +1049,39 @@ async def get_mutual_balances(
         # repayment = погашает долг (прямая выплата)
         # ВАЖНО: unpaid_expense НЕ учитывается - неоплаченные расходы не влияют на баланс
         # ВАЖНО: paid expense НЕ вычитается — оплаченные расходы просто "уже возмещены"
-        # positive = B owes A, negative = A owes B
+        # positive = B owes A, negative/zero = debt is paid off
         
-        balance_b_owes_a = debt_a_to_b - salary_a_to_b - repayment_b_to_a
-        balance_a_owes_b = debt_b_to_a - salary_b_to_a - repayment_a_to_b
-        net_balance = balance_b_owes_a - balance_a_owes_b
+        # Долг B перед A (с учётом погашения зарплатой и repayment)
+        balance_b_owes_a = max(0, debt_a_to_b - salary_a_to_b - repayment_b_to_a)
+        # Долг A перед B (с учётом погашения)
+        balance_a_owes_b = max(0, debt_b_to_a - salary_b_to_a - repayment_a_to_b)
         
         # Для отображения: используем ФАКТИЧЕСКИЙ долг из более крупного направления
         if debt_a_to_b >= debt_b_to_a:
             # A дал больше долга B (или равно)
             main_debt = debt_a_to_b
             main_offset = salary_a_to_b + expense_a_to_b + repayment_b_to_a
+            remaining = balance_b_owes_a
+            creditor_id, debtor_id = a_id, b_id
         else:
             # B дал больше долга A
             main_debt = debt_b_to_a
             main_offset = salary_b_to_a + expense_b_to_a + repayment_a_to_b
+            remaining = balance_a_owes_b
+            creditor_id, debtor_id = b_id, a_id
         
-        if abs(net_balance) > 0.01:
-            if net_balance > 0:
-                # B должен A
-                balances.append(MutualBalance(
-                    creditor_id=a_id,
-                    creditor_name=user_names.get(a_id, f"ID:{a_id}"),
-                    debtor_id=b_id,
-                    debtor_name=user_names.get(b_id, f"ID:{b_id}"),
-                    credit=round(main_debt, 2),
-                    offset=round(main_offset, 2),
-                    remaining=round(net_balance, 2),
-                    currency=currency
-                ))
-            else:
-                # A должен B
-                balances.append(MutualBalance(
-                    creditor_id=b_id,
-                    creditor_name=user_names.get(b_id, f"ID:{b_id}"),
-                    debtor_id=a_id,
-                    debtor_name=user_names.get(a_id, f"ID:{a_id}"),
-                    credit=round(main_debt, 2),
-                    offset=round(main_offset, 2),
-                    remaining=round(-net_balance, 2),
-                    currency=currency
-                ))
+        # Показываем только если есть реальный остаток долга
+        if remaining > 0.01:
+            balances.append(MutualBalance(
+                creditor_id=creditor_id,
+                creditor_name=user_names.get(creditor_id, f"ID:{creditor_id}"),
+                debtor_id=debtor_id,
+                debtor_name=user_names.get(debtor_id, f"ID:{debtor_id}"),
+                credit=round(main_debt, 2),
+                offset=round(main_offset, 2),
+                remaining=round(remaining, 2),
+                currency=currency
+            ))
     
     return balances
 
@@ -1133,7 +1128,7 @@ async def get_debug_export(
     monthly = [
         m for m in monthly 
         if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
-           m.credit > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0 or m.paid > 0
+           m.credit > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0
     ]
     
     mutual = await get_mutual_balances(
