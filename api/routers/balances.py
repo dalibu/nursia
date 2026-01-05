@@ -37,10 +37,11 @@ class MonthlySummary(BaseModel):
     hours: float  # Часы работы
     salary: float  # Зарплата (оплаченная)
     credit: float  # Кредит (выданные авансы, оплаченные)
-    offset: float  # Погашение (зачтённые в счёт долга)
-    to_pay: float  # К оплате (все платежи со статусом unpaid)
-    expenses: float  # Расходы (оплаченные)
-    expenses_paid: float  # Возмещено расходов
+    repayment: float  # Погашено (зарплатой + явные repayment платежи)
+    debt: float  # Остаток долга = credit - repayment
+    unpaid: float  # Неоплаченные платежи (к получению/оплате)
+    expenses: float  # Расходы
+    expenses_paid: float  # Возмещённые расходы
     bonus: float  # Премии (оплаченные)
     expenses_unpaid: float  # Невозмещённые расходы
     total: float  # Итого
@@ -711,6 +712,13 @@ async def get_monthly_summary(
         else:
             total = salary + credits_given + bonus + expenses_paid - credits_offset
 
+        # Погашено = зарплата (до размера долга) + явные repayment платежи
+        # Если есть долг (credit), зарплата идёт на его погашение
+        salary_used_for_repayment = min(salary, credits_given) if credits_given > 0 else 0
+        total_repayment = salary_used_for_repayment + credits_offset
+        
+        # Остаток долга = кредит - погашено
+        debt_remaining = max(0, credits_given - total_repayment)
         
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
@@ -718,8 +726,9 @@ async def get_monthly_summary(
             hours=round(hours, 2),
             salary=round(salary, 2),
             credit=round(credits_given, 2),  # Кредит: выданные авансы
-            offset=round(-credits_offset, 2),  # Погашено: отрицательное (возврат)
-            to_pay=round(unpaid_amount, 2),  # К оплате: все неоплаченные платежи
+            repayment=round(total_repayment, 2),  # Погашено: зарплатой + явные repayment
+            debt=round(debt_remaining, 2),  # Остаток долга
+            unpaid=round(unpaid_amount, 2),  # Неоплаченные платежи
             expenses=round(expenses, 2),
             expenses_paid=round(expenses_paid, 2),
             bonus=round(bonus, 2),
@@ -1128,7 +1137,7 @@ async def get_debug_export(
     monthly = [
         m for m in monthly 
         if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
-           m.credit > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0
+           m.credit > 0 or m.bonus > 0 or m.repayment > 0 or m.debt > 0 or m.unpaid > 0
     ]
     
     mutual = await get_mutual_balances(

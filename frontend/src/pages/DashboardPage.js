@@ -331,9 +331,10 @@ function DashboardPage() {
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
                                 <TableCell align="right"><strong>Зарплата</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
-                                <TableCell align="right"><strong>К оплате</strong></TableCell>
                                 <TableCell align="right"><strong>Кредиты</strong></TableCell>
                                 <TableCell align="right"><strong>Погашено</strong></TableCell>
+                                <TableCell align="right"><strong>Долг</strong></TableCell>
+                                <TableCell align="right"><strong>К оплате</strong></TableCell>
                                 <TableCell align="right"><strong>Премии</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
                             </TableRow>
@@ -369,17 +370,6 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-
-                                    {/* К оплате - все неоплаченные платежи - красный */}
-                                    <TableCell align="right">
-                                        {row.to_pay > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.to_pay, row.currency)}
-                                                sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
                                     {/* Кредит - фиолетовый */}
                                     <TableCell align="right">
                                         {row.credit > 0 && (
@@ -390,15 +380,32 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    {/* Погашено - зелёный для положительных, красный для отрицательных */}
+                                    {/* Погашено - зелёный */}
                                     <TableCell align="right">
-                                        {row.offset !== 0 && (
+                                        {row.repayment > 0 && (
                                             <Chip
-                                                label={formatCurrency(row.offset, row.currency)}
-                                                sx={{
-                                                    backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
-                                                    color: row.offset > 0 ? '#1a1a1a' : 'white'
-                                                }}
+                                                label={formatCurrency(row.repayment, row.currency)}
+                                                sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    {/* Долг - красный */}
+                                    <TableCell align="right">
+                                        {row.debt > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.debt, row.currency)}
+                                                sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    {/* К оплате (unpaid) - оранжевый */}
+                                    <TableCell align="right">
+                                        {row.unpaid > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.unpaid, row.currency)}
+                                                sx={{ backgroundColor: '#ff9800', color: 'white' }}
                                                 size="small"
                                             />
                                         )}
