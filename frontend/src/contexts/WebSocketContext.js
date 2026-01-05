@@ -62,11 +62,9 @@ export const WebSocketProvider = ({ children }) => {
                 data = JSON.parse(event.data);
             } catch (parseError) {
                 // Silently ignore non-JSON messages (ping/pong, keep-alive, etc.)
-                console.debug('[WebSocket] Ignoring non-JSON message:', event.data);
                 return;
             }
 
-            console.log('[WebSocket] Received:', data);
             setLastEvent(data);
 
             // Notify subscribers
@@ -99,27 +97,23 @@ export const WebSocketProvider = ({ children }) => {
     const connect = useCallback(() => {
         const url = getWebSocketUrl();
         if (!url) {
-            console.log('[WebSocket] No token, skipping connection');
             return;
         }
 
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            console.log('[WebSocket] Already connected');
             return;
         }
 
-        console.log('[WebSocket] Connecting to:', url);
+
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
         ws.onopen = () => {
-            console.log('[WebSocket] Connected');
             setIsConnected(true);
             reconnectAttemptsRef.current = 0;
         };
 
         ws.onclose = (event) => {
-            console.log('[WebSocket] Disconnected:', event.code, event.reason);
             setIsConnected(false);
             wsRef.current = null;
 
@@ -150,12 +144,11 @@ export const WebSocketProvider = ({ children }) => {
 
     const scheduleReconnect = useCallback(() => {
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-            console.log('[WebSocket] Max reconnect attempts reached');
             return;
         }
 
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-        console.log(`[WebSocket] Reconnecting in ${delay}ms...`);
+
 
         reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;

@@ -80,7 +80,6 @@ function DashboardPage() {
         const unsubscribe = subscribe(
             ['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'],
             (event) => {
-                console.log('[Dashboard] WebSocket event received:', event.type);
                 // Silent reload - no loading spinner
                 loadData(false);
             }

@@ -327,7 +327,6 @@ function TimeTrackerPage() {
             setGroupedAssignments(groupedRes.data);
             setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
-            console.log('Employment data loaded:', empRes.data);
             setEmploymentList(empRes.data);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
         } catch (error) {
@@ -462,7 +461,6 @@ function TimeTrackerPage() {
             'payment_created', 'payment_updated', 'payment_deleted'
         ];
         const unsubscribe = subscribe(events, (event) => {
-            console.log('[TimeTracker] WebSocket event received:', event.type);
             loadData(true); // Silent refresh - no loading spinner
             loadSummary();
         });

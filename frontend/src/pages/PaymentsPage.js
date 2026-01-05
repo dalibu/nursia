@@ -360,7 +360,6 @@ function PaymentsPage() {
   // Subscribe to payment WebSocket events
   useEffect(() => {
     const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
-      console.log('Payment changed, reloading...');
       loadPayments();
     });
     return unsubscribe;

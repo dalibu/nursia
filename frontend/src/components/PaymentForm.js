@@ -93,18 +93,12 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       setCurrentUser(userData);
 
       const userId = userData.id;
-      console.log('Current User ID:', userId);
-      console.log('Raw users from API:', usersRes?.length);
-      if (usersRes && usersRes.length > 0) {
-        console.log('Sample user from list:', usersRes[0]);
-      }
 
       // Сразу фильтруем список пользователей, чтобы не показывать себя
       const filteredUsers = (Array.isArray(usersRes) ? usersRes : []).filter(u => {
         const uId = u.id || u.user_id;
         return String(uId) !== String(userId);
       });
-      console.log('Filtered users count:', filteredUsers.length);
 
       setUserList(filteredUsers);
 

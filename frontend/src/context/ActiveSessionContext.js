@@ -84,7 +84,6 @@ export function ActiveSessionProvider({ children }) {
         const unsubscribeActions = subscribe(
             ['assignment_started', 'assignment_stopped', 'task_created', 'task_deleted'],
             (event) => {
-                console.log('[ActiveSessionContext] Action event received:', event.type);
                 fetchActiveSession();
                 notifySessionChange();
             }
