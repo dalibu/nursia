@@ -925,7 +925,7 @@ function TimeTrackerPage() {
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    Учёт заданий
+                    Учёт времени
                 </Typography>
                 <Box display="flex" gap={1}>
                     {/* Dropdown menu for "Начать смену" */}

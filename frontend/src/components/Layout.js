@@ -120,7 +120,7 @@ function Layout({ onLogout }) {
               Платежи
             </Button>
             <Button color="inherit" component={Link} to="/time-tracker">
-              Задания
+              Время
             </Button>
             {isAdmin && (
               <>
