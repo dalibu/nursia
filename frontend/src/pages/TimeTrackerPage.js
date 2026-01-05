@@ -17,7 +17,7 @@ import {
     PlayArrow, Stop, AccessTime, Person, Work, Add,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange,
-    ArrowDropDown, NoteAdd
+    ArrowDropDown, NoteAdd, Replay
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
@@ -230,6 +230,7 @@ function TimeTrackerPage() {
 
     // Manual assignment dialog
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
+    const [cloneData, setCloneData] = useState(null); // Data for cloning assignment
 
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -542,6 +543,33 @@ function TimeTrackerPage() {
 
     const handleManualAddClick = () => {
         handleStartMenuClose();
+        setCloneData(null);  // Reset clone data for new assignment
+        setManualDialogOpen(true);
+    };
+
+    // Handle cloning an assignment
+    const handleCloneAssignment = (assignment, e) => {
+        e?.stopPropagation();
+
+        // Find the employment by matching employee_id with worker_id from assignment
+        // In EmploymentResponse: employee_id = user_id (worker)
+        const employment = employmentList.find(emp => emp.employee_id === assignment.worker_id);
+
+        // Prepare clone data from the assignment
+        const cloneInfo = {
+            employment_id: employment?.id || '',
+            assignment_date: assignment.assignment_date,  // Copy shift date
+            hourly_rate: assignment.hourly_rate,
+            currency: assignment.currency,
+            description: assignment.description || '',
+            tasks: assignment.segments?.map(seg => ({
+                start_time: seg.start_time?.slice(0, 5) || '09:00',
+                end_time: seg.end_time?.slice(0, 5) || '18:00',
+                task_type: seg.session_type || 'work',
+                description: seg.description || ''
+            })) || []
+        };
+        setCloneData(cloneInfo);
         setManualDialogOpen(true);
     };
 
@@ -550,6 +578,7 @@ function TimeTrackerPage() {
         const result = await assignmentsService.createManual(payload);
         loadData();
         loadSummary();
+        setCloneData(null);  // Clear clone data after save
         showSuccess(`Смена ${result.data.tracking_nr} создана!`);
         return result.data;
     };
@@ -1332,6 +1361,14 @@ function TimeTrackerPage() {
                                                         </Tooltip>
                                                     </>
                                                 )}
+                                                <Tooltip title="Клонировать">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={(e) => handleCloneAssignment(assignment, e)}
+                                                    >
+                                                        <Replay fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
                                                 <Tooltip title="Редактировать">
                                                     <IconButton
                                                         size="small"
@@ -1391,12 +1428,16 @@ function TimeTrackerPage() {
                                                                         {seg.description || ''}
                                                                     </TableCell>
                                                                     <TableCell align="right">
-                                                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(seg); }}>
-                                                                            <Edit fontSize="small" />
-                                                                        </IconButton>
-                                                                        <IconButton size="small" onClick={(e) => handleDeleteClick(seg.id, e)}>
-                                                                            <Delete fontSize="small" />
-                                                                        </IconButton>
+                                                                        <Tooltip title="Редактировать">
+                                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(seg); }}>
+                                                                                <Edit fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Удалить">
+                                                                            <IconButton size="small" onClick={(e) => handleDeleteClick(seg.id, e)}>
+                                                                                <Delete fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Tooltip>
                                                                     </TableCell>
                                                                 </TableRow>
                                                             ))}
@@ -1702,11 +1743,12 @@ function TimeTrackerPage() {
             {/* Manual Assignment Dialog */}
             <ManualAssignmentDialog
                 open={manualDialogOpen}
-                onClose={() => setManualDialogOpen(false)}
+                onClose={() => { setManualDialogOpen(false); setCloneData(null); }}
                 onSave={handleSaveManualAssignment}
                 employmentList={employmentList}
                 isAdmin={isAdmin}
                 onPaymentEdit={handlePaymentEditFromManual}
+                initialData={cloneData}
             />
 
             {/* Snackbar for notifications */}

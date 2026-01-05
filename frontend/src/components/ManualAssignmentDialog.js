@@ -70,7 +70,8 @@ function ManualAssignmentDialog({
     onSave,
     employmentList,
     isAdmin,
-    onPaymentEdit  // Callback to open payment edit dialog with payment_id
+    onPaymentEdit,  // Callback to open payment edit dialog with payment_id
+    initialData = null  // Optional data for cloning
 }) {
     // Form state
     const [selectedEmployment, setSelectedEmployment] = useState('');
@@ -91,36 +92,61 @@ function ManualAssignmentDialog({
             setError('');
             setLoading(false);
 
-            // Auto-select employment if only one exists
-            if (employmentList.length === 1) {
-                const emp = employmentList[0];
-                setSelectedEmployment(emp.id);
-                setHourlyRate(emp.hourly_rate || '');
-                setCurrency(emp.currency || 'UAH');
+            if (initialData) {
+                // Clone mode: pre-fill with initial data
+                setSelectedEmployment(initialData.employment_id || '');
+                // Use date from cloned assignment, or today if not provided
+                setAssignmentDate(initialData.assignment_date ? new Date(initialData.assignment_date) : new Date());
+                setHourlyRate(initialData.hourly_rate || '');
+                setCurrency(initialData.currency || 'UAH');
+                setDescription(initialData.description || '');
+
+                // Clone tasks if available
+                if (initialData.tasks && initialData.tasks.length > 0) {
+                    setTasks(initialData.tasks.map(t => ({
+                        start_time: t.start_time || '09:00',
+                        end_time: t.end_time || '18:00',
+                        task_type: t.task_type || 'work',
+                        description: t.description || ''
+                    })));
+                } else {
+                    setTasks([
+                        { start_time: '09:00', end_time: '18:00', task_type: 'work', description: initialData.description || '' }
+                    ]);
+                }
             } else {
-                setSelectedEmployment('');
-                setHourlyRate('');
-                setCurrency('UAH');
+                // Normal mode: reset to defaults
+                // Auto-select employment if only one exists
+                if (employmentList.length === 1) {
+                    const emp = employmentList[0];
+                    setSelectedEmployment(emp.id);
+                    setHourlyRate(emp.hourly_rate || '');
+                    setCurrency(emp.currency || 'UAH');
+                } else {
+                    setSelectedEmployment('');
+                    setHourlyRate('');
+                    setCurrency('UAH');
+                }
+
+                setAssignmentDate(new Date());
+                setDescription('');
+                setTasks([
+                    { start_time: '09:00', end_time: '18:00', task_type: 'work', description: '' }
+                ]);
             }
-
-            setAssignmentDate(new Date());
-            setDescription('');
-            setTasks([
-                { start_time: '09:00', end_time: '18:00', task_type: 'work', description: '' }
-            ]);
         }
-    }, [open, employmentList]);
+    }, [open, employmentList, initialData]);
 
-    // Update rate/currency when employment changes
+    // Update rate/currency when employment changes (but not in clone mode)
     useEffect(() => {
-        if (selectedEmployment) {
+        if (selectedEmployment && !initialData) {
             const emp = employmentList.find(e => e.id === selectedEmployment);
             if (emp) {
                 setHourlyRate(emp.hourly_rate || '');
                 setCurrency(emp.currency || 'UAH');
             }
         }
-    }, [selectedEmployment, employmentList]);
+    }, [selectedEmployment, employmentList, initialData]);
 
     // Calculate totals
     const totals = useMemo(() => {
