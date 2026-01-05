@@ -889,7 +889,8 @@ async def update_assignment(
     if update_data.currency is not None:
         assignment.currency = update_data.currency
     if update_data.description is not None:
-        assignment.description = update_data.description
+        # Allow empty string to clear description
+        assignment.description = update_data.description if update_data.description else None
     
     await db.commit()
     

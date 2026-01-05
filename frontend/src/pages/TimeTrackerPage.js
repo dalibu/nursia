@@ -806,7 +806,7 @@ function TimeTrackerPage() {
                     assignment_date: assignmentForm.assignment_date,
                     hourly_rate: parseFloat(assignmentForm.hourly_rate),
                     currency: assignmentForm.currency,
-                    description: assignmentForm.description || null
+                    description: assignmentForm.description  // Allow empty string to clear description
                 })
             });
             if (!response.ok) {
