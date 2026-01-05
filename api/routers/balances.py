@@ -732,7 +732,7 @@ async def get_monthly_summary(
             repayment=round(display_repayment, 2),  # Погашено (только если есть остаток долга)
             debt=round(debt_remaining, 2),  # Остаток долга
             unpaid=round(unpaid_amount, 2),  # Неоплаченные платежи
-            expenses=round(expenses, 2),
+            expenses=round(remaining, 2) if is_worker_view else round(expenses_paid, 2),  # Worker: unpaid, Employer: paid
             expenses_paid=round(expenses_paid, 2),
             bonus=round(bonus, 2),
             expenses_unpaid=round(remaining, 2),
