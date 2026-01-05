@@ -36,9 +36,10 @@ class MonthlySummary(BaseModel):
     sessions: int  # Количество посещений (сессий)
     hours: float  # Часы работы
     salary: float  # Зарплата (из work_sessions)
-    paid: float  # Кредит (выданные авансы)
+    credit: float  # Кредит (выданные авансы)
     offset: float  # Погашение (зачтённые в счёт долга)
-    to_pay: float  # Задолженность (неоплаченные платежи за период)
+    paid: float  # Оплачено (все платежи со статусом paid)
+    to_pay: float  # К оплате (все платежи со статусом unpaid)
     expenses: float  # Потрачено (расходы)
     expenses_paid: float  # Возмещено расходов
     bonus: float  # Премии
@@ -712,9 +713,10 @@ async def get_monthly_summary(
             sessions=sessions,
             hours=round(hours, 2),
             salary=round(salary, 2),
-            paid=round(credits_given, 2),  # Кредит: выданные авансы
+            credit=round(credits_given, 2),  # Кредит: выданные авансы
             offset=round(-credits_offset, 2),  # Погашено: отрицательное (возврат)
-            to_pay=round(unpaid_amount, 2),  # Только неоплаченные платежи
+            paid=round(total_paid, 2),  # Оплачено: все оплаченные платежи
+            to_pay=round(unpaid_amount, 2),  # К оплате: все неоплаченные платежи
             expenses=round(expenses, 2),
             expenses_paid=round(expenses_paid, 2),
             bonus=round(bonus, 2),
@@ -1131,7 +1133,7 @@ async def get_debug_export(
     monthly = [
         m for m in monthly 
         if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
-           m.paid > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0
+           m.credit > 0 or m.bonus > 0 or m.offset != 0 or m.to_pay > 0 or m.paid > 0
     ]
     
     mutual = await get_mutual_balances(
