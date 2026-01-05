@@ -574,11 +574,18 @@ function TimeTrackerPage() {
     };
 
     // Handle saving manual assignment
-    const handleSaveManualAssignment = async (payload) => {
+    // keepOpen = true when user clicks "Save and Create Another"
+    // newCloneData contains updated form data for next iteration
+    const handleSaveManualAssignment = async (payload, keepOpen = false, newCloneData = null) => {
         const result = await assignmentsService.createManual(payload);
         loadData();
         loadSummary();
-        setCloneData(null);  // Clear clone data after save
+        if (keepOpen && newCloneData) {
+            // Update cloneData with new values for the next assignment
+            setCloneData(newCloneData);
+        } else if (!keepOpen) {
+            setCloneData(null);  // Clear clone data after save (only if closing dialog)
+        }
         showSuccess(`Смена ${result.data.tracking_nr} создана!`);
         return result.data;
     };

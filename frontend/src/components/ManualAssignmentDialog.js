@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -86,54 +86,60 @@ function ManualAssignmentDialog({
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Reset form when dialog opens
+    // Track previous open state to only reset form when dialog opens (not when deps change while open)
+    const prevOpenRef = useRef(false);
+
+    // Reset form only when dialog opens (transitions from closed to open)
     useEffect(() => {
-        if (open) {
-            setError('');
-            setLoading(false);
+        const justOpened = open && !prevOpenRef.current;
+        prevOpenRef.current = open;
 
-            if (initialData) {
-                // Clone mode: pre-fill with initial data
-                setSelectedEmployment(initialData.employment_id || '');
-                // Use date from cloned assignment, or today if not provided
-                setAssignmentDate(initialData.assignment_date ? new Date(initialData.assignment_date) : new Date());
-                setHourlyRate(initialData.hourly_rate || '');
-                setCurrency(initialData.currency || 'UAH');
-                setDescription(initialData.description || '');
+        if (!justOpened) return;
 
-                // Clone tasks if available
-                if (initialData.tasks && initialData.tasks.length > 0) {
-                    setTasks(initialData.tasks.map(t => ({
-                        start_time: t.start_time || '09:00',
-                        end_time: t.end_time || '18:00',
-                        task_type: t.task_type || 'work',
-                        description: t.description || ''
-                    })));
-                } else {
-                    setTasks([
-                        { start_time: '09:00', end_time: '18:00', task_type: 'work', description: initialData.description || '' }
-                    ]);
-                }
+        setError('');
+        setLoading(false);
+
+        if (initialData) {
+            // Clone mode: pre-fill with initial data
+            setSelectedEmployment(initialData.employment_id || '');
+            // Use date from cloned assignment, or today if not provided
+            setAssignmentDate(initialData.assignment_date ? new Date(initialData.assignment_date) : new Date());
+            setHourlyRate(initialData.hourly_rate || '');
+            setCurrency(initialData.currency || 'UAH');
+            setDescription(initialData.description || '');
+
+            // Clone tasks if available
+            if (initialData.tasks && initialData.tasks.length > 0) {
+                setTasks(initialData.tasks.map(t => ({
+                    start_time: t.start_time || '09:00',
+                    end_time: t.end_time || '18:00',
+                    task_type: t.task_type || 'work',
+                    description: t.description || ''
+                })));
             } else {
-                // Normal mode: reset to defaults
-                // Auto-select employment if only one exists
-                if (employmentList.length === 1) {
-                    const emp = employmentList[0];
-                    setSelectedEmployment(emp.id);
-                    setHourlyRate(emp.hourly_rate || '');
-                    setCurrency(emp.currency || 'UAH');
-                } else {
-                    setSelectedEmployment('');
-                    setHourlyRate('');
-                    setCurrency('UAH');
-                }
-
-                setAssignmentDate(new Date());
-                setDescription('');
                 setTasks([
-                    { start_time: '09:00', end_time: '18:00', task_type: 'work', description: '' }
+                    { start_time: '09:00', end_time: '18:00', task_type: 'work', description: initialData.description || '' }
                 ]);
             }
+        } else {
+            // Normal mode: reset to defaults
+            // Auto-select employment if only one exists
+            if (employmentList.length === 1) {
+                const emp = employmentList[0];
+                setSelectedEmployment(emp.id);
+                setHourlyRate(emp.hourly_rate || '');
+                setCurrency(emp.currency || 'UAH');
+            } else {
+                setSelectedEmployment('');
+                setHourlyRate('');
+                setCurrency('UAH');
+            }
+
+            setAssignmentDate(new Date());
+            setDescription('');
+            setTasks([
+                { start_time: '09:00', end_time: '18:00', task_type: 'work', description: '' }
+            ]);
         }
     }, [open, employmentList, initialData]);
 
@@ -298,6 +304,74 @@ function ManualAssignmentDialog({
             console.error('Failed to create manual assignment:', err);
             setError(err.response?.data?.detail || 'Ошибка при создании смены');
         } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveAndClone = async () => {
+        setError('');
+
+        // Validate
+        if (!selectedEmployment) {
+            setError('Выберите работника');
+            return;
+        }
+        if (!assignmentDate) {
+            setError('Укажите дату');
+            return;
+        }
+        if (tasks.length === 0) {
+            setError('Добавьте хотя бы одно задание');
+            return;
+        }
+
+        const validationError = validateTasks();
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
+        const emp = employmentList.find(e => e.id === selectedEmployment);
+        const workerId = emp?.employee_id || emp?.user_id;
+
+        const payload = {
+            worker_id: workerId,
+            assignment_date: formatDateStr(assignmentDate),
+            hourly_rate: parseFloat(hourlyRate) || null,
+            currency: currency,
+            description: description || null,
+            tasks: tasks.map(t => ({
+                start_time: t.start_time + ':00',
+                end_time: t.end_time + ':00',
+                task_type: t.task_type,
+                description: t.description || null
+            }))
+        };
+
+        // Prepare new clone data with updated values for next iteration (same date)
+        const newCloneData = {
+            employment_id: selectedEmployment,
+            assignment_date: formatDateStr(assignmentDate),  // Keep same date
+            hourly_rate: hourlyRate,
+            currency: currency,
+            description: description || '',
+            tasks: tasks.map(t => ({
+                start_time: t.start_time,
+                end_time: t.end_time,
+                task_type: t.task_type,
+                description: t.description || ''
+            }))
+        };
+
+        setLoading(true);
+        try {
+            await onSave(payload, true, newCloneData);  // true = keepOpen, pass new clone data
+
+            // Just reset loading state - form will be updated via initialData (cloneData)
+            setLoading(false);
+        } catch (err) {
+            console.error('Failed to create manual assignment:', err);
+            setError(err.response?.data?.detail || 'Ошибка при создании смены');
             setLoading(false);
         }
     };
@@ -560,6 +634,21 @@ function ManualAssignmentDialog({
             <DialogActions sx={{ p: 2 }}>
                 <Button onClick={onClose} disabled={loading}>
                     Отмена
+                </Button>
+                <Button
+                    variant="outlined"
+                    onClick={handleSaveAndClone}
+                    disabled={loading || !selectedEmployment}
+                    sx={{
+                        borderColor: '#667eea',
+                        color: '#667eea',
+                        '&:hover': {
+                            borderColor: '#5a6fd6',
+                            backgroundColor: 'rgba(102, 126, 234, 0.04)'
+                        }
+                    }}
+                >
+                    {loading ? 'Сохранение...' : 'Сохранить и создать ещё'}
                 </Button>
                 <Button
                     variant="contained"
