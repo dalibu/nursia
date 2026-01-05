@@ -16,7 +16,7 @@
       "hours": 3.5,
       "salary": 350,
       "credit": 270,
-      "repayment": 270,
+      "repayment": 0,
       "debt": 0,
       "unpaid": 0,
       "expenses": 0,

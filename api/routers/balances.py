@@ -720,13 +720,16 @@ async def get_monthly_summary(
         # Остаток долга = кредит - погашено
         debt_remaining = max(0, credits_given - total_repayment)
         
+        # Если долг полностью погашен, не показываем repayment (согласованность с GUI)
+        display_repayment = total_repayment if debt_remaining > 0 else 0
+        
         summaries.append(MonthlySummary(
             period=f"{year}-{month:02d}",
             sessions=sessions,
             hours=round(hours, 2),
             salary=round(salary, 2),
             credit=round(credits_given, 2),  # Кредит: выданные авансы
-            repayment=round(total_repayment, 2),  # Погашено: зарплатой + явные repayment
+            repayment=round(display_repayment, 2),  # Погашено (только если есть остаток долга)
             debt=round(debt_remaining, 2),  # Остаток долга
             unpaid=round(unpaid_amount, 2),  # Неоплаченные платежи
             expenses=round(expenses, 2),
