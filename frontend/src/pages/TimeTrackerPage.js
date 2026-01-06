@@ -1356,15 +1356,21 @@ function TimeTrackerPage() {
                                             cursor: 'pointer',
                                             backgroundColor: assignment.is_active ? '#e8f5e9' : 'inherit'
                                         }}
-                                        onClick={() => setExpandedRows(prev => ({
-                                            ...prev,
-                                            [assignment.assignment_id]: !prev[assignment.assignment_id]
-                                        }))}
+                                        onClick={() => {
+                                            if (assignment.segments && assignment.segments.length > 0) {
+                                                setExpandedRows(prev => ({
+                                                    ...prev,
+                                                    [assignment.assignment_id]: !prev[assignment.assignment_id]
+                                                }));
+                                            }
+                                        }}
                                     >
                                         <TableCell>
-                                            <IconButton size="small">
-                                                {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-                                            </IconButton>
+                                            {(assignment.segments && assignment.segments.length > 0) && (
+                                                <IconButton size="small">
+                                                    {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                                                </IconButton>
+                                            )}
                                         </TableCell>
                                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                             <strong>{formatDate(assignment.assignment_date)}</strong>
