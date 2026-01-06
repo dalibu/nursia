@@ -92,7 +92,8 @@ export const assignments = {
   list: (params) => api.get('/assignments/', { params }),
   getGrouped: (params) => api.get('/assignments/grouped', { params }),
   getActive: () => api.get('/assignments/active'),
-  getSummary: (params) => api.get('/assignments/summary', { params })
+  getSummary: (params) => api.get('/assignments/summary', { params }),
+  getTypes: () => api.get('/assignments/types')
 };
 
 export const employment = {

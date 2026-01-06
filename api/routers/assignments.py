@@ -16,7 +16,7 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory
+from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory, AssignmentType
 from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -182,6 +182,27 @@ def _task_to_response(task: Task, assignment: Assignment,
         total_work_seconds=total_work_seconds,
         total_pause_seconds=total_pause_seconds
     )
+
+# Метки типов для отображения
+ASSIGNMENT_TYPE_LABELS = {
+    AssignmentType.WORK: "Смена",
+    AssignmentType.SICK_LEAVE: "Больничный",
+    AssignmentType.VACATION: "Отпуск",
+    AssignmentType.DAY_OFF: "Отгул",
+    AssignmentType.UNPAID_LEAVE: "Отпуск б/с",
+}
+
+
+@router.get("/types")
+async def get_assignment_types():
+    """Получить список типов записей/смен из enum"""
+    return [
+        {
+            "value": t.value,
+            "label": ASSIGNMENT_TYPE_LABELS.get(t, t.value)
+        }
+        for t in AssignmentType
+    ]
 
 
 @router.post("/start", response_model=WorkSessionResponse)

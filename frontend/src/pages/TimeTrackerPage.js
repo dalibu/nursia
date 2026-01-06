@@ -50,13 +50,13 @@ const currencySymbols = {
     'USD': '$'
 };
 
-// Assignment type configuration for display
-const ASSIGNMENT_TYPES = {
-    work: { label: 'Смена', icon: Work, color: '#4caf50' },
-    sick_leave: { label: 'Больничный', icon: Sick, color: '#f44336' },
-    vacation: { label: 'Отпуск', icon: BeachAccess, color: '#4caf50' },
-    day_off: { label: 'Отгул', icon: EventBusy, color: '#ff9800' },
-    unpaid_leave: { label: 'Отпуск б/с', icon: MoneyOff, color: '#9e9e9e' }
+// Assignment type icon and color configuration (labels come from API)
+const ASSIGNMENT_TYPE_ICONS = {
+    work: { icon: Work, color: '#4caf50' },
+    sick_leave: { icon: Sick, color: '#f44336' },
+    vacation: { icon: BeachAccess, color: '#2196f3' },
+    day_off: { icon: EventBusy, color: '#ff9800' },
+    unpaid_leave: { icon: MoneyOff, color: '#9e9e9e' }
 };
 
 // LiveTimer component for displaying real-time elapsed time in table rows
@@ -144,6 +144,7 @@ function TimeTrackerPage() {
     const [groupedAssignments, setGroupedAssignments] = useState([]);
     const [activeSessions, setActiveSessions] = useState([]);
     const [employmentList, setEmploymentList] = useState([]);
+    const [assignmentTypes, setAssignmentTypes] = useState([]);
     const [summary, setSummary] = useState([]);
     const [period, setPeriod] = useState('all');  // Show all shifts by default
     const [isAdmin, setIsAdmin] = useState(false);
@@ -154,12 +155,14 @@ function TimeTrackerPage() {
         const urlSearch = searchParams.get('search');
         const urlWorker = searchParams.get('worker');
         const urlStatus = searchParams.get('status');
+        const urlType = searchParams.get('type');
 
-        if (urlSearch || urlWorker || urlStatus) {
+        if (urlSearch || urlWorker || urlStatus || urlType) {
             return {
                 search: urlSearch || '',
                 worker: urlWorker || '',
-                status: urlStatus || 'all'
+                status: urlStatus || 'all',
+                type: urlType || 'all'
             };
         }
 
@@ -171,12 +174,13 @@ function TimeTrackerPage() {
                 return {
                     search: parsed.search || '',
                     worker: parsed.worker || '',
-                    status: parsed.status || 'all'
+                    status: parsed.status || 'all',
+                    type: parsed.type || 'all'
                 };
             }
         } catch (e) { }
 
-        return { search: '', worker: '', status: 'all' };
+        return { search: '', worker: '', status: 'all', type: 'all' };
     });
 
     const [dateRange, setDateRange] = useState(() => {
@@ -319,6 +323,10 @@ function TimeTrackerPage() {
             params.set('to', toStr);
             storageData.to = toStr;
         }
+        if (filters.type && filters.type !== 'all') {
+            params.set('type', filters.type);
+            storageData.type = filters.type;
+        }
 
         setSearchParams(params, { replace: true });
         localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(storageData));
@@ -342,16 +350,18 @@ function TimeTrackerPage() {
             setOffset(0);
             setHasMore(true);
 
-            const [groupedRes, activeRes, empRes, userRes] = await Promise.all([
+            const [groupedRes, activeRes, empRes, userRes, typesRes] = await Promise.all([
                 assignmentsService.getGrouped({ period, limit: PAGE_SIZE, offset: 0 }),
                 assignmentsService.getActive(),
                 employmentService.list({ is_active: true }),
-                paymentsService.getUserInfo()
+                paymentsService.getUserInfo(),
+                assignmentsService.getTypes()
             ]);
             setGroupedAssignments(groupedRes.data);
             setFilteredAssignments(groupedRes.data); // Initialize filtered list
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
+            setAssignmentTypes(typesRes.data || []);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
 
             // Check if there might be more data
@@ -429,6 +439,11 @@ function TimeTrackerPage() {
             filtered = filtered.filter(a => a.is_active);
         } else if (filters.status === 'completed') {
             filtered = filtered.filter(a => !a.is_active);
+        }
+
+        // Assignment type filter
+        if (filters.type && filters.type !== 'all') {
+            filtered = filtered.filter(a => a.assignment_type === filters.type);
         }
 
         // Date range filter
@@ -1140,33 +1155,7 @@ function TimeTrackerPage() {
                             </Card>
                         </Grid>
 
-                        {/* Оплачено */}
-                        <Grid item xs={6} sm={4} md={2}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #56ab2f 0%, #a8e063 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Оплачено</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{paidSessions}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
 
-                        {/* К оплате */}
-                        <Grid item xs={6} sm={4} md={2}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">К оплате</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{unpaidSessions}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
                     </Grid>
                 );
             })()}
@@ -1188,7 +1177,7 @@ function TimeTrackerPage() {
                     {isAdmin && (
                         <TextField
                             select
-                            label="Работник"
+                            label="Исполнитель"
                             size="small"
                             value={filters.worker}
                             onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
@@ -1200,6 +1189,19 @@ function TimeTrackerPage() {
                             ))}
                         </TextField>
                     )}
+                    <TextField
+                        select
+                        label="Тип"
+                        size="small"
+                        value={filters.type}
+                        onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                        sx={{ minWidth: 120 }}
+                    >
+                        <MenuItem value="all">Все</MenuItem>
+                        {assignmentTypes.map(t => (
+                            <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
+                        ))}
+                    </TextField>
                     <TextField
                         select
                         label="Статус"
@@ -1253,7 +1255,7 @@ function TimeTrackerPage() {
                     <Button
                         variant="outlined"
                         onClick={() => {
-                            setFilters({ search: '', worker: '', status: 'all' });
+                            setFilters({ search: '', worker: '', status: 'all', type: 'all' });
                             setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
                         }}
                     >
@@ -1284,7 +1286,16 @@ function TimeTrackerPage() {
                                         direction={sortField === 'worker_name' ? sortDirection : 'asc'}
                                         onClick={() => handleSort('worker_name')}
                                     >
-                                        <strong>Работник</strong>
+                                        <strong>Исполнитель</strong>
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell>
+                                    <TableSortLabel
+                                        active={sortField === 'assignment_type'}
+                                        direction={sortField === 'assignment_type' ? sortDirection : 'asc'}
+                                        onClick={() => handleSort('assignment_type')}
+                                    >
+                                        <strong>Тип</strong>
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell align="center">
@@ -1302,7 +1313,7 @@ function TimeTrackerPage() {
                                         direction={sortField === 'total_amount' ? sortDirection : 'asc'}
                                         onClick={() => handleSort('total_amount')}
                                     >
-                                        <strong>Работа</strong>
+                                        <strong>Продолж.</strong>
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell>
@@ -1356,26 +1367,30 @@ function TimeTrackerPage() {
                                             </IconButton>
                                         </TableCell>
                                         <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                {assignment.assignment_type && assignment.assignment_type !== 'work' && (() => {
-                                                    const typeInfo = ASSIGNMENT_TYPES[assignment.assignment_type];
-                                                    const TypeIcon = typeInfo?.icon;
-                                                    return TypeIcon ? (
-                                                        <Tooltip title={typeInfo.label} arrow>
-                                                            <TypeIcon sx={{ fontSize: 18, color: typeInfo.color }} />
-                                                        </Tooltip>
-                                                    ) : null;
-                                                })()}
-                                                <strong>{formatDate(assignment.assignment_date)}</strong>
-                                            </Box>
+                                            <strong>{formatDate(assignment.assignment_date)}</strong>
                                             <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '8px' }}>
                                                 {assignment.tracking_nr || ''}
                                             </span>
                                         </TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
+                                        <TableCell>
+                                            {(() => {
+                                                const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
+                                                const typeData = assignmentTypes.find(t => t.value === assignment.assignment_type) || { label: 'Смена' };
+                                                const Icon = iconConfig?.icon || Work;
+                                                return (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                        <Icon sx={{ fontSize: 16, color: iconConfig?.color || '#666' }} />
+                                                        <span style={{ color: iconConfig?.color || '#666' }}>
+                                                            {typeData.label}
+                                                        </span>
+                                                    </Box>
+                                                );
+                                            })()}
+                                        </TableCell>
                                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                                             {assignment.assignment_type && assignment.assignment_type !== 'work'
-                                                ? ASSIGNMENT_TYPES[assignment.assignment_type]?.label || assignment.assignment_type
+                                                ? '—'
                                                 : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
                                             }
                                         </TableCell>
