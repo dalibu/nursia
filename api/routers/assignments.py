@@ -1292,6 +1292,7 @@ async def get_grouped_sessions(
     employer_id: Optional[int] = Query(None),
     period: str = Query("month", pattern="^(all|day|week|month|year)$"),
     limit: int = Query(50, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1340,7 +1341,7 @@ async def get_grouped_sessions(
     assignments = result.scalars().unique().all()
     
     responses = []
-    for assignment in assignments[:limit]:
+    for assignment in assignments[offset:offset + limit]:
         tasks = sorted(assignment.tasks, key=lambda t: (t.start_time, t.id))
         
         # Time-off assignments may have no tasks

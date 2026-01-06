@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
@@ -217,6 +217,13 @@ function TimeTrackerPage() {
     const [sortField, setSortField] = useState('assignment_date');
     const [sortDirection, setSortDirection] = useState('desc');
 
+    // Infinite scroll pagination state
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const sentinelRef = useRef(null);
+    const PAGE_SIZE = 50;
+
     // Use shared context for active session - provides synchronized timer and optimistic updates
     const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange, stopSession, togglePause } = useActiveSession();
 
@@ -331,8 +338,12 @@ function TimeTrackerPage() {
     const loadData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
+            // Reset pagination when loading fresh data
+            setOffset(0);
+            setHasMore(true);
+
             const [groupedRes, activeRes, empRes, userRes] = await Promise.all([
-                assignmentsService.getGrouped({ period }),
+                assignmentsService.getGrouped({ period, limit: PAGE_SIZE, offset: 0 }),
                 assignmentsService.getActive(),
                 employmentService.list({ is_active: true }),
                 paymentsService.getUserInfo()
@@ -342,12 +353,42 @@ function TimeTrackerPage() {
             setActiveSessions(activeRes.data);
             setEmploymentList(empRes.data);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
+
+            // Check if there might be more data
+            setHasMore(groupedRes.data.length >= PAGE_SIZE);
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
             if (!silent) setLoading(false);
         }
     }, [period]);
+
+    // Load more data for infinite scroll
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+
+        setLoadingMore(true);
+        try {
+            const newOffset = offset + PAGE_SIZE;
+            const groupedRes = await assignmentsService.getGrouped({
+                period,
+                limit: PAGE_SIZE,
+                offset: newOffset
+            });
+
+            if (groupedRes.data.length > 0) {
+                setGroupedAssignments(prev => [...prev, ...groupedRes.data]);
+                setOffset(newOffset);
+                setHasMore(groupedRes.data.length >= PAGE_SIZE);
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Failed to load more data:', error);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [loadingMore, hasMore, offset, period]);
 
     // Apply filters to assignments
     useEffect(() => {
@@ -479,6 +520,24 @@ function TimeTrackerPage() {
         });
         return unsubscribe;
     }, [subscribe, loadData, loadSummary]);
+
+    // Infinite scroll - IntersectionObserver to load more when sentinel becomes visible
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+                    loadMore();
+                }
+            },
+            { threshold: 0.1, rootMargin: '100px' }
+        );
+
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasMore, loadingMore, loading, loadMore]);
 
     // Smart sync: reload table when activeSession changes (started/stopped by any client)
     useEffect(() => {
@@ -1492,6 +1551,30 @@ function TimeTrackerPage() {
                         </TableBody>
                     </Table>
                 </TableContainer>
+
+                {/* Infinite scroll sentinel and loading indicator */}
+                <Box
+                    ref={sentinelRef}
+                    sx={{
+                        height: 1,
+                        visibility: 'hidden'
+                    }}
+                />
+                {loadingMore && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                        <CircularProgress size={24} />
+                        <Typography variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
+                            Загрузка...
+                        </Typography>
+                    </Box>
+                )}
+                {!hasMore && filteredAssignments.length > 0 && (
+                    <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary' }}>
+                        <Typography variant="body2">
+                            Все записи загружены ({filteredAssignments.length})
+                        </Typography>
+                    </Box>
+                )}
             </Paper>
 
             {/* Start Session Dialog */}
