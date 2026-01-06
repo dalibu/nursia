@@ -68,7 +68,7 @@ const LiveTimer = ({ assignment, currentTime }) => {
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
         const hours = (assignment.total_work_seconds / 3600).toFixed(2).replace('.', ',');
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours} ч.)`;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours})`;
     }
 
     // Find active segment
@@ -112,7 +112,7 @@ const LiveTimer = ({ assignment, currentTime }) => {
                 {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(sec).padStart(2, '0')}
             </Box>
             <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                ({hours} ч.)
+                ({hours})
             </Box>
             {isPaused && (
                 <Chip
@@ -248,6 +248,114 @@ function TimeTrackerPage() {
 
     // Dropdown menu for "Начать смену" button
     const [startMenuAnchor, setStartMenuAnchor] = useState(null);
+
+    // Column Resizing Logic
+    const [columnWidths, setColumnWidths] = useState(() => {
+        try {
+            const saved = localStorage.getItem('timeTracker_columnWidths');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { }
+        return {
+            date: 160,
+            worker: 150,
+            type: 110,
+            time: 135,
+            duration: 110,
+            description: 180,
+            status: 100,
+            payment: 125,
+            actions: 150
+        };
+    });
+
+    const [resizing, setResizing] = useState(null);
+
+    const startResizing = (column, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setResizing({
+            column,
+            startX: e.pageX,
+            startWidth: columnWidths[column]
+        });
+    };
+
+    useEffect(() => {
+        if (!resizing) return;
+
+        const handleMouseMove = (e) => {
+            const delta = e.pageX - resizing.startX;
+            const newWidth = Math.max(40, resizing.startWidth + delta);
+            setColumnWidths(prev => {
+                const updated = { ...prev, [resizing.column]: newWidth };
+                localStorage.setItem('timeTracker_columnWidths', JSON.stringify(updated));
+                return updated;
+            });
+        };
+
+        const handleMouseUp = () => setResizing(null);
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [resizing]);
+
+    const renderHeaderCell = (id, label, align = 'left', sortKey = null, extraSx = {}) => {
+        const isDateColumn = id === 'date';
+        const isResizing = resizing?.column === id;
+
+        return (
+            <TableCell
+                align={align}
+                padding={isDateColumn ? "none" : "normal"}
+                sx={{
+                    width: columnWidths[id],
+                    minWidth: columnWidths[id],
+                    position: 'relative',
+                    ...(isDateColumn ? { pl: 5 } : {}),
+                    ...extraSx,
+                    '&:hover .resizer': { opacity: 1 }
+                }}
+            >
+                {sortKey ? (
+                    <TableSortLabel
+                        active={sortField === sortKey}
+                        direction={sortField === sortKey ? sortDirection : 'asc'}
+                        onClick={() => handleSort(sortKey)}
+                    >
+                        <strong>{label}</strong>
+                    </TableSortLabel>
+                ) : (
+                    <strong>{label}</strong>
+                )}
+                <Box
+                    className="resizer"
+                    onMouseDown={(e) => startResizing(id, e)}
+                    sx={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '15%',
+                        height: '70%',
+                        width: '3px',
+                        cursor: 'col-resize',
+                        backgroundColor: isResizing ? '#1976d2' : 'divider',
+                        opacity: isResizing ? 1 : 0,
+                        borderRadius: '2px',
+                        transition: 'opacity 0.2s, background-color 0.2s',
+                        zIndex: 10,
+                        '&:hover': {
+                            opacity: 1,
+                            backgroundColor: '#1976d2',
+                            width: '5px'
+                        }
+                    }}
+                />
+            </TableCell>
+        );
+    };
 
     // Manual assignment dialog
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
@@ -1270,82 +1378,15 @@ function TimeTrackerPage() {
                     <Table size="small" sx={{ tableLayout: 'fixed' }}>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-
-                                <TableCell width={160} padding="none" sx={{ pl: 5 }}>
-                                    <TableSortLabel
-                                        active={sortField === 'assignment_date'}
-                                        direction={sortField === 'assignment_date' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('assignment_date')}
-                                    >
-                                        <strong>Дата</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={150}>
-                                    <TableSortLabel
-                                        active={sortField === 'worker_name'}
-                                        direction={sortField === 'worker_name' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('worker_name')}
-                                    >
-                                        <strong>Исполнитель</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={110}>
-                                    <TableSortLabel
-                                        active={sortField === 'assignment_type'}
-                                        direction={sortField === 'assignment_type' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('assignment_type')}
-                                    >
-                                        <strong>Тип</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={130} align="center">
-                                    <TableSortLabel
-                                        active={sortField === 'total_work_seconds'}
-                                        direction={sortField === 'total_work_seconds' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('total_work_seconds')}
-                                    >
-                                        <strong>Время</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={100} align="right">
-                                    <TableSortLabel
-                                        active={sortField === 'total_amount'}
-                                        direction={sortField === 'total_amount' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('total_amount')}
-                                    >
-                                        <strong>Продолж.</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell>
-                                    <TableSortLabel
-                                        active={sortField === 'description'}
-                                        direction={sortField === 'description' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('description')}
-                                    >
-                                        <strong>Описание</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={100} align="center">
-                                    <TableSortLabel
-                                        active={sortField === 'is_active'}
-                                        direction={sortField === 'is_active' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('is_active')}
-                                    >
-                                        <strong>Статус</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={120} align="center">
-                                    <TableSortLabel
-                                        active={sortField === 'payment_tracking_nr'}
-                                        direction={sortField === 'payment_tracking_nr' ? sortDirection : 'asc'}
-                                        onClick={() => handleSort('payment_tracking_nr')}
-                                    >
-                                        <strong>Платёж</strong>
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell width={140} align="right" sx={{ pr: 4 }}>
-                                    <strong>Действия</strong>
-                                </TableCell>
+                                {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
+                                {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
+                                {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}
+                                {renderHeaderCell('time', 'Время', 'center', 'total_work_seconds')}
+                                {renderHeaderCell('duration', 'Продолж.', 'right', 'total_amount')}
+                                {renderHeaderCell('description', 'Описание', 'left', 'description')}
+                                {renderHeaderCell('status', 'Статус', 'center', 'is_active')}
+                                {renderHeaderCell('payment', 'Платёж', 'center', 'payment_tracking_nr')}
+                                {renderHeaderCell('actions', 'Действия', 'right', null, { pr: 3 })}
                             </TableRow>
                         </TableHead>
                         <TableBody>
