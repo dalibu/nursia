@@ -1188,7 +1188,7 @@ function TimeTrackerPage() {
                     {isAdmin && (
                         <TextField
                             select
-                            label="Клиент"
+                            label="Работник"
                             size="small"
                             value={filters.worker}
                             onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
@@ -1196,7 +1196,7 @@ function TimeTrackerPage() {
                         >
                             <MenuItem value="">Все</MenuItem>
                             {employmentList.map(emp => (
-                                <MenuItem key={emp.id} value={emp.employer_id}>{emp.employer_name}</MenuItem>
+                                <MenuItem key={emp.id} value={emp.employee_id}>{emp.employee_name}</MenuItem>
                             ))}
                         </TextField>
                     )}
