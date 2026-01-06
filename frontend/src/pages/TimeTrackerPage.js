@@ -1271,7 +1271,7 @@ function TimeTrackerPage() {
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
 
-                                <TableCell width={120} sx={{ pl: 4 }}>
+                                <TableCell width={160} padding="none" sx={{ pl: 5 }}>
                                     <TableSortLabel
                                         active={sortField === 'assignment_date'}
                                         direction={sortField === 'assignment_date' ? sortDirection : 'asc'}
@@ -1368,9 +1368,9 @@ function TimeTrackerPage() {
                                         }}
                                     >
 
-                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                        <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap' }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <Box sx={{ width: 24, mr: 1, display: 'flex', justifyContent: 'center' }}>
+                                                <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
                                                     {(assignment.segments && assignment.segments.length > 0) && (
                                                         <IconButton size="small" onClick={(e) => {
                                                             e.stopPropagation();
@@ -1383,11 +1383,11 @@ function TimeTrackerPage() {
                                                         </IconButton>
                                                     )}
                                                 </Box>
-                                                <Box>
-                                                    <strong>{formatDate(assignment.assignment_date)}</strong>
-                                                    <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                                                    <span>{formatDate(assignment.assignment_date)}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: '#666' }}>
                                                         {assignment.tracking_nr || ''}
-                                                    </div>
+                                                    </span>
                                                 </Box>
                                             </Box>
                                         </TableCell>
