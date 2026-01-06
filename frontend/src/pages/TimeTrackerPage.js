@@ -1264,14 +1264,14 @@ function TimeTrackerPage() {
                 </Box>
             </Paper>
 
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ py: 3, px: 0 }}>
 
                 <TableContainer>
                     <Table size="small" sx={{ tableLayout: 'fixed' }}>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell width={40}></TableCell>
-                                <TableCell width={120}>
+
+                                <TableCell width={120} sx={{ pl: 4 }}>
                                     <TableSortLabel
                                         active={sortField === 'assignment_date'}
                                         direction={sortField === 'assignment_date' ? sortDirection : 'asc'}
@@ -1343,7 +1343,9 @@ function TimeTrackerPage() {
                                         <strong>Платёж</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell align="center" width={80}></TableCell>
+                                <TableCell width={140} align="right" sx={{ pr: 4 }}>
+                                    <strong>Действия</strong>
+                                </TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -1365,18 +1367,29 @@ function TimeTrackerPage() {
                                             }
                                         }}
                                     >
-                                        <TableCell>
-                                            {(assignment.segments && assignment.segments.length > 0) && (
-                                                <IconButton size="small">
-                                                    {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-                                                </IconButton>
-                                            )}
-                                        </TableCell>
+
                                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                            <strong>{formatDate(assignment.assignment_date)}</strong>
-                                            <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                                                {assignment.tracking_nr || ''}
-                                            </div>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Box sx={{ width: 24, mr: 1, display: 'flex', justifyContent: 'center' }}>
+                                                    {(assignment.segments && assignment.segments.length > 0) && (
+                                                        <IconButton size="small" onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setExpandedRows(prev => ({
+                                                                ...prev,
+                                                                [assignment.assignment_id]: !prev[assignment.assignment_id]
+                                                            }));
+                                                        }}>
+                                                            {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
+                                                <Box>
+                                                    <strong>{formatDate(assignment.assignment_date)}</strong>
+                                                    <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                                                        {assignment.tracking_nr || ''}
+                                                    </div>
+                                                </Box>
+                                            </Box>
                                         </TableCell>
                                         <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assignment.worker_name}>
                                             {assignment.worker_name}
@@ -1438,8 +1451,8 @@ function TimeTrackerPage() {
                                                 <Typography variant="caption" color="text.secondary">—</Typography>
                                             )}
                                         </TableCell>
-                                        <TableCell align="center">
-                                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                                        <TableCell align="right" sx={{ pr: 1 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
                                                 {/* Session control buttons for active sessions */}
                                                 {assignment.is_active && (
                                                     <>
@@ -1515,7 +1528,7 @@ function TimeTrackerPage() {
 
                                     {/* Expandable segments */}
                                     <TableRow>
-                                        <TableCell colSpan={10} sx={{ p: 0, border: 0 }}>
+                                        <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
                                             <Collapse in={expandedRows[assignment.assignment_id]} timeout="auto" unmountOnExit>
                                                 <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
 
