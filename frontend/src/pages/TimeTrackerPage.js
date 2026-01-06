@@ -1100,7 +1100,7 @@ function TimeTrackerPage() {
                 return (
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         {/* Смены / Задания */}
-                        <Grid item xs={6} sm={4} md={2}>
+                        <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                                 color: 'white',
@@ -1114,7 +1114,7 @@ function TimeTrackerPage() {
                         </Grid>
 
                         {/* Часы */}
-                        <Grid item xs={6} sm={4} md={2}>
+                        <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
                                 background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                                 color: 'white',
@@ -1128,7 +1128,7 @@ function TimeTrackerPage() {
                         </Grid>
 
                         {/* В работе */}
-                        <Grid item xs={6} sm={4} md={2}>
+                        <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
                                 background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
                                 color: 'white',
@@ -1142,7 +1142,7 @@ function TimeTrackerPage() {
                         </Grid>
 
                         {/* Готово */}
-                        <Grid item xs={6} sm={4} md={2}>
+                        <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
                                 background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                                 color: 'white',
@@ -1267,11 +1267,11 @@ function TimeTrackerPage() {
             <Paper sx={{ p: 3 }}>
 
                 <TableContainer>
-                    <Table size="small">
+                    <Table size="small" sx={{ tableLayout: 'fixed' }}>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                                 <TableCell width={40}></TableCell>
-                                <TableCell>
+                                <TableCell width={120}>
                                     <TableSortLabel
                                         active={sortField === 'assignment_date'}
                                         direction={sortField === 'assignment_date' ? sortDirection : 'asc'}
@@ -1280,7 +1280,7 @@ function TimeTrackerPage() {
                                         <strong>Дата</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell width={150}>
                                     <TableSortLabel
                                         active={sortField === 'worker_name'}
                                         direction={sortField === 'worker_name' ? sortDirection : 'asc'}
@@ -1289,7 +1289,7 @@ function TimeTrackerPage() {
                                         <strong>Исполнитель</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell width={110}>
                                     <TableSortLabel
                                         active={sortField === 'assignment_type'}
                                         direction={sortField === 'assignment_type' ? sortDirection : 'asc'}
@@ -1298,7 +1298,7 @@ function TimeTrackerPage() {
                                         <strong>Тип</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell align="center">
+                                <TableCell width={130} align="center">
                                     <TableSortLabel
                                         active={sortField === 'total_work_seconds'}
                                         direction={sortField === 'total_work_seconds' ? sortDirection : 'asc'}
@@ -1307,7 +1307,7 @@ function TimeTrackerPage() {
                                         <strong>Время</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell align="right">
+                                <TableCell width={100} align="right">
                                     <TableSortLabel
                                         active={sortField === 'total_amount'}
                                         direction={sortField === 'total_amount' ? sortDirection : 'asc'}
@@ -1325,7 +1325,7 @@ function TimeTrackerPage() {
                                         <strong>Описание</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell align="center">
+                                <TableCell width={100} align="center">
                                     <TableSortLabel
                                         active={sortField === 'is_active'}
                                         direction={sortField === 'is_active' ? sortDirection : 'asc'}
@@ -1334,7 +1334,7 @@ function TimeTrackerPage() {
                                         <strong>Статус</strong>
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell align="center">
+                                <TableCell width={120} align="center">
                                     <TableSortLabel
                                         active={sortField === 'payment_tracking_nr'}
                                         direction={sortField === 'payment_tracking_nr' ? sortDirection : 'asc'}
@@ -1366,13 +1366,15 @@ function TimeTrackerPage() {
                                                 {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
                                             </IconButton>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                             <strong>{formatDate(assignment.assignment_date)}</strong>
-                                            <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '8px' }}>
+                                            <div style={{ fontSize: '0.75rem', color: '#666' }}>
                                                 {assignment.tracking_nr || ''}
-                                            </span>
+                                            </div>
                                         </TableCell>
-                                        <TableCell>{assignment.worker_name}</TableCell>
+                                        <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assignment.worker_name}>
+                                            {assignment.worker_name}
+                                        </TableCell>
                                         <TableCell>
                                             {(() => {
                                                 const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
