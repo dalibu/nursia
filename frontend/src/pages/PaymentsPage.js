@@ -836,10 +836,20 @@ function PaymentsPage() {
                     <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
                       <Replay fontSize="small" />
                     </IconButton>
-                    <IconButton title="Редактировать" onClick={() => handleEdit(payment)} size="small">
+                    <IconButton
+                      title={payment.payment_status === 'paid' && !isAdmin ? "Оплаченные платежи может редактировать только администратор" : "Редактировать"}
+                      onClick={() => handleEdit(payment)}
+                      size="small"
+                      disabled={payment.payment_status === 'paid' && !isAdmin}
+                    >
                       <Edit fontSize="small" />
                     </IconButton>
-                    <IconButton title="Удалить" onClick={() => handleDeleteClick(payment)} size="small">
+                    <IconButton
+                      title={payment.payment_status === 'paid' && !isAdmin ? "Оплаченные платежи может удалять только администратор" : "Удалить"}
+                      onClick={() => handleDeleteClick(payment)}
+                      size="small"
+                      disabled={payment.payment_status === 'paid' && !isAdmin}
+                    >
                       <Delete fontSize="small" />
                     </IconButton>
                   </Box>

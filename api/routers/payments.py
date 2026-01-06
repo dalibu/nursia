@@ -355,12 +355,21 @@ async def update_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Обновить платёж. Админ может редактировать любые, пользователи — только свои."""
+    """Обновить платёж. Админ может редактировать любые, пользователи — только свои неоплаченные."""
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     
     db_payment = result.scalar_one_or_none()
     if not db_payment:
         raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Проверка прав: только админ может редактировать оплаченные платежи
+    if db_payment.payment_status == 'paid' and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Только администратор может редактировать оплаченные платежи")
+    
+    # Проверка прав: плательщик или получатель могут редактировать свои неоплаченные платежи
+    is_owner = db_payment.payer_id == current_user.id or db_payment.recipient_id == current_user.id
+    if not current_user.is_admin and not is_owner:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
     
     payment_data = payment.model_dump()
     
@@ -408,8 +417,13 @@ async def delete_payment(
     if not db_payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Проверяем права доступа: админ или владелец платежа
-    if not current_user.is_admin and db_payment.payer_id != current_user.id:
+    # Проверка прав: только админ может удалять оплаченные платежи
+    if db_payment.payment_status == 'paid' and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Только администратор может удалять оплаченные платежи")
+    
+    # Проверяем права доступа: админ, плательщик или получатель платежа
+    is_owner = db_payment.payer_id == current_user.id or db_payment.recipient_id == current_user.id
+    if not current_user.is_admin and not is_owner:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
     await db.delete(db_payment)

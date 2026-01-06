@@ -311,6 +311,15 @@ class TaskType(str, Enum):
     PAUSE = "pause"
 
 
+class AssignmentType(str, Enum):
+    """Тип записи/смены"""
+    WORK = "work"           # Обычная рабочая смена
+    SICK_LEAVE = "sick_leave"   # Больничный
+    VACATION = "vacation"       # Отпуск (оплачиваемый)
+    DAY_OFF = "day_off"         # Отгул
+    UNPAID_LEAVE = "unpaid_leave"  # Отпуск за свой счёт
+
+
 class Assignment(Base):
     """Посещение/смена - родительская сущность для tasks"""
     __tablename__ = "assignments"
@@ -318,6 +327,7 @@ class Assignment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто работал → users!
     assignment_date: Mapped[date] = mapped_column(Date)
+    assignment_type: Mapped[str] = mapped_column(String(20), default="work")  # work, sick_leave, vacation, day_off, unpaid_leave
     hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

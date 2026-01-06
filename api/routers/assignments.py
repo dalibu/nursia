@@ -66,12 +66,13 @@ class AssignmentResponse(BaseModel):
     """Группировка сегментов по assignment"""
     assignment_id: int
     tracking_nr: str
+    assignment_type: str = "work"  # work, sick_leave, vacation, day_off, unpaid_leave
     assignment_date: date
     worker_id: int
     worker_name: Optional[str] = None
     employer_id: int
     employer_name: Optional[str] = None
-    start_time: time  # Начало первого сегмента
+    start_time: Optional[time] = None  # Начало первого сегмента (может быть None для time-off)
     end_time: Optional[time] = None  # Конец последнего сегмента
     total_work_seconds: int
     total_pause_seconds: int
@@ -124,16 +125,30 @@ class ManualAssignmentCreate(BaseModel):
     """Ручное создание смены"""
     worker_id: int
     assignment_date: date
+    assignment_type: str = "work"  # work, sick_leave, vacation, day_off, unpaid_leave
     hourly_rate: Optional[float] = None  # Если не указано, берётся из EmploymentRelation
     currency: Optional[str] = None
     description: Optional[str] = None
-    tasks: List[ManualTaskCreate]
+    tasks: List[ManualTaskCreate] = []  # Пустой для не-work типов
+
+
+class TimeOffCreate(BaseModel):
+    """Создание записи отсутствия (отпуск, больничный и т.д.) на диапазон дат"""
+    worker_id: int
+    assignment_type: str  # sick_leave, vacation, day_off, unpaid_leave
+    start_date: date
+    end_date: date
+    hourly_rate: Optional[float] = None  # Для оплачиваемых отсутствий
+    hours_per_day: Optional[float] = 8.0  # Часов в день для расчёта оплаты
+    currency: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ManualAssignmentResponse(BaseModel):
     """Ответ на ручное создание смены"""
     assignment_id: int
     tracking_nr: str
+    assignment_type: str = "work"
     payment_id: Optional[int] = None
     payment_tracking_nr: Optional[str] = None
     total_hours: float
@@ -289,39 +304,48 @@ async def create_manual_assignment(
             raise HTTPException(status_code=403, detail="Вы можете создать смену только для себя")
         target_worker_id = current_user.id
     
-    # Проверяем наличие заданий
-    if not data.tasks or len(data.tasks) == 0:
-        raise HTTPException(status_code=400, detail="Необходимо указать хотя бы одно задание")
+    # Валидация типа записи
+    valid_types = ["work", "sick_leave", "vacation", "day_off", "unpaid_leave"]
+    if data.assignment_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Недопустимый тип записи. Допустимые: {', '.join(valid_types)}")
     
-    # Валидация заданий: проверка времени
-    def to_minutes(t: time) -> int:
-        return t.hour * 60 + t.minute
+    # Для обычных рабочих смен нужны задания
+    is_time_off = data.assignment_type != "work"
     
-    for i, task in enumerate(data.tasks):
-        if to_minutes(task.end_time) <= to_minutes(task.start_time):
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Задание #{i+1}: время окончания должно быть позже времени начала"
-            )
-        if task.task_type not in ["work", "pause"]:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Задание #{i+1}: тип должен быть 'work' или 'pause'"
-            )
-    
-    # Проверка пересечений между заданиями внутри смены
-    for i, task1 in enumerate(data.tasks):
-        for j, task2 in enumerate(data.tasks):
-            if i >= j:
-                continue
-            t1_start, t1_end = to_minutes(task1.start_time), to_minutes(task1.end_time)
-            t2_start, t2_end = to_minutes(task2.start_time), to_minutes(task2.end_time)
-            # Пересечение: (start1 < end2) AND (end1 > start2)
-            if t1_start < t2_end and t1_end > t2_start:
+    if not is_time_off:
+        # Проверяем наличие заданий для рабочих смен
+        if not data.tasks or len(data.tasks) == 0:
+            raise HTTPException(status_code=400, detail="Необходимо указать хотя бы одно задание")
+        
+        # Валидация заданий: проверка времени
+        def to_minutes(t: time) -> int:
+            return t.hour * 60 + t.minute
+        
+        for i, task in enumerate(data.tasks):
+            if to_minutes(task.end_time) <= to_minutes(task.start_time):
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Задания #{i+1} и #{j+1} пересекаются по времени"
+                    detail=f"Задание #{i+1}: время окончания должно быть позже времени начала"
                 )
+            if task.task_type not in ["work", "pause"]:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Задание #{i+1}: тип должен быть 'work' или 'pause'"
+                )
+        
+        # Проверка пересечений между заданиями внутри смены
+        for i, task1 in enumerate(data.tasks):
+            for j, task2 in enumerate(data.tasks):
+                if i >= j:
+                    continue
+                t1_start, t1_end = to_minutes(task1.start_time), to_minutes(task1.end_time)
+                t2_start, t2_end = to_minutes(task2.start_time), to_minutes(task2.end_time)
+                # Пересечение: (start1 < end2) AND (end1 > start2)
+                if t1_start < t2_end and t1_end > t2_start:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Задания #{i+1} и #{j+1} пересекаются по времени"
+                    )
     
     # Проверяем, есть ли активное трудовое отношение для работника
     result = await db.execute(
@@ -341,43 +365,66 @@ async def create_manual_assignment(
     hourly_rate = Decimal(str(data.hourly_rate)) if data.hourly_rate else employment.hourly_rate
     currency = data.currency or employment.currency
     
-    # Проверка пересечений с существующими сменами в тот же день
-    result = await db.execute(
-        select(Assignment)
-        .options(joinedload(Assignment.tasks))
-        .where(
-            and_(
-                Assignment.user_id == target_worker_id,
-                Assignment.assignment_date == data.assignment_date
+    # Для не-work типов: проверка на дубликат в тот же день
+    if is_time_off:
+        result = await db.execute(
+            select(Assignment).where(
+                and_(
+                    Assignment.user_id == target_worker_id,
+                    Assignment.assignment_date == data.assignment_date,
+                    Assignment.assignment_type == data.assignment_type
+                )
             )
         )
-    )
-    existing_assignments = result.unique().scalars().all()
-    
-    # Диапазон новой смены
-    new_tasks_sorted = sorted(data.tasks, key=lambda t: to_minutes(t.start_time))
-    new_shift_start = to_minutes(new_tasks_sorted[0].start_time)
-    new_shift_end = to_minutes(new_tasks_sorted[-1].end_time)
-    
-    for existing in existing_assignments:
-        if not existing.tasks:
-            continue
-        # Находим границы существующей смены
-        existing_tasks_sorted = sorted(existing.tasks, key=lambda t: to_minutes(t.start_time))
-        existing_start = to_minutes(existing_tasks_sorted[0].start_time)
-        existing_end = to_minutes(existing_tasks_sorted[-1].end_time) if existing_tasks_sorted[-1].end_time else 24 * 60
-        
-        # Проверяем пересечение
-        if new_shift_start < existing_end and new_shift_end > existing_start:
+        existing = result.scalar_one_or_none()
+        if existing:
             raise HTTPException(
                 status_code=400,
-                detail=f"Смена пересекается с существующей {existing.tracking_nr} ({existing_tasks_sorted[0].start_time.strftime('%H:%M')}-{existing_tasks_sorted[-1].end_time.strftime('%H:%M') if existing_tasks_sorted[-1].end_time else '...'})'"
+                detail=f"Запись типа '{data.assignment_type}' уже существует на эту дату"
             )
+    else:
+        # Для рабочих смен - проверка пересечений
+        def to_minutes(t: time) -> int:
+            return t.hour * 60 + t.minute
+            
+        result = await db.execute(
+            select(Assignment)
+            .options(joinedload(Assignment.tasks))
+            .where(
+                and_(
+                    Assignment.user_id == target_worker_id,
+                    Assignment.assignment_date == data.assignment_date,
+                    Assignment.assignment_type == "work"
+                )
+            )
+        )
+        existing_assignments = result.unique().scalars().all()
+        
+        # Диапазон новой смены
+        new_tasks_sorted = sorted(data.tasks, key=lambda t: to_minutes(t.start_time))
+        new_shift_start = to_minutes(new_tasks_sorted[0].start_time)
+        new_shift_end = to_minutes(new_tasks_sorted[-1].end_time)
+        
+        for existing in existing_assignments:
+            if not existing.tasks:
+                continue
+            # Находим границы существующей смены
+            existing_tasks_sorted = sorted(existing.tasks, key=lambda t: to_minutes(t.start_time))
+            existing_start = to_minutes(existing_tasks_sorted[0].start_time)
+            existing_end = to_minutes(existing_tasks_sorted[-1].end_time) if existing_tasks_sorted[-1].end_time else 24 * 60
+            
+            # Проверяем пересечение
+            if new_shift_start < existing_end and new_shift_end > existing_start:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Смена пересекается с существующей {existing.tracking_nr} ({existing_tasks_sorted[0].start_time.strftime('%H:%M')}-{existing_tasks_sorted[-1].end_time.strftime('%H:%M') if existing_tasks_sorted[-1].end_time else '...'})'"
+                )
     
     # Создаём Assignment (завершённую смену)
     new_assignment = Assignment(
         user_id=target_worker_id,
         assignment_date=data.assignment_date,
+        assignment_type=data.assignment_type,
         hourly_rate=hourly_rate,
         currency=currency,
         description=data.description,
@@ -488,11 +535,144 @@ async def create_manual_assignment(
     return ManualAssignmentResponse(
         assignment_id=new_assignment.id,
         tracking_nr=new_assignment.tracking_nr,
+        assignment_type=new_assignment.assignment_type,
         payment_id=payment.id if payment else None,
         payment_tracking_nr=payment.tracking_nr if payment else None,
         total_hours=total_hours,
         total_amount=float(total_amount),
         currency=currency
+    )
+
+
+class TimeOffResponse(BaseModel):
+    """Ответ на создание записей отсутствия"""
+    created_count: int
+    assignments: List[ManualAssignmentResponse]
+    skipped_dates: List[str] = []  # Даты, которые были пропущены (уже существуют)
+
+
+@router.post("/time-off", response_model=TimeOffResponse)
+async def create_time_off(
+    data: TimeOffCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Создать записи отсутствия (отпуск, больничный и т.д.) на диапазон дат"""
+    
+    target_worker_id = data.worker_id
+    
+    # Проверка прав
+    if not current_user.is_admin:
+        if target_worker_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Вы можете создать запись только для себя")
+        target_worker_id = current_user.id
+    
+    # Валидация типа записи
+    valid_types = ["sick_leave", "vacation", "day_off", "unpaid_leave"]
+    if data.assignment_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Для данного endpoint допустимые типы: {', '.join(valid_types)}")
+    
+    # Проверка дат
+    if data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="Дата окончания должна быть не раньше даты начала")
+    
+    # Ограничение на количество дней (защита от случайных ошибок)
+    from datetime import timedelta
+    days_count = (data.end_date - data.start_date).days + 1
+    if days_count > 365:
+        raise HTTPException(status_code=400, detail="Максимальный период: 365 дней")
+    
+    # Проверяем трудовые отношения
+    result = await db.execute(
+        select(EmploymentRelation).where(
+            and_(
+                EmploymentRelation.user_id == target_worker_id,
+                EmploymentRelation.is_active == True
+            )
+        )
+    )
+    employment = result.scalar_one_or_none()
+    if not employment:
+        raise HTTPException(status_code=404, detail="Трудовые отношения не найдены")
+    
+    hourly_rate = Decimal(str(data.hourly_rate)) if data.hourly_rate else employment.hourly_rate
+    currency = data.currency or employment.currency
+    hours_per_day = data.hours_per_day or 8.0
+    
+    # Находим существующие записи на эти даты
+    result = await db.execute(
+        select(Assignment).where(
+            and_(
+                Assignment.user_id == target_worker_id,
+                Assignment.assignment_date >= data.start_date,
+                Assignment.assignment_date <= data.end_date,
+                Assignment.assignment_type == data.assignment_type
+            )
+        )
+    )
+    existing_assignments = result.scalars().all()
+    existing_dates = {a.assignment_date for a in existing_assignments}
+    
+    # Создаём записи на каждый день
+    from utils.tracking import format_assignment_tracking_nr
+    
+    created_assignments = []
+    skipped_dates = []
+    current_date = data.start_date
+    
+    while current_date <= data.end_date:
+        if current_date in existing_dates:
+            skipped_dates.append(current_date.isoformat())
+            current_date += timedelta(days=1)
+            continue
+        
+        new_assignment = Assignment(
+            user_id=target_worker_id,
+            assignment_date=current_date,
+            assignment_type=data.assignment_type,
+            hourly_rate=hourly_rate,
+            currency=currency,
+            description=data.description,
+            is_active=False
+        )
+        db.add(new_assignment)
+        await db.flush()
+        new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
+        
+        created_assignments.append(new_assignment)
+        current_date += timedelta(days=1)
+    
+    await db.commit()
+    
+    # WebSocket broadcast
+    from api.routers.websocket import manager, get_admin_ids
+    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    
+    for assignment in created_assignments:
+        await manager.broadcast({
+            "type": "assignment_started",
+            "assignment_id": assignment.id,
+            "user_id": target_worker_id
+        }, user_ids=target_users)
+    
+    # Формируем ответ
+    responses = []
+    for a in created_assignments:
+        responses.append(ManualAssignmentResponse(
+            assignment_id=a.id,
+            tracking_nr=a.tracking_nr,
+            assignment_type=a.assignment_type,
+            payment_id=None,  # Для time-off payment может создаваться отдельно
+            payment_tracking_nr=None,
+            total_hours=hours_per_day,
+            total_amount=float(hourly_rate * Decimal(str(hours_per_day))),
+            currency=currency
+        ))
+    
+    return TimeOffResponse(
+        created_count=len(created_assignments),
+        assignments=responses,
+        skipped_dates=skipped_dates
     )
 
 
@@ -1162,7 +1342,12 @@ async def get_grouped_sessions(
     responses = []
     for assignment in assignments[:limit]:
         tasks = sorted(assignment.tasks, key=lambda t: (t.start_time, t.id))
-        if not tasks:
+        
+        # Time-off assignments may have no tasks
+        is_time_off = assignment.assignment_type != "work"
+        
+        # For work assignments, skip if no tasks
+        if not tasks and not is_time_off:
             continue
         
         # Calculate totals
@@ -1188,8 +1373,8 @@ async def get_grouped_sessions(
             else:
                 total_pause_seconds += seg_seconds
         
-        first_task = tasks[0]
-        last_task = tasks[-1]
+        first_task = tasks[0] if tasks else None
+        last_task = tasks[-1] if tasks else None
         
         # Segments in descending order (newest first), stable sort by (start_time, id)
         segment_responses = [
@@ -1204,13 +1389,14 @@ async def get_grouped_sessions(
         responses.append(AssignmentResponse(
             assignment_id=assignment.id,
             tracking_nr=assignment.tracking_nr,
+            assignment_type=assignment.assignment_type,
             assignment_date=assignment.assignment_date,
             worker_id=assignment.user_id,
             worker_name=assignment.worker.full_name if assignment.worker else None,
             employer_id=assignment.user_id,
             employer_name=None,  # Assignment does not have employer relationship
-            start_time=first_task.start_time,
-            end_time=last_task.end_time if not is_active else None,
+            start_time=first_task.start_time if first_task else None,
+            end_time=last_task.end_time if last_task and not is_active else None,
             total_work_seconds=total_work_seconds,
             total_pause_seconds=total_pause_seconds,
             total_hours=round(total_work_seconds / 3600, 2),

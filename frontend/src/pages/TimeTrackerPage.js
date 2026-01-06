@@ -17,11 +17,12 @@ import {
     PlayArrow, Stop, AccessTime, Person, Work, Add,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange,
-    ArrowDropDown, NoteAdd, Replay
+    ArrowDropDown, NoteAdd, Replay, BeachAccess, Sick, EventBusy, MoneyOff
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
 import ManualAssignmentDialog from '../components/ManualAssignmentDialog';
+import TimeOffDialog from '../components/TimeOffDialog';
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -47,6 +48,15 @@ const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
     'USD': '$'
+};
+
+// Assignment type configuration for display
+const ASSIGNMENT_TYPES = {
+    work: { label: 'Смена', icon: Work, color: '#4caf50' },
+    sick_leave: { label: 'Больничный', icon: Sick, color: '#f44336' },
+    vacation: { label: 'Отпуск', icon: BeachAccess, color: '#4caf50' },
+    day_off: { label: 'Отгул', icon: EventBusy, color: '#ff9800' },
+    unpaid_leave: { label: 'Отпуск б/с', icon: MoneyOff, color: '#9e9e9e' }
 };
 
 // LiveTimer component for displaying real-time elapsed time in table rows
@@ -231,6 +241,9 @@ function TimeTrackerPage() {
     // Manual assignment dialog
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
     const [cloneData, setCloneData] = useState(null); // Data for cloning assignment
+
+    // Time-off dialog (vacation, sick leave, etc.)
+    const [timeOffDialogOpen, setTimeOffDialogOpen] = useState(false);
 
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -962,6 +975,10 @@ function TimeTrackerPage() {
                             <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
                             Добавить вручную
                         </MenuItem>
+                        <MenuItem onClick={() => { setStartMenuAnchor(null); setTimeOffDialogOpen(true); }}>
+                            <BeachAccess sx={{ mr: 1, color: 'warning.main' }} />
+                            Отпуск/Больничный
+                        </MenuItem>
                     </Menu>
                     <Button
                         variant="contained"
@@ -1280,17 +1297,35 @@ function TimeTrackerPage() {
                                             </IconButton>
                                         </TableCell>
                                         <TableCell>
-                                            <strong>{formatDate(assignment.assignment_date)}</strong>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                {assignment.assignment_type && assignment.assignment_type !== 'work' && (() => {
+                                                    const typeInfo = ASSIGNMENT_TYPES[assignment.assignment_type];
+                                                    const TypeIcon = typeInfo?.icon;
+                                                    return TypeIcon ? (
+                                                        <Tooltip title={typeInfo.label} arrow>
+                                                            <TypeIcon sx={{ fontSize: 18, color: typeInfo.color }} />
+                                                        </Tooltip>
+                                                    ) : null;
+                                                })()}
+                                                <strong>{formatDate(assignment.assignment_date)}</strong>
+                                            </Box>
                                             <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '8px' }}>
                                                 {assignment.tracking_nr || ''}
                                             </span>
                                         </TableCell>
                                         <TableCell>{assignment.worker_name}</TableCell>
                                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                                            {formatTime(assignment.start_time)} — {assignment.end_time ? formatTime(assignment.end_time) : '...'}
+                                            {assignment.assignment_type && assignment.assignment_type !== 'work'
+                                                ? ASSIGNMENT_TYPES[assignment.assignment_type]?.label || assignment.assignment_type
+                                                : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
+                                            }
                                         </TableCell>
                                         <TableCell align="right">
-                                            <LiveTimer assignment={assignment} currentTime={currentTime} />
+                                            {assignment.assignment_type === 'work' || !assignment.assignment_type ? (
+                                                <LiveTimer assignment={assignment} currentTime={currentTime} />
+                                            ) : (
+                                                <span style={{ color: '#666' }}>—</span>
+                                            )}
                                         </TableCell>
                                         <Tooltip title={assignment.description || ''} arrow placement="top">
                                             <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1754,6 +1789,15 @@ function TimeTrackerPage() {
                 isAdmin={isAdmin}
                 onPaymentEdit={handlePaymentEditFromManual}
                 initialData={cloneData}
+            />
+
+            {/* Time Off Dialog (Vacation, Sick Leave, etc.) */}
+            <TimeOffDialog
+                open={timeOffDialogOpen}
+                onClose={() => setTimeOffDialogOpen(false)}
+                onSave={() => { setTimeOffDialogOpen(false); loadData(true); }}
+                employmentList={employmentList}
+                isAdmin={isAdmin}
             />
 
             {/* Snackbar for notifications */}
