@@ -31,47 +31,62 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const [isEmployer, setIsEmployer] = useState(false);
   const [isWorker, setIsWorker] = useState(false);
 
+  // Track if we've already initialized the form for this dialog session
+  const initializedRef = React.useRef(false);
+
   useEffect(() => {
     if (open) {
       loadData();
-      if (payment) {
-        const dateTimeParts = payment.payment_date.split('T');
-        setOriginalTime(dateTimeParts[1] || null);
 
-        setFormData({
-          amount: payment.amount,
-          currency: payment.currency,
-          category_id: payment.category_id,
-          recipient_id: payment.recipient_id || '',
-          payer_id: payment.payer_id || '',
-          payment_date: dateTimeParts[0],
-          description: payment.description || '',
-          payment_status: payment.payment_status || 'unpaid'
-        });
-      } else if (initialData) {
-        setFormData({
-          amount: initialData.amount || '',
-          currency: initialData.currency || '',
-          category_id: initialData.category_id || '',
-          recipient_id: initialData.recipient_id || '',
-          payer_id: initialData.payer_id || '',
-          payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
-          description: initialData.description || '',
-          payment_status: initialData.payment_status || 'unpaid'
-        });
-      } else {
-        setFormData({
-          amount: '',
-          currency: '',
-          category_id: '',
-          recipient_id: '',
-          payer_id: '',
-          payment_date: new Date().toISOString().split('T')[0],
-          description: '',
-          payment_status: 'unpaid'
-        });
+      // Only initialize formData when dialog first opens, not on subsequent payment updates
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+
+        if (payment) {
+          const dateTimeParts = payment.payment_date.split('T');
+          setOriginalTime(dateTimeParts[1] || null);
+
+          setFormData({
+            amount: payment.amount,
+            currency: payment.currency,
+            category_id: payment.category_id,
+            recipient_id: payment.recipient_id || '',
+            payer_id: payment.payer_id || '',
+            payment_date: dateTimeParts[0],
+            description: payment.description || '',
+            payment_status: payment.payment_status || 'unpaid',
+            assignment_id: payment.assignment_id || ''
+          });
+        } else if (initialData) {
+          setFormData({
+            amount: initialData.amount || '',
+            currency: initialData.currency || '',
+            category_id: initialData.category_id || '',
+            recipient_id: initialData.recipient_id || '',
+            payer_id: initialData.payer_id || '',
+            payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
+            description: initialData.description || '',
+            payment_status: initialData.payment_status || 'unpaid',
+            assignment_id: initialData.assignment_id || ''
+          });
+        } else {
+          setFormData({
+            amount: '',
+            currency: '',
+            category_id: '',
+            recipient_id: '',
+            payer_id: '',
+            payment_date: new Date().toISOString().split('T')[0],
+            description: '',
+            payment_status: 'unpaid',
+            assignment_id: ''
+          });
+        }
       }
       setLocalError(''); // Clear error on dialog open
+    } else {
+      // Reset the ref when dialog closes
+      initializedRef.current = false;
     }
   }, [open, payment, initialData]);
 
@@ -155,6 +170,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
       recipient_id: formData.recipient_id ? parseInt(formData.recipient_id) : undefined,
       payer_id: formData.payer_id ? parseInt(formData.payer_id) : (currentUser?.id || undefined),
+      assignment_id: formData.assignment_id ? parseInt(formData.assignment_id) : undefined,
       payment_date: formData.payment_date + 'T' + timeToUse
     };
 

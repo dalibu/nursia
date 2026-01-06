@@ -238,6 +238,7 @@ class Payment(Base):
     assignment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assignments.id"), nullable=True)
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    modified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     payer: Mapped["User"] = relationship("User", foreign_keys=[payer_id], back_populates="payments_made")
     recipient: Mapped[Optional["User"]] = relationship("User", foreign_keys=[recipient_id], back_populates="payments_received")

@@ -37,10 +37,24 @@ const toLocalDateString = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '—';
-  const [year, month, day] = dateStr.split('-');
+const formatDateFull = (dateInput) => {
+  if (!dateInput) return '—';
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return '—';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
   return `${day}.${month}.${year}`;
+};
+
+const formatTimeFull = (dateInput) => {
+  if (!dateInput) return '';
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return '';
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
 };
 
 // Helper to parse date from URL string
@@ -440,10 +454,26 @@ function PaymentsPage() {
   const handlePaymentToggle = async (paymentId, newStatus) => {
     try {
       const payment = paymentList.find(e => e.id === paymentId);
-      await payments.update(paymentId, {
-        ...payment,
+      if (!payment) return;
+
+      // Send only required fields, not the entire object with nested relations
+      const updateData = {
+        amount: parseFloat(payment.amount),
+        currency: payment.currency,
+        category_id: payment.category_id,
+        recipient_id: payment.recipient_id,
+        payer_id: payment.payer_id,
+        payment_date: payment.payment_date,
+        description: payment.description || '',
         payment_status: newStatus
-      });
+      };
+
+      // Only include assignment_id if it exists (backend preserves old value if not sent)
+      if (payment.assignment_id) {
+        updateData.assignment_id = payment.assignment_id;
+      }
+
+      await payments.update(paymentId, updateData);
       loadPayments();
     } catch (error) {
       console.error('Failed to update payment status:', error);
@@ -610,7 +640,7 @@ function PaymentsPage() {
             sx={{ minWidth: 200 }}
           >
             {dateRange[0].startDate && dateRange[0].endDate
-              ? `${formatDate(toLocalDateString(dateRange[0].startDate))} — ${formatDate(toLocalDateString(dateRange[0].endDate))}`
+              ? `${formatDateFull(dateRange[0].startDate)} — ${formatDateFull(dateRange[0].endDate)}`
               : 'Выберите период'}
           </Button>
           <Popover
@@ -748,8 +778,19 @@ function PaymentsPage() {
                 <TableCell sx={{ width: 55, minWidth: 55, px: 0.5, fontSize: '0.75rem' }}>{payment.tracking_nr || '-'}</TableCell>
                 <TableCell>
                   <div style={{ lineHeight: 1 }}>
-                    <div>{new Date(payment.payment_date).toLocaleDateString()}</div>
-                    <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{new Date(payment.payment_date).toLocaleTimeString()}</div>
+                    {payment.modified_at ? (
+                      <Tooltip title={`Отредактировано: ${formatDateFull(payment.modified_at)} ${formatTimeFull(payment.modified_at)}`} arrow placement="top">
+                        <div>
+                          <div style={{ color: '#ff9800' }}>{formatDateFull(payment.modified_at)}</div>
+                          <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeFull(payment.modified_at)}</div>
+                        </div>
+                      </Tooltip>
+                    ) : (
+                      <>
+                        <div>{formatDateFull(payment.payment_date)}</div>
+                        <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeFull(payment.payment_date)}</div>
+                      </>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell

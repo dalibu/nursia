@@ -50,6 +50,7 @@ class PaymentBase(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     payment_date: datetime
     payment_status: Literal['unpaid', 'paid'] = 'unpaid'
+    modified_at: Optional[datetime] = None
 
 
 class PaymentCreate(PaymentBase):

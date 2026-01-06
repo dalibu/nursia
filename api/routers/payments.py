@@ -245,7 +245,8 @@ async def get_payments(
     result = await db.execute(query)
     payments = result.scalars().all()
     
-    return [PaymentSchema.from_orm(p) for p in payments]
+    serialized = [PaymentSchema.model_validate(p) for p in payments]
+    return serialized
 
 
 @router.get("/reports")
@@ -381,13 +382,23 @@ async def update_payment(
         elif status == 'unpaid':
             payment_data['paid_at'] = None
     
-    # Удаляем payer_id, если он не должен обновляться, или оставляем?
-    # В PaymentCreate payer_id опционален. Если передан - обновляем.
+    # Удаляем поля, которые не должны перезаписываться из запроса, если они null
     if 'payer_id' in payment_data and payment_data['payer_id'] is None:
         del payment_data['payer_id']
     
+    # Если в базе уже был assignment_id, а в обновлении его нет (null) - сохраняем старый
+    if db_payment.assignment_id and payment_data.get('assignment_id') is None:
+        del payment_data['assignment_id']
+    
+    # Не позволяем клиенту устанавливать modified_at вручную
+    if 'modified_at' in payment_data:
+        del payment_data['modified_at']
+    
     for field, value in payment_data.items():
         setattr(db_payment, field, value)
+    
+    # Устанавливаем время изменения принудительно ПОСЛЕ цикла
+    db_payment.modified_at = now_server()
     
     await db.commit()
     await db.refresh(db_payment)
