@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
@@ -150,6 +150,14 @@ function PaymentsPage() {
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
 
+  // Infinite scroll pagination state
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const sentinelRef = useRef(null);
+  const PAGE_SIZE = 50;
+
   // Sync filters to URL params AND localStorage
   useEffect(() => {
     const params = new URLSearchParams();
@@ -184,10 +192,15 @@ function PaymentsPage() {
 
   const { subscribe } = useWebSocket();
 
-  const loadPayments = useCallback(async () => {
+  const loadPayments = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
+      // Reset pagination when loading fresh data
+      setOffset(0);
+      setHasMore(true);
+
       const [paymentsRes, categoriesRes, userRes] = await Promise.all([
-        payments.list(),
+        payments.list({ skip: 0, limit: PAGE_SIZE }),
         payments.categories(),
         payments.getUserInfo()
       ]);
@@ -217,10 +230,44 @@ function PaymentsPage() {
         userRes.data.roles?.includes('employer') ||
         userRes.data.role === 'employer';
       setCanManagePaymentStatus(hasPermission);
+
+      // Check if there might be more data
+      setHasMore(paymentsRes.data.length >= PAGE_SIZE);
     } catch (error) {
       console.error('Failed to load payments:', error);
+    } finally {
+      if (!silent) setLoading(false);
     }
   }, []);
+
+  // Load more data for infinite scroll
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const newOffset = offset + PAGE_SIZE;
+      const paymentsRes = await payments.list({ skip: newOffset, limit: PAGE_SIZE });
+
+      if (paymentsRes.data.length > 0) {
+        // Add row numbers to new payments (continuing from current count)
+        const newPayments = paymentsRes.data.map((payment, index) => ({
+          ...payment,
+          rowNumber: paymentList.length + index + 1
+        }));
+
+        setPaymentList(prev => [...prev, ...newPayments]);
+        setOffset(newOffset);
+        setHasMore(paymentsRes.data.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Failed to load more payments:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, offset, paymentList.length]);
 
   const applyFiltersAndSort = useCallback(() => {
     let filtered = [...paymentList];
@@ -374,10 +421,28 @@ function PaymentsPage() {
   // Subscribe to payment WebSocket events
   useEffect(() => {
     const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
-      loadPayments();
+      loadPayments(true); // Silent refresh
     });
     return unsubscribe;
   }, [subscribe, loadPayments]);
+
+  // Infinite scroll - IntersectionObserver to load more when sentinel becomes visible
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   // Apply filters when data or filters change
   useEffect(() => {
@@ -904,8 +969,29 @@ function PaymentsPage() {
         </Table>
       </TableContainer>
 
-
-
+      {/* Infinite scroll sentinel and loading indicator */}
+      <Box
+        ref={sentinelRef}
+        sx={{
+          height: 1,
+          visibility: 'hidden'
+        }}
+      />
+      {loadingMore && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={24} />
+          <Typography variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
+            Загрузка...
+          </Typography>
+        </Box>
+      )}
+      {!hasMore && filteredList.length > 0 && (
+        <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary' }}>
+          <Typography variant="body2">
+            Все записи загружены ({filteredList.length})
+          </Typography>
+        </Box>
+      )}
 
       <PaymentForm
         open={showForm}
