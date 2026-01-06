@@ -31,63 +31,62 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const [isEmployer, setIsEmployer] = useState(false);
   const [isWorker, setIsWorker] = useState(false);
 
-  // Track if we've already initialized the form for this dialog session
-  const initializedRef = React.useRef(false);
+  // Ref to detect when dialog opens (transition from false to true)
+  const prevOpenRef = React.useRef(false);
 
   useEffect(() => {
-    if (open) {
+    // Detect if dialog just opened (false -> true transition)
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+
+    if (justOpened) {
+      // Dialog just opened - initialize form
       loadData();
 
-      // Only initialize formData when dialog first opens, not on subsequent payment updates
-      if (!initializedRef.current) {
-        initializedRef.current = true;
+      if (payment) {
+        const dateTimeParts = payment.payment_date.split('T');
+        setOriginalTime(dateTimeParts[1] || null);
 
-        if (payment) {
-          const dateTimeParts = payment.payment_date.split('T');
-          setOriginalTime(dateTimeParts[1] || null);
-
-          setFormData({
-            amount: payment.amount,
-            currency: payment.currency,
-            category_id: payment.category_id,
-            recipient_id: payment.recipient_id || '',
-            payer_id: payment.payer_id || '',
-            payment_date: dateTimeParts[0],
-            description: payment.description || '',
-            payment_status: payment.payment_status || 'unpaid',
-            assignment_id: payment.assignment_id || ''
-          });
-        } else if (initialData) {
-          setFormData({
-            amount: initialData.amount || '',
-            currency: initialData.currency || '',
-            category_id: initialData.category_id || '',
-            recipient_id: initialData.recipient_id || '',
-            payer_id: initialData.payer_id || '',
-            payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
-            description: initialData.description || '',
-            payment_status: initialData.payment_status || 'unpaid',
-            assignment_id: initialData.assignment_id || ''
-          });
-        } else {
-          setFormData({
-            amount: '',
-            currency: '',
-            category_id: '',
-            recipient_id: '',
-            payer_id: '',
-            payment_date: new Date().toISOString().split('T')[0],
-            description: '',
-            payment_status: 'unpaid',
-            assignment_id: ''
-          });
-        }
+        setFormData({
+          amount: payment.amount,
+          currency: payment.currency,
+          category_id: payment.category_id,
+          recipient_id: payment.recipient_id || '',
+          payer_id: payment.payer_id || '',
+          payment_date: dateTimeParts[0],
+          description: payment.description || '',
+          payment_status: payment.payment_status || 'unpaid',
+          assignment_id: payment.assignment_id || ''
+        });
+      } else if (initialData) {
+        setFormData({
+          amount: initialData.amount || '',
+          currency: initialData.currency || '',
+          category_id: initialData.category_id || '',
+          recipient_id: initialData.recipient_id || '',
+          payer_id: initialData.payer_id || '',
+          payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
+          description: initialData.description || '',
+          payment_status: initialData.payment_status || 'unpaid',
+          assignment_id: initialData.assignment_id || ''
+        });
+      } else {
+        setFormData({
+          amount: '',
+          currency: '',
+          category_id: '',
+          recipient_id: '',
+          payer_id: '',
+          payment_date: new Date().toISOString().split('T')[0],
+          description: '',
+          payment_status: 'unpaid',
+          assignment_id: ''
+        });
       }
-      setLocalError(''); // Clear error on dialog open
-    } else {
-      // Reset the ref when dialog closes
-      initializedRef.current = false;
+      setLocalError('');
     }
+    // If open is true but justOpened is false - do nothing, keep current formData
+    // If open is false - do nothing
   }, [open, payment, initialData]);
 
   const loadData = async () => {
