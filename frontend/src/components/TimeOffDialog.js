@@ -132,14 +132,20 @@ function TimeOffDialog({
         try {
             const emp = employmentList.find(e => e.id === selectedEmployment);
 
+            // Format dates as ISO datetime strings
+            // Start time is beginning of start_date, end time is end of end_date
+            const startDateTime = new Date(startDate);
+            startDateTime.setHours(0, 0, 0, 0);
+
+            const endDateTime = new Date(endDate);
+            // Set to end of day + hours_per_day (e.g., 8 hours working day)
+            endDateTime.setHours(parseInt(hoursPerDay) || 8, 0, 0, 0);
+
             const payload = {
                 worker_id: emp.user_id,
                 assignment_type: assignmentType,
-                start_date: formatDateStr(startDate),
-                end_date: formatDateStr(endDate),
-                hourly_rate: isPaid ? parseFloat(hourlyRate) : 0,
-                hours_per_day: parseFloat(hoursPerDay),
-                currency: currency,
+                start_time: startDateTime.toISOString(),
+                end_time: endDateTime.toISOString(),
                 description: description || null
             };
 
@@ -151,7 +157,16 @@ function TimeOffDialog({
                 onSave(response.data);
             }
         } catch (err) {
-            setError(err.response?.data?.detail || 'Ошибка при создании записей');
+            // Handle validation errors properly
+            const detail = err.response?.data?.detail;
+            if (typeof detail === 'string') {
+                setError(detail);
+            } else if (Array.isArray(detail)) {
+                // Pydantic validation errors come as array
+                setError(detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', '));
+            } else {
+                setError('Ошибка при создании записей');
+            }
         } finally {
             setLoading(false);
         }

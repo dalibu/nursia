@@ -245,8 +245,8 @@ async def broadcast_timer_updates():
                             if t.end_time:
                                 seg_seconds = t.duration_seconds
                             elif t.id == task.id:
-                                start_dt = datetime.combine(assignment.assignment_date, t.start_time)
-                                seg_seconds = int((now - start_dt).total_seconds())
+                                # t.start_time is now full datetime
+                                seg_seconds = int((now - t.start_time).total_seconds())
                             else:
                                 seg_seconds = 0
                             
@@ -296,13 +296,6 @@ async def broadcast_timer_updates():
                         })
                 
                 prev_active_users = current_active_users
-        
-        except asyncio.CancelledError:
-            logger.info("Timer broadcast task cancelled")
-            break
-        except Exception as e:
-            logger.error(f"Timer broadcast error: {e}")
-            await asyncio.sleep(5)  # Wait before retrying after error
         
         except asyncio.CancelledError:
             logger.info("Timer broadcast task cancelled")

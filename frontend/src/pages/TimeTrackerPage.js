@@ -77,7 +77,9 @@ const LiveTimer = ({ assignment, currentTime }) => {
     const isPaused = activeSegment?.session_type === 'pause';
 
     // Calculate elapsed time since segment started
-    const segmentStart = new Date(`${assignment.assignment_date}T${activeSegment?.start_time || assignment.start_time}`);
+    // start_time is now full datetime (ISO format), no need to combine with assignment_date
+    const startTimeStr = activeSegment?.start_time || assignment.start_time;
+    const segmentStart = new Date(startTimeStr);
     const nowMs = currentTime?.getTime() || Date.now();
     const currentSegmentSeconds = Math.max(0, Math.floor((nowMs - segmentStart.getTime()) / 1000));
 
@@ -115,15 +117,6 @@ const LiveTimer = ({ assignment, currentTime }) => {
             <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                 ({hours})
             </Box>
-            {isPaused && (
-                <Chip
-                    icon={<Coffee sx={{ fontSize: '0.8rem !important' }} />}
-                    label="пауза"
-                    size="small"
-                    color="warning"
-                    sx={{ height: 20, fontSize: '0.65rem' }}
-                />
-            )}
         </Box>
     );
 };
@@ -704,6 +697,18 @@ function TimeTrackerPage() {
         const employment = employmentList.find(emp => emp.employee_id === assignment.worker_id);
 
         // Prepare clone data from the assignment
+        // Helper to extract time from datetime or legacy time format
+        const extractTime = (str) => {
+            if (!str) return '09:00';
+            if (str.includes('T')) {
+                // ISO datetime: extract HH:MM from time part
+                const timePart = str.split('T')[1];
+                return timePart ? timePart.substring(0, 5) : '09:00';
+            }
+            // Legacy time format
+            return str.slice(0, 5);
+        };
+
         const cloneInfo = {
             employment_id: employment?.id || '',
             assignment_date: assignment.assignment_date,  // Copy shift date
@@ -711,8 +716,8 @@ function TimeTrackerPage() {
             currency: assignment.currency,
             description: assignment.description || '',
             tasks: assignment.segments?.map(seg => ({
-                start_time: seg.start_time?.slice(0, 5) || '09:00',
-                end_time: seg.end_time?.slice(0, 5) || '18:00',
+                start_time: extractTime(seg.start_time),
+                end_time: seg.end_time ? extractTime(seg.end_time) : '18:00',
                 task_type: seg.session_type || 'work',
                 description: seg.description || ''
             })) || []
@@ -787,7 +792,7 @@ function TimeTrackerPage() {
             const isPaused = activeSegment.session_type === 'pause';
             const endpoint = isPaused ? 'resume' : 'pause';
             await assignmentsService[endpoint](activeSegment.id);  // Use Task ID
-            loadData();
+            loadData(true);  // Silent refresh - no loading spinner
             fetchActiveSession();
             notifySessionChange();
         } catch (error) {
@@ -807,7 +812,7 @@ function TimeTrackerPage() {
                 return;
             }
             await assignmentsService.stop(activeSegment.id);  // Use Task ID
-            loadData();
+            loadData(true);  // Silent refresh
             loadSummary();
             fetchActiveSession();
             notifySessionChange();
@@ -1008,6 +1013,15 @@ function TimeTrackerPage() {
 
     const formatTime = (timeStr) => {
         if (!timeStr) return '—';
+        // Handle both formats:
+        // - Legacy: "HH:MM:SS" or "HH:MM"
+        // - New: "2026-01-07T17:38:00" (ISO datetime)
+        if (timeStr.includes('T')) {
+            // ISO datetime format - extract time part
+            const timePart = timeStr.split('T')[1];
+            return timePart ? timePart.substring(0, 5) : '—';
+        }
+        // Legacy time format
         return timeStr.substring(0, 5);
     };
 
@@ -1037,8 +1051,8 @@ function TimeTrackerPage() {
         }
 
         // Fallback for other sessions (shouldn't happen, but keep for safety)
-        const dateTimeStr = `${session.assignment_date}T${session.start_time}`;
-        const start = new Date(dateTimeStr);
+        // start_time is now full datetime (ISO format)
+        const start = new Date(session.start_time);
         const now = currentTime;
         const currentSegmentSeconds = Math.max(0, Math.floor((now - start) / 1000));
 

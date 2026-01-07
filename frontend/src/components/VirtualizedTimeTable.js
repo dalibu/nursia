@@ -5,7 +5,7 @@ import {
     Box, IconButton, Chip, Collapse, Tooltip, Typography
 } from '@mui/material';
 import {
-    PlayArrow, Stop, Edit, Delete, Pause,
+    PlayArrow, Stop, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Add, Replay, Work, BeachAccess, Sick, EventBusy, MoneyOff
 } from '@mui/icons-material';
 
@@ -112,7 +112,16 @@ const AssignmentRow = memo(({
                 </Tooltip>
                 <TableCell align="center" sx={{ width: columnWidths.status }}>
                     {assignment.is_active ? (
-                        <Chip label="В работе" color="warning" size="small" />
+                        isPaused ? (
+                            <Chip
+                                icon={<Coffee sx={{ fontSize: '1rem !important' }} />}
+                                label="Пауза"
+                                color="warning"
+                                size="small"
+                            />
+                        ) : (
+                            <Chip label="В работе" color="warning" size="small" />
+                        )
                     ) : (
                         <Chip label="Готово" color="success" size="small" />
                     )}

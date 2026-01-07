@@ -327,12 +327,8 @@ class Assignment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))  # Кто работал → users!
-    assignment_date: Mapped[date] = mapped_column(Date)
     assignment_type: Mapped[str] = mapped_column(String(20), default="work")  # work, sick_leave, vacation, day_off, unpaid_leave
-    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3), default="UAH")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool] = mapped_column(default=True)
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -340,8 +336,35 @@ class Assignment(Base):
     tasks: Mapped[list["Task"]] = relationship("Task", back_populates="assignment", order_by="Task.start_time")
     payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="assignment", uselist=False)
 
+    @property
+    def start_time(self) -> Optional[datetime]:
+        """Время начала = start_time первого task"""
+        if not self.tasks:
+            return None
+        return min(t.start_time for t in self.tasks)
+
+    @property
+    def end_time(self) -> Optional[datetime]:
+        """Время окончания = end_time последнего task (None если есть активный)"""
+        if not self.tasks:
+            return None
+        last_task = max(self.tasks, key=lambda t: t.start_time)
+        return last_task.end_time
+
+    @property
+    def is_active(self) -> bool:
+        """Смена активна если есть task без end_time"""
+        return any(t.end_time is None for t in self.tasks)
+
+    @property
+    def assignment_date(self) -> Optional[date]:
+        """Дата смены = дата первого task (для обратной совместимости)"""
+        if self.start_time:
+            return self.start_time.date()
+        return None
+
     def __repr__(self) -> str:
-        return f"<Assignment(id={self.id}, date={self.assignment_date}, user_id={self.user_id})>"
+        return f"<Assignment(id={self.id}, user_id={self.user_id}, type={self.assignment_type})>"
 
 
 class Task(Base):
@@ -350,10 +373,11 @@ class Task(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"))
-    start_time: Mapped[time] = mapped_column(Time)
-    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # Полная дата+время
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)  # Полная дата+время
     task_type: Mapped[str] = mapped_column(String(10), default="work")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)  # Txxx
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     assignment: Mapped["Assignment"] = relationship("Assignment", back_populates="tasks")
@@ -363,23 +387,13 @@ class Task(Base):
         """Вычисляемая длительность в секундах"""
         if not self.end_time or not self.start_time:
             return 0
-        from datetime import datetime as dt
-        start = dt.combine(dt.today(), self.start_time)
-        end = dt.combine(dt.today(), self.end_time)
-        return int((end - start).total_seconds())
+        return int((self.end_time - self.start_time).total_seconds())
 
     @property
     def duration_hours(self) -> float:
         """Вычисляемая длительность в часах"""
         return self.duration_seconds / 3600
 
-    @property
-    def amount(self) -> Decimal:
-        """Вычисляемая сумма (только для work)"""
-        if self.task_type != "work" or not self.assignment:
-            return Decimal(0)
-        hours = Decimal(str(self.duration_hours))
-        return hours * self.assignment.hourly_rate
-
     def __repr__(self) -> str:
         return f"<Task(id={self.id}, type={self.task_type}, start={self.start_time})>"
+

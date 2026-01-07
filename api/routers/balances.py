@@ -402,54 +402,51 @@ async def get_monthly_summary(
             next_month_start = date(year + 1, 1, 1)
         else:
             next_month_start = date(year, month + 1, 1)
-        end_date = next_month_start - timedelta(days=1)  # Для Assignment.assignment_date (date only)
+        end_date = next_month_start - timedelta(days=1)
+        
+        # Начало и конец месяца как datetime для фильтрации по Task.start_time
+        from datetime import datetime
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(next_month_start, datetime.min.time())
         
         # Рабочие сессии за месяц (из Assignment + Task)
+        # Теперь фильтруем по Task.start_time (datetime) вместо Assignment.assignment_date
         sessions_query = select(
-            func.count(func.distinct(Assignment.id)).label("sessions"),
-            Assignment.currency
+            func.count(func.distinct(Assignment.id)).label("sessions")
         ).select_from(Assignment).join(Task).where(
             and_(
-                Assignment.assignment_date >= start_date,
-                Assignment.assignment_date <= end_date,
-                Assignment.is_active == False,
-                Task.task_type == "work",
-                Task.end_time != None
+                Task.start_time >= start_datetime,
+                Task.start_time < end_datetime,
+                Task.end_time != None,  # Завершённые задачи
+                Task.task_type == "work"
             )
-        ).group_by(Assignment.currency)
+        )
         
         if worker_id:
             sessions_query = sessions_query.where(Assignment.user_id == worker_id)
-        # Note: employer_id not used for Assignment (single-employer model)
         
         result = await db.execute(sessions_query)
         session_row = result.first()
         
         sessions = session_row.sessions if session_row else 0
-        currency = session_row.currency if session_row else "UAH"
+        currency = "UAH"  # Hardcoded for now, can be fetched from EmploymentRelation if needed
         
-        # Подсчёт часов и суммы отдельным запросом
+        # Подсчёт часов — теперь Task.start_time и end_time уже datetime
         hours_query = select(
             func.sum(
-                (func.julianday(
-                    func.datetime(Assignment.assignment_date, Task.end_time)
-                ) - func.julianday(
-                    func.datetime(Assignment.assignment_date, Task.start_time)
-                )) * 24
+                (func.julianday(Task.end_time) - func.julianday(Task.start_time)) * 24
             ).label("hours")
         ).select_from(Task).join(Assignment).where(
             and_(
-                Assignment.assignment_date >= start_date,
-                Assignment.assignment_date <= end_date,
-                Assignment.is_active == False,
-                Task.task_type == "work",
-                Task.end_time != None
+                Task.start_time >= start_datetime,
+                Task.start_time < end_datetime,
+                Task.end_time != None,
+                Task.task_type == "work"
             )
         )
         
         if worker_id:
             hours_query = hours_query.where(Assignment.user_id == worker_id)
-        # Note: employer_id not used for Assignment (single-employer model)
         
         result = await db.execute(hours_query)
         hours_row = result.first()

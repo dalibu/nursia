@@ -128,8 +128,8 @@ export function ActiveSessionProvider({ children }) {
 
         // Calculate delta since the activeSession was fetched
         // Use start_time to calculate full elapsed, then subtract API's value to get delta
-        const dateTimeStr = `${activeSession.assignment_date}T${activeSession.start_time}`;
-        const startTime = new Date(dateTimeStr);
+        // start_time is now full datetime (ISO format)
+        const startTime = new Date(activeSession.start_time);
         const fullElapsedSeconds = Math.max(0, Math.floor((currentTime - startTime) / 1000));
 
         // API returned these values (which included elapsed at that moment)

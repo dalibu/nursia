@@ -273,16 +273,16 @@ function ManualAssignmentDialog({
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
         const workerId = emp?.employee_id || emp?.user_id;
+        const dateStr = formatDateStr(assignmentDate);
 
         const payload = {
             worker_id: workerId,
-            assignment_date: formatDateStr(assignmentDate),
-            hourly_rate: parseFloat(hourlyRate) || null,
-            currency: currency,
+            assignment_type: 'work',  // Manual assignments are work type
             description: description || null,
             tasks: tasks.map(t => ({
-                start_time: t.start_time + ':00',  // Add seconds
-                end_time: t.end_time + ':00',
+                // Combine date with time to create full datetime
+                start_time: `${dateStr}T${t.start_time}:00`,
+                end_time: `${dateStr}T${t.end_time}:00`,
                 task_type: t.task_type,
                 description: t.description || null
             }))
@@ -333,16 +333,16 @@ function ManualAssignmentDialog({
 
         const emp = employmentList.find(e => e.id === selectedEmployment);
         const workerId = emp?.employee_id || emp?.user_id;
+        const dateStr = formatDateStr(assignmentDate);
 
         const payload = {
             worker_id: workerId,
-            assignment_date: formatDateStr(assignmentDate),
-            hourly_rate: parseFloat(hourlyRate) || null,
-            currency: currency,
+            assignment_type: 'work',  // Manual assignments are work type
             description: description || null,
             tasks: tasks.map(t => ({
-                start_time: t.start_time + ':00',
-                end_time: t.end_time + ':00',
+                // Combine date with time to create full datetime
+                start_time: `${dateStr}T${t.start_time}:00`,
+                end_time: `${dateStr}T${t.end_time}:00`,
                 task_type: t.task_type,
                 description: t.description || null
             }))

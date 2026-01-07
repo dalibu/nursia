@@ -34,12 +34,11 @@ class WorkSessionResponse(BaseModel):
     id: int
     worker_id: int
     employer_id: int
-    assignment_date: date
-    start_time: time
-    end_time: Optional[time] = None
+    start_time: datetime  # Полная дата+время
+    end_time: Optional[datetime] = None  # Полная дата+время
     duration_hours: Optional[float] = None
-    hourly_rate: float
-    currency: str
+    hourly_rate: Optional[float] = None  # Из employment_relations
+    currency: Optional[str] = None
     amount: Optional[float] = None
     is_active: bool
     session_type: str = "work"
@@ -47,6 +46,7 @@ class WorkSessionResponse(BaseModel):
     description: Optional[str] = None
     worker_name: Optional[str] = None
     employer_name: Optional[str] = None
+    tracking_nr: Optional[str] = None  # Task tracking number
     # Aggregated times for the assignment
     total_work_seconds: Optional[int] = None
     total_pause_seconds: Optional[int] = None
@@ -67,19 +67,19 @@ class AssignmentResponse(BaseModel):
     assignment_id: int
     tracking_nr: str
     assignment_type: str = "work"  # work, sick_leave, vacation, day_off, unpaid_leave
-    assignment_date: date
+    assignment_date: Optional[date] = None  # Вычисляется из tasks.start_time
     worker_id: int
     worker_name: Optional[str] = None
     employer_id: int
     employer_name: Optional[str] = None
-    start_time: Optional[time] = None  # Начало первого сегмента (может быть None для time-off)
-    end_time: Optional[time] = None  # Конец последнего сегмента
+    start_time: Optional[datetime] = None  # Начало первого task (полная дата+время)
+    end_time: Optional[datetime] = None  # Конец последнего task (полная дата+время)
     total_work_seconds: int
     total_pause_seconds: int
     total_hours: float
     total_amount: float
-    hourly_rate: float
-    currency: str
+    hourly_rate: Optional[float] = None  # Из employment_relations
+    currency: Optional[str] = None
     description: Optional[str] = None
     is_active: bool
     payment_id: Optional[int] = None  # Linked payment ID
@@ -99,24 +99,22 @@ class WorkSessionUpdate(BaseModel):
 
 class AssignmentUpdate(BaseModel):
     """Обновление Assignment"""
-    assignment_date: Optional[date] = None
-    hourly_rate: Optional[float] = None
-    currency: Optional[str] = None
+    assignment_type: Optional[str] = None
     description: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
     """Обновление Task"""
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
+    start_time: Optional[datetime] = None  # Полная дата+время
+    end_time: Optional[datetime] = None  # Полная дата+время
     task_type: Optional[str] = None  # work или pause
     description: Optional[str] = None
 
 
 class ManualTaskCreate(BaseModel):
     """Задание для ручного создания смены"""
-    start_time: time
-    end_time: time
+    start_time: datetime  # Полная дата+время
+    end_time: datetime  # Полная дата+время
     task_type: str = "work"  # work или pause
     description: Optional[str] = None
 
@@ -124,23 +122,17 @@ class ManualTaskCreate(BaseModel):
 class ManualAssignmentCreate(BaseModel):
     """Ручное создание смены"""
     worker_id: int
-    assignment_date: date
     assignment_type: str = "work"  # work, sick_leave, vacation, day_off, unpaid_leave
-    hourly_rate: Optional[float] = None  # Если не указано, берётся из EmploymentRelation
-    currency: Optional[str] = None
     description: Optional[str] = None
     tasks: List[ManualTaskCreate] = []  # Пустой для не-work типов
 
 
 class TimeOffCreate(BaseModel):
-    """Создание записи отсутствия (отпуск, больничный и т.д.) на диапазон дат"""
+    """Создание записи отсутствия (отпуск, больничный и т.д.) — один assignment с одним task"""
     worker_id: int
     assignment_type: str  # sick_leave, vacation, day_off, unpaid_leave
-    start_date: date
-    end_date: date
-    hourly_rate: Optional[float] = None  # Для оплачиваемых отсутствий
-    hours_per_day: Optional[float] = 8.0  # Часов в день для расчёта оплаты
-    currency: Optional[str] = None
+    start_time: datetime  # Начало периода (полная дата+время)
+    end_time: datetime  # Конец периода (полная дата+время)
     description: Optional[str] = None
 
 
@@ -159,26 +151,33 @@ class ManualAssignmentResponse(BaseModel):
 def _task_to_response(task: Task, assignment: Assignment, 
                       worker_name: Optional[str] = None,
                       employer_name: Optional[str] = None,
+                      hourly_rate: Optional[float] = None,
+                      currency: Optional[str] = None,
                       total_work_seconds: Optional[int] = None,
                       total_pause_seconds: Optional[int] = None) -> WorkSessionResponse:
     """Преобразование Task в WorkSessionResponse для совместимости API"""
+    # Calculate amount if task is completed and is work type
+    amount = None
+    if task.end_time and task.task_type == "work" and hourly_rate:
+        amount = task.duration_hours * hourly_rate
+    
     return WorkSessionResponse(
         id=task.id,
         worker_id=assignment.user_id,
         employer_id=assignment.user_id,
-        assignment_date=assignment.assignment_date,
         start_time=task.start_time,
         end_time=task.end_time,
         duration_hours=task.duration_hours if task.end_time else None,
-        hourly_rate=float(assignment.hourly_rate),
-        currency=assignment.currency,
-        amount=float(task.amount) if task.end_time and task.task_type == "work" else None,
+        hourly_rate=hourly_rate,
+        currency=currency,
+        amount=amount,
         is_active=task.end_time is None,
         session_type=task.task_type,
         assignment_id=assignment.id,
         description=task.description,
         worker_name=worker_name,
         employer_name=employer_name,
+        tracking_nr=task.tracking_nr,
         total_work_seconds=total_work_seconds,
         total_pause_seconds=total_pause_seconds
     )
@@ -236,12 +235,11 @@ async def start_work_session(
     if not employment:
         raise HTTPException(status_code=404, detail="Трудовые отношения не найдены")
     
-    # Проверяем, нет ли уже активной сессии (незавершённого task у активного assignment)
+    # Проверяем, нет ли уже активной сессии (незавершённого task)
     result = await db.execute(
         select(Task).join(Assignment).where(
             and_(
                 Assignment.user_id == target_worker_id,
-                Assignment.is_active == True,
                 Task.end_time == None
             )
         )
@@ -253,15 +251,10 @@ async def start_work_session(
     
     now = datetime.now()
     
-    # Создаём Assignment (tracking_nr будет присвоен после flush)
-    # Note: employer relationship is in EmploymentRelation, not Assignment
+    # Создаём Assignment (без assignment_date, hourly_rate, currency, is_active)
     new_assignment = Assignment(
-        user_id=target_worker_id,  # user_id = worker who is assigned
-        assignment_date=now.date(),
-        hourly_rate=employment.hourly_rate,
-        currency=employment.currency,
-        description=session_data.description,  # Save description to assignment
-        is_active=True
+        user_id=target_worker_id,
+        description=session_data.description
     )
     db.add(new_assignment)
     await db.flush()  # Получаем ID
@@ -270,10 +263,10 @@ async def start_work_session(
     from utils.tracking import format_assignment_tracking_nr
     new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
     
-    # Создаём первый Task (use task_description if provided, else fallback to assignment description)
+    # Создаём первый Task с полным datetime
     new_task = Task(
         assignment_id=new_assignment.id,
-        start_time=now.time(),
+        start_time=now,  # Теперь полная дата+время
         task_type="work",
         description=session_data.task_description or session_data.description
     )
@@ -282,10 +275,10 @@ async def start_work_session(
     await db.refresh(new_task)
     await db.refresh(new_assignment)
     
-    # Загружаем имена участников
+    # Загружаем worker и employment relationship
     result = await db.execute(
         select(Assignment)
-        .options(joinedload(Assignment.worker), joinedload(Assignment.worker))
+        .options(joinedload(Assignment.worker))
         .where(Assignment.id == new_assignment.id)
     )
     assignment = result.scalar_one()
@@ -293,7 +286,9 @@ async def start_work_session(
     return_response = _task_to_response(
         new_task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=None  # Assignment doesn't store employer directly, it's in EmploymentRelation
+        employer_name=None,
+        hourly_rate=float(employment.hourly_rate),
+        currency=employment.currency
     )
     
     # WebSocket broadcast
@@ -338,12 +333,9 @@ async def create_manual_assignment(
         if not data.tasks or len(data.tasks) == 0:
             raise HTTPException(status_code=400, detail="Необходимо указать хотя бы одно задание")
         
-        # Валидация заданий: проверка времени
-        def to_minutes(t: time) -> int:
-            return t.hour * 60 + t.minute
-        
+        # Валидация заданий: проверка времени (теперь datetime)
         for i, task in enumerate(data.tasks):
-            if to_minutes(task.end_time) <= to_minutes(task.start_time):
+            if task.end_time <= task.start_time:
                 raise HTTPException(
                     status_code=400, 
                     detail=f"Задание #{i+1}: время окончания должно быть позже времени начала"
@@ -359,10 +351,8 @@ async def create_manual_assignment(
             for j, task2 in enumerate(data.tasks):
                 if i >= j:
                     continue
-                t1_start, t1_end = to_minutes(task1.start_time), to_minutes(task1.end_time)
-                t2_start, t2_end = to_minutes(task2.start_time), to_minutes(task2.end_time)
                 # Пересечение: (start1 < end2) AND (end1 > start2)
-                if t1_start < t2_end and t1_end > t2_start:
+                if task1.start_time < task2.end_time and task1.end_time > task2.start_time:
                     raise HTTPException(
                         status_code=400, 
                         detail=f"Задания #{i+1} и #{j+1} пересекаются по времени"
@@ -382,74 +372,53 @@ async def create_manual_assignment(
     if not employment:
         raise HTTPException(status_code=404, detail="Трудовые отношения не найдены")
     
-    # Получаем ставку и валюту
-    hourly_rate = Decimal(str(data.hourly_rate)) if data.hourly_rate else employment.hourly_rate
-    currency = data.currency or employment.currency
+    # Получаем ставку и валюту из employment
+    hourly_rate = employment.hourly_rate
+    currency = employment.currency
     
-    # Для не-work типов: проверка на дубликат в тот же день
-    if is_time_off:
-        result = await db.execute(
-            select(Assignment).where(
-                and_(
-                    Assignment.user_id == target_worker_id,
-                    Assignment.assignment_date == data.assignment_date,
-                    Assignment.assignment_type == data.assignment_type
-                )
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Запись типа '{data.assignment_type}' уже существует на эту дату"
-            )
-    else:
-        # Для рабочих смен - проверка пересечений
-        def to_minutes(t: time) -> int:
-            return t.hour * 60 + t.minute
-            
+    # Проверка пересечений с существующими сменами (для work типов)
+    if not is_time_off and data.tasks:
+        # Получаем диапазон новой смены
+        new_tasks_sorted = sorted(data.tasks, key=lambda t: t.start_time)
+        new_shift_start = new_tasks_sorted[0].start_time
+        new_shift_end = new_tasks_sorted[-1].end_time
+        
+        # Находим существующие assignments в том же временном диапазоне
         result = await db.execute(
             select(Assignment)
             .options(joinedload(Assignment.tasks))
+            .join(Task)
             .where(
                 and_(
                     Assignment.user_id == target_worker_id,
-                    Assignment.assignment_date == data.assignment_date,
-                    Assignment.assignment_type == "work"
+                    Assignment.assignment_type == "work",
+                    # Check if any tasks overlap with our time range
+                    Task.start_time < new_shift_end,
+                    Task.end_time > new_shift_start
                 )
             )
         )
         existing_assignments = result.unique().scalars().all()
         
-        # Диапазон новой смены
-        new_tasks_sorted = sorted(data.tasks, key=lambda t: to_minutes(t.start_time))
-        new_shift_start = to_minutes(new_tasks_sorted[0].start_time)
-        new_shift_end = to_minutes(new_tasks_sorted[-1].end_time)
-        
         for existing in existing_assignments:
             if not existing.tasks:
                 continue
-            # Находим границы существующей смены
-            existing_tasks_sorted = sorted(existing.tasks, key=lambda t: to_minutes(t.start_time))
-            existing_start = to_minutes(existing_tasks_sorted[0].start_time)
-            existing_end = to_minutes(existing_tasks_sorted[-1].end_time) if existing_tasks_sorted[-1].end_time else 24 * 60
+            existing_tasks_sorted = sorted(existing.tasks, key=lambda t: t.start_time)
+            existing_start = existing_tasks_sorted[0].start_time
+            existing_end = existing_tasks_sorted[-1].end_time if existing_tasks_sorted[-1].end_time else datetime.now()
             
             # Проверяем пересечение
             if new_shift_start < existing_end and new_shift_end > existing_start:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Смена пересекается с существующей {existing.tracking_nr} ({existing_tasks_sorted[0].start_time.strftime('%H:%M')}-{existing_tasks_sorted[-1].end_time.strftime('%H:%M') if existing_tasks_sorted[-1].end_time else '...'})'"
+                    detail=f"Смена пересекается с существующей {existing.tracking_nr} ({existing_start.strftime('%d.%m %H:%M')}-{existing_end.strftime('%H:%M')})'"
                 )
     
-    # Создаём Assignment (завершённую смену)
+    # Создаём Assignment (без удалённых полей)
     new_assignment = Assignment(
         user_id=target_worker_id,
-        assignment_date=data.assignment_date,
         assignment_type=data.assignment_type,
-        hourly_rate=hourly_rate,
-        currency=currency,
-        description=data.description,
-        is_active=False  # Смена уже завершена
+        description=data.description
     )
     db.add(new_assignment)
     await db.flush()
@@ -463,8 +432,8 @@ async def create_manual_assignment(
     for task_data in data.tasks:
         new_task = Task(
             assignment_id=new_assignment.id,
-            start_time=task_data.start_time,
-            end_time=task_data.end_time,
+            start_time=task_data.start_time,  # Now full datetime
+            end_time=task_data.end_time,  # Now full datetime
             task_type=task_data.task_type,
             description=task_data.description
         )
@@ -472,8 +441,8 @@ async def create_manual_assignment(
         
         # Считаем рабочее время
         if task_data.task_type == "work":
-            duration_seconds = (to_minutes(task_data.end_time) - to_minutes(task_data.start_time)) * 60
-            total_work_seconds += duration_seconds
+            duration = task_data.end_time - task_data.start_time
+            total_work_seconds += int(duration.total_seconds())
     
     # Рассчитываем сумму
     total_hours = total_work_seconds / 3600
@@ -517,6 +486,10 @@ async def create_manual_assignment(
         if not salary_category:
             raise HTTPException(status_code=500, detail="Категория зарплаты не найдена")
         
+        # Payment date = first task's start_time
+        first_task = data.tasks[0] if data.tasks else None
+        payment_date = first_task.start_time if first_task else datetime.now()
+        
         payment = Payment(
             payer_id=payer_id,
             recipient_id=target_worker_id,
@@ -524,7 +497,7 @@ async def create_manual_assignment(
             amount=total_amount,
             currency=currency,
             description=full_description,
-            payment_date=datetime.combine(data.assignment_date, time(12, 0)),  # Полдень в день смены
+            payment_date=payment_date,
             payment_status='unpaid',
             assignment_id=new_assignment.id
         )
@@ -540,7 +513,7 @@ async def create_manual_assignment(
     target_users = list(set([target_worker_id] + await get_admin_ids()))
     
     await manager.broadcast({
-        "type": "assignment_started",  # Используем существующий тип для триггера обновления
+        "type": "assignment_started",
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
     }, user_ids=target_users)
@@ -593,14 +566,13 @@ async def create_time_off(
     if data.assignment_type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Для данного endpoint допустимые типы: {', '.join(valid_types)}")
     
-    # Проверка дат
-    if data.end_date < data.start_date:
-        raise HTTPException(status_code=400, detail="Дата окончания должна быть не раньше даты начала")
+    # Проверка времени
+    if data.end_time <= data.start_time:
+        raise HTTPException(status_code=400, detail="Время окончания должно быть позже времени начала")
     
-    # Ограничение на количество дней (защита от случайных ошибок)
-    from datetime import timedelta
-    days_count = (data.end_date - data.start_date).days + 1
-    if days_count > 365:
+    # Ограничение на продолжительность (защита от случайных ошибок)
+    duration = data.end_time - data.start_time
+    if duration.days > 365:
         raise HTTPException(status_code=400, detail="Максимальный период: 365 дней")
     
     # Проверяем трудовые отношения
@@ -616,84 +588,86 @@ async def create_time_off(
     if not employment:
         raise HTTPException(status_code=404, detail="Трудовые отношения не найдены")
     
-    hourly_rate = Decimal(str(data.hourly_rate)) if data.hourly_rate else employment.hourly_rate
-    currency = data.currency or employment.currency
-    hours_per_day = data.hours_per_day or 8.0
+    hourly_rate = employment.hourly_rate
+    currency = employment.currency
     
-    # Находим существующие записи на эти даты
+    # Проверяем пересечение с существующими записями того же типа
     result = await db.execute(
-        select(Assignment).where(
+        select(Assignment)
+        .options(joinedload(Assignment.tasks))
+        .join(Task)
+        .where(
             and_(
                 Assignment.user_id == target_worker_id,
-                Assignment.assignment_date >= data.start_date,
-                Assignment.assignment_date <= data.end_date,
-                Assignment.assignment_type == data.assignment_type
+                Assignment.assignment_type == data.assignment_type,
+                # Пересечение временных диапазонов
+                Task.start_time < data.end_time,
+                Task.end_time > data.start_time
             )
         )
     )
-    existing_assignments = result.scalars().all()
-    existing_dates = {a.assignment_date for a in existing_assignments}
+    existing = result.scalars().first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Запись типа '{data.assignment_type}' уже существует и пересекается с указанным периодом"
+        )
     
-    # Создаём записи на каждый день
+    # Создаём один Assignment с одним Task на весь период
     from utils.tracking import format_assignment_tracking_nr
     
-    created_assignments = []
-    skipped_dates = []
-    current_date = data.start_date
+    new_assignment = Assignment(
+        user_id=target_worker_id,
+        assignment_type=data.assignment_type,
+        description=data.description
+    )
+    db.add(new_assignment)
+    await db.flush()
+    new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
     
-    while current_date <= data.end_date:
-        if current_date in existing_dates:
-            skipped_dates.append(current_date.isoformat())
-            current_date += timedelta(days=1)
-            continue
-        
-        new_assignment = Assignment(
-            user_id=target_worker_id,
-            assignment_date=current_date,
-            assignment_type=data.assignment_type,
-            hourly_rate=hourly_rate,
-            currency=currency,
-            description=data.description,
-            is_active=False
-        )
-        db.add(new_assignment)
-        await db.flush()
-        new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
-        
-        created_assignments.append(new_assignment)
-        current_date += timedelta(days=1)
+    # Создаём Task на весь период
+    new_task = Task(
+        assignment_id=new_assignment.id,
+        start_time=data.start_time,
+        end_time=data.end_time,
+        task_type="work",  # Time-off uses work type for the task
+        description=data.description
+    )
+    db.add(new_task)
     
     await db.commit()
+    await db.refresh(new_assignment)
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
     target_users = list(set([target_worker_id] + await get_admin_ids()))
     
-    for assignment in created_assignments:
-        await manager.broadcast({
-            "type": "assignment_started",
-            "assignment_id": assignment.id,
-            "user_id": target_worker_id
-        }, user_ids=target_users)
+    await manager.broadcast({
+        "type": "assignment_started",
+        "assignment_id": new_assignment.id,
+        "user_id": target_worker_id
+    }, user_ids=target_users)
+    
+    # Calculate hours for response
+    total_hours = duration.total_seconds() / 3600
+    total_amount = float(hourly_rate) * total_hours if data.assignment_type != "unpaid_leave" else 0.0
     
     # Формируем ответ
-    responses = []
-    for a in created_assignments:
-        responses.append(ManualAssignmentResponse(
-            assignment_id=a.id,
-            tracking_nr=a.tracking_nr,
-            assignment_type=a.assignment_type,
-            payment_id=None,  # Для time-off payment может создаваться отдельно
-            payment_tracking_nr=None,
-            total_hours=hours_per_day,
-            total_amount=float(hourly_rate * Decimal(str(hours_per_day))),
-            currency=currency
-        ))
+    response = ManualAssignmentResponse(
+        assignment_id=new_assignment.id,
+        tracking_nr=new_assignment.tracking_nr,
+        assignment_type=new_assignment.assignment_type,
+        payment_id=None,
+        payment_tracking_nr=None,
+        total_hours=round(total_hours, 2),
+        total_amount=round(total_amount, 2),
+        currency=currency
+    )
     
     return TimeOffResponse(
-        created_count=len(created_assignments),
-        assignments=responses,
-        skipped_dates=skipped_dates
+        created_count=1,
+        assignments=[response],
+        skipped_dates=[]
     )
 
 
@@ -707,8 +681,7 @@ async def stop_work_session(
     # session_id это ID Task'а
     result = await db.execute(
         select(Task)
-        .options(joinedload(Task.assignment).joinedload(Assignment.worker),
-                 joinedload(Task.assignment).joinedload(Assignment.worker))
+        .options(joinedload(Task.assignment).joinedload(Assignment.worker))
         .where(Task.id == session_id)
     )
     task = result.scalar_one_or_none()
@@ -721,10 +694,22 @@ async def stop_work_session(
     
     assignment = task.assignment
     now = datetime.now()
-    task.end_time = now.time()
+    task.end_time = now  # Full datetime now
     
-    # Закрываем Assignment
-    assignment.is_active = False
+    # is_active is now a computed property, no need to set it
+    
+    # Get employment relation for rate/currency
+    emp_result = await db.execute(
+        select(EmploymentRelation).where(
+            and_(
+                EmploymentRelation.user_id == assignment.user_id,
+                EmploymentRelation.is_active == True
+            )
+        )
+    )
+    employment = emp_result.scalar_one_or_none()
+    hourly_rate = employment.hourly_rate if employment else Decimal(0)
+    currency = employment.currency if employment else "UAH"
     
     # Рассчитываем общую сумму по всем work-tasks
     result = await db.execute(
@@ -734,10 +719,13 @@ async def stop_work_session(
     
     total_amount = Decimal(0)
     for t in all_tasks:
-        if t.task_type == "work":
-            total_amount += t.amount
+        if t.task_type == "work" and t.end_time:
+            # Calculate amount manually: hours * hourly_rate
+            task_hours = Decimal(str(t.duration_hours))
+            total_amount += task_hours * hourly_rate
     
     # Создаём платёж только если сумма > 0
+    employer = None
     if total_amount > 0:
         # Собираем комментарии из смены и всех заданий
         comments = []
@@ -783,7 +771,7 @@ async def stop_work_session(
             recipient_id=assignment.user_id,  # Работник — получатель
             category_id=salary_category.id,
             amount=total_amount,
-            currency=assignment.currency,
+            currency=currency,
             description=full_description,
             payment_date=now,
             payment_status='unpaid',
@@ -798,7 +786,9 @@ async def stop_work_session(
     return_response = _task_to_response(
         task, assignment,
         worker_name=assignment.worker.full_name if assignment.worker else None,
-        employer_name=employer.full_name if employer else None
+        employer_name=employer.full_name if employer else None,
+        hourly_rate=float(hourly_rate),
+        currency=currency
     )
     
     # WebSocket broadcast
@@ -866,12 +856,12 @@ async def switch_task(
     
     now = datetime.now()
     if current_task:
-        current_task.end_time = now.time()
+        current_task.end_time = now  # Full datetime now
     
     # Создаём новый work task
     new_task = Task(
         assignment_id=assignment_id,
-        start_time=now.time(),
+        start_time=now,  # Full datetime now
         task_type="work",
         description=request.description
     )
@@ -1078,17 +1068,11 @@ async def update_assignment(
     
     # Проверка прав
     if not current_user.is_admin:
-        pass  # User is now the worker directly
         if assignment.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет прав на редактирование")
     
-    # Обновляем поля
-    if update_data.assignment_date is not None:
-        assignment.assignment_date = update_data.assignment_date
-    if update_data.hourly_rate is not None:
-        assignment.hourly_rate = Decimal(str(update_data.hourly_rate))
-    if update_data.currency is not None:
-        assignment.currency = update_data.currency
+    # Обновляем только те поля, которые ещё есть в модели
+    # assignment_date, hourly_rate, currency теперь computed/from employment
     if update_data.description is not None:
         # Allow empty string to clear description
         assignment.description = update_data.description if update_data.description else None
@@ -1282,16 +1266,20 @@ async def get_work_sessions(
     if False:  # employer_id removed - single employer
         query = query.where(Assignment.user_id == employer_id)
     if start_date:
-        query = query.where(Assignment.assignment_date >= start_date)
+        from datetime import datetime as dt
+        start_datetime = dt.combine(start_date, dt.min.time())
+        query = query.where(Task.start_time >= start_datetime)
     if end_date:
-        query = query.where(Assignment.assignment_date <= end_date)
+        from datetime import datetime as dt
+        end_datetime = dt.combine(end_date + timedelta(days=1), dt.min.time())
+        query = query.where(Task.start_time < end_datetime)
     if is_active is not None:
         if is_active:
             query = query.where(Task.end_time == None)
         else:
             query = query.where(Task.end_time != None)
     
-    query = query.order_by(Assignment.assignment_date.desc(), Task.start_time.desc())
+    query = query.order_by(Task.start_time.desc())
     query = query.limit(limit).offset(offset)
     
     result = await db.execute(query)
@@ -1341,11 +1329,19 @@ async def get_grouped_sessions(
         joinedload(Assignment.payment)
     )
     
-    # Apply date filter only if start_date is set
+    # Apply date filter using subquery on Task.start_time
     if start_date:
-        query = query.where(Assignment.assignment_date >= start_date)
+        from datetime import datetime as dt
+        start_datetime = dt.combine(start_date, dt.min.time())
+        # Filter assignments that have at least one task starting on or after start_date
+        query = query.where(
+            Assignment.id.in_(
+                select(Task.assignment_id).where(Task.start_time >= start_datetime).distinct()
+            )
+        )
     
-    query = query.order_by(Assignment.assignment_date.desc(), Assignment.id.desc())
+    # Sort by created_at (since assignment_date is now computed)
+    query = query.order_by(Assignment.created_at.desc(), Assignment.id.desc())
     
     if worker_id:
         query = query.where(Assignment.user_id == worker_id)
@@ -1368,6 +1364,19 @@ async def get_grouped_sessions(
         paginated = assignments[offset:] if offset > 0 else assignments
     
     responses = []
+    
+    # Pre-load employment relations for rate lookup
+    worker_ids = list(set(a.user_id for a in paginated))
+    emp_result = await db.execute(
+        select(EmploymentRelation).where(
+            and_(
+                EmploymentRelation.user_id.in_(worker_ids),
+                EmploymentRelation.is_active == True
+            )
+        )
+    )
+    emp_by_worker = {e.user_id: e for e in emp_result.scalars().all()}
+    
     for assignment in paginated:
         tasks = sorted(assignment.tasks, key=lambda t: (t.start_time, t.id))
         
@@ -1377,6 +1386,11 @@ async def get_grouped_sessions(
         # For work assignments, skip if no tasks
         if not tasks and not is_time_off:
             continue
+        
+        # Get employment relation for hourly rate
+        employment = emp_by_worker.get(assignment.user_id)
+        hourly_rate = float(employment.hourly_rate) if employment else 0.0
+        currency = employment.currency if employment else "UAH"
         
         # Calculate totals
         total_work_seconds = 0
@@ -1388,16 +1402,17 @@ async def get_grouped_sessions(
             if task.end_time:
                 seg_seconds = task.duration_seconds
             elif task.end_time is None:
-                # Active task
-                start_dt = datetime.combine(assignment.assignment_date, task.start_time)
-                seg_seconds = int((now - start_dt).total_seconds())
+                # Active task - Task.start_time is now full datetime
+                seg_seconds = int((now - task.start_time).total_seconds())
             else:
                 seg_seconds = 0
             
             if task.task_type == "work":
                 total_work_seconds += seg_seconds
                 if task.end_time:
-                    total_amount += float(task.amount)
+                    # Calculate amount manually: hours * hourly_rate
+                    task_hours = task.duration_hours
+                    total_amount += task_hours * hourly_rate
             else:
                 total_pause_seconds += seg_seconds
         
@@ -1409,7 +1424,9 @@ async def get_grouped_sessions(
             _task_to_response(
                 task, assignment,
                 worker_name=assignment.worker.full_name if assignment.worker else None,
-                employer_name=None  # Assignment doesn't have employer relationship
+                employer_name=None,
+                hourly_rate=hourly_rate,
+                currency=currency
             )
             for task in sorted(tasks, key=lambda t: (t.start_time, t.id), reverse=True)
         ]
@@ -1422,15 +1439,15 @@ async def get_grouped_sessions(
             worker_id=assignment.user_id,
             worker_name=assignment.worker.full_name if assignment.worker else None,
             employer_id=assignment.user_id,
-            employer_name=None,  # Assignment does not have employer relationship
+            employer_name=None,
             start_time=first_task.start_time if first_task else None,
             end_time=last_task.end_time if last_task and not is_active else None,
             total_work_seconds=total_work_seconds,
             total_pause_seconds=total_pause_seconds,
             total_hours=round(total_work_seconds / 3600, 2),
-            total_amount=total_amount,
-            hourly_rate=float(assignment.hourly_rate),
-            currency=assignment.currency,
+            total_amount=round(total_amount, 2),
+            hourly_rate=hourly_rate,
+            currency=currency,
             description=assignment.description,
             is_active=is_active,
             payment_id=assignment.payment.id if assignment.payment else None,
@@ -1451,7 +1468,6 @@ async def get_active_sessions(
     
     query = select(Task).join(Assignment).options(
         joinedload(Task.assignment).joinedload(Assignment.worker),
-        joinedload(Task.assignment).joinedload(Assignment.worker),
         joinedload(Task.assignment).joinedload(Assignment.tasks)
     ).where(Task.end_time == None)
     
@@ -1465,9 +1481,29 @@ async def get_active_sessions(
     from utils.timezone import now_server
     now = now_server()
     
+    # Pre-load employment relations for rate lookup
+    worker_ids = list(set(t.assignment.user_id for t in active_tasks))
+    if worker_ids:
+        emp_result = await db.execute(
+            select(EmploymentRelation).where(
+                and_(
+                    EmploymentRelation.user_id.in_(worker_ids),
+                    EmploymentRelation.is_active == True
+                )
+            )
+        )
+        emp_by_worker = {e.user_id: e for e in emp_result.scalars().all()}
+    else:
+        emp_by_worker = {}
+    
     responses = []
     for task in active_tasks:
         assignment = task.assignment
+        
+        # Get employment for rate/currency
+        employment = emp_by_worker.get(assignment.user_id)
+        hourly_rate = float(employment.hourly_rate) if employment else 0.0
+        currency = employment.currency if employment else "UAH"
         
         # Calculate aggregated times for this assignment
         total_work_seconds = 0
@@ -1477,9 +1513,8 @@ async def get_active_sessions(
             if t.end_time:
                 seg_seconds = t.duration_seconds
             elif t.id == task.id:
-                # Current running task
-                start_dt = datetime.combine(assignment.assignment_date, t.start_time)
-                seg_seconds = int((now - start_dt).total_seconds())
+                # Current running task - t.start_time is now full datetime
+                seg_seconds = int((now - t.start_time).total_seconds())
             else:
                 seg_seconds = 0
             
@@ -1491,7 +1526,9 @@ async def get_active_sessions(
         responses.append(_task_to_response(
             task, assignment,
             worker_name=assignment.worker.full_name if assignment.worker else None,
-            employer_name=None,  # Assignment does not have employer relationship
+            employer_name=None,
+            hourly_rate=hourly_rate,
+            currency=currency,
             total_work_seconds=total_work_seconds,
             total_pause_seconds=total_pause_seconds
         ))
@@ -1514,9 +1551,7 @@ async def get_sessions_summary(
     
     # Автофильтрация для не-админов
     if not current_user.is_admin:
-        pass  # User is now the worker directly
-        if True:  # User is worker
-            worker_id = current_user.id
+        worker_id = current_user.id
     
     now = now_server()
     
@@ -1535,89 +1570,79 @@ async def get_sessions_summary(
     if not end_date:
         end_date = now.date()
     
-    # Query completed work tasks with their assignments
+    # Convert to datetime for Task.start_time filtering
+    from datetime import datetime as dt
+    start_datetime = dt.combine(start_date, dt.min.time())
+    end_datetime = dt.combine(end_date + timedelta(days=1), dt.min.time())
+    
+    # Query completed work tasks - now use Task.start_time for date filtering
     query = select(
-        func.count(func.distinct(Assignment.id)).label("total_sessions"),
-        Assignment.currency
-    ).join(Task).where(
+        func.count(func.distinct(Assignment.id)).label("total_sessions")
+    ).select_from(Assignment).join(Task).where(
         and_(
-            Assignment.assignment_date >= start_date,
-            Assignment.assignment_date <= end_date,
-            Assignment.is_active == False,
-            Task.task_type == "work",
-            Task.end_time != None
+            Task.start_time >= start_datetime,
+            Task.start_time < end_datetime,
+            Task.end_time != None,
+            Task.task_type == "work"
         )
-    ).group_by(Assignment.currency)
+    )
     
     if worker_id:
         query = query.where(Assignment.user_id == worker_id)
-    if False:  # employer_id removed - single employer
-        query = query.where(Assignment.user_id == employer_id)
     
     result = await db.execute(query)
-    rows = result.all()
+    row = result.one()
+    total_sessions = row.total_sessions or 0
     
-    summaries = []
-    for row in rows:
-        # Get total hours and amount for this currency
-        hours_query = select(
-            func.sum(
-                (func.julianday(
-                    func.datetime(Assignment.assignment_date, Task.end_time)
-                ) - func.julianday(
-                    func.datetime(Assignment.assignment_date, Task.start_time)
-                )) * 24
-            ).label("total_hours")
-        ).select_from(Task).join(Assignment).where(
-            and_(
-                Assignment.assignment_date >= start_date,
-                Assignment.assignment_date <= end_date,
-                Assignment.is_active == False,
-                Task.task_type == "work",
-                Task.end_time != None,
-                Assignment.currency == row.currency
-            )
+    # Get total hours - Task.start_time and end_time are now full datetime
+    hours_query = select(
+        func.sum(
+            (func.julianday(Task.end_time) - func.julianday(Task.start_time)) * 24
+        ).label("total_hours")
+    ).select_from(Task).join(Assignment).where(
+        and_(
+            Task.start_time >= start_datetime,
+            Task.start_time < end_datetime,
+            Task.end_time != None,
+            Task.task_type == "work"
         )
-        
-        if worker_id:
-            hours_query = hours_query.where(Assignment.user_id == worker_id)
-        if False:  # employer_id removed - single employer
-            hours_query = hours_query.where(Assignment.user_id == employer_id)
-        
-        hours_result = await db.execute(hours_query)
-        hours_row = hours_result.one()
-        
-        # Calculate total amount from payments for assignments
-        amount_query = select(
-            func.sum(Payment.amount).label("total_amount")
-        ).select_from(Payment).join(
-            Assignment, Assignment.id == Payment.assignment_id
-        ).where(
-            and_(
-                Assignment.assignment_date >= start_date,
-                Assignment.assignment_date <= end_date,
-                Assignment.currency == row.currency
-            )
-        )
-        
-        if worker_id:
-            amount_query = amount_query.where(Assignment.user_id == worker_id)
-        if False:  # employer_id removed - single employer
-            amount_query = amount_query.where(Assignment.user_id == employer_id)
-        
-        amount_result = await db.execute(amount_query)
-        amount_row = amount_result.one()
-        
-        summaries.append(WorkSessionSummary(
-            period_start=start_date,
-            period_end=end_date,
-            total_sessions=row.total_sessions or 0,
-            total_hours=float(hours_row.total_hours) if hours_row.total_hours else 0,
-            total_amount=float(amount_row.total_amount) if amount_row.total_amount else 0,
-            currency=row.currency
-        ))
+    )
     
-    return summaries
+    if worker_id:
+        hours_query = hours_query.where(Assignment.user_id == worker_id)
+    
+    hours_result = await db.execute(hours_query)
+    hours_row = hours_result.one()
+    total_hours = float(hours_row.total_hours) if hours_row.total_hours else 0
+    
+    # Calculate total amount from payments for assignments in this period
+    amount_query = select(
+        func.sum(Payment.amount).label("total_amount")
+    ).select_from(Payment).join(
+        Assignment, Assignment.id == Payment.assignment_id
+    ).join(Task).where(
+        and_(
+            Task.start_time >= start_datetime,
+            Task.start_time < end_datetime
+        )
+    )
+    
+    if worker_id:
+        amount_query = amount_query.where(Assignment.user_id == worker_id)
+    
+    amount_result = await db.execute(amount_query)
+    amount_row = amount_result.one()
+    total_amount = float(amount_row.total_amount) if amount_row.total_amount else 0
+    
+    # Return single summary (currency from employment relation)
+    return [WorkSessionSummary(
+        period_start=start_date,
+        period_end=end_date,
+        total_sessions=total_sessions,
+        total_hours=round(total_hours, 2),
+        total_amount=round(total_amount, 2),
+        currency="UAH"  # Hardcoded for now
+    )]
 
 
 @router.post("/{session_id}/pause", response_model=WorkSessionResponse)
@@ -1649,14 +1674,14 @@ async def pause_work_session(
     assignment = task.assignment
     
     # End current work task
-    task.end_time = now.time()
+    task.end_time = now  # Full datetime
     if description:
         task.description = description
     
     # Start new pause task
     pause_task = Task(
         assignment_id=assignment.id,
-        start_time=now.time(),
+        start_time=now,  # Full datetime
         task_type="pause"
     )
     db.add(pause_task)
@@ -1708,14 +1733,14 @@ async def resume_work_session(
     assignment = task.assignment
     
     # End pause task
-    task.end_time = now.time()
+    task.end_time = now  # Full datetime
     if description:
         task.description = description
     
     # Start new work task
     work_task = Task(
         assignment_id=assignment.id,
-        start_time=now.time(),
+        start_time=now,  # Full datetime
         task_type="work"
     )
     db.add(work_task)
