@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
@@ -23,6 +23,7 @@ import { assignments as assignmentsService, employment as employmentService, pay
 import { useActiveSession } from '../context/ActiveSessionContext';
 import ManualAssignmentDialog from '../components/ManualAssignmentDialog';
 import TimeOffDialog from '../components/TimeOffDialog';
+import VirtualizedTimeTable from '../components/VirtualizedTimeTable';
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -137,6 +138,8 @@ const parseDateFromUrl = (dateStr) => {
 // Storage key for persisting filters
 const FILTERS_STORAGE_KEY = 'timetracker_filters';
 
+
+
 function TimeTrackerPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -221,12 +224,6 @@ function TimeTrackerPage() {
     const [sortField, setSortField] = useState('assignment_date');
     const [sortDirection, setSortDirection] = useState('desc');
 
-    // Infinite scroll pagination state
-    const [offset, setOffset] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const sentinelRef = useRef(null);
-    const PAGE_SIZE = 50;
 
     // Use shared context for active session - provides synchronized timer and optimistic updates
     const { activeSession, getElapsedTimes, fetchActiveSession, currentTime, setOnSessionChange, notifySessionChange, stopSession, togglePause } = useActiveSession();
@@ -454,12 +451,9 @@ function TimeTrackerPage() {
     const loadData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            // Reset pagination when loading fresh data
-            setOffset(0);
-            setHasMore(true);
-
+            // Load all data at once - virtualization handles rendering efficiently
             const [groupedRes, activeRes, empRes, userRes, typesRes] = await Promise.all([
-                assignmentsService.getGrouped({ period, limit: PAGE_SIZE, offset: 0 }),
+                assignmentsService.getGrouped({ period }),  // No limit - virtualization handles large datasets
                 assignmentsService.getActive(),
                 employmentService.list({ is_active: true }),
                 paymentsService.getUserInfo(),
@@ -471,9 +465,6 @@ function TimeTrackerPage() {
             setEmploymentList(empRes.data);
             setAssignmentTypes(typesRes.data || []);
             setIsAdmin(userRes.data.roles?.includes('admin') || userRes.data.role === 'admin');
-
-            // Check if there might be more data
-            setHasMore(groupedRes.data.length >= PAGE_SIZE);
         } catch (error) {
             console.error('Failed to load data:', error);
         } finally {
@@ -481,32 +472,6 @@ function TimeTrackerPage() {
         }
     }, [period]);
 
-    // Load more data for infinite scroll
-    const loadMore = useCallback(async () => {
-        if (loadingMore || !hasMore) return;
-
-        setLoadingMore(true);
-        try {
-            const newOffset = offset + PAGE_SIZE;
-            const groupedRes = await assignmentsService.getGrouped({
-                period,
-                limit: PAGE_SIZE,
-                offset: newOffset
-            });
-
-            if (groupedRes.data.length > 0) {
-                setGroupedAssignments(prev => [...prev, ...groupedRes.data]);
-                setOffset(newOffset);
-                setHasMore(groupedRes.data.length >= PAGE_SIZE);
-            } else {
-                setHasMore(false);
-            }
-        } catch (error) {
-            console.error('Failed to load more data:', error);
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [loadingMore, hasMore, offset, period]);
 
     // Apply filters to assignments
     useEffect(() => {
@@ -576,6 +541,10 @@ function TimeTrackerPage() {
                     aVal = a.worker_name || '';
                     bVal = b.worker_name || '';
                     break;
+                case 'assignment_type':
+                    aVal = a.assignment_type || 'work';
+                    bVal = b.assignment_type || 'work';
+                    break;
                 case 'total_work_seconds':
                     aVal = a.total_work_seconds || 0;
                     bVal = b.total_work_seconds || 0;
@@ -644,23 +613,9 @@ function TimeTrackerPage() {
         return unsubscribe;
     }, [subscribe, loadData, loadSummary]);
 
-    // Infinite scroll - IntersectionObserver to load more when sentinel becomes visible
-    useEffect(() => {
-        const sentinel = sentinelRef.current;
-        if (!sentinel) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-                    loadMore();
-                }
-            },
-            { threshold: 0.1, rootMargin: '100px' }
-        );
+    // Virtual scrolling handles rendering - no infinite scroll observer needed
 
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, loading, loadMore]);
 
     // Smart sync: reload table when activeSession changes (started/stopped by any client)
     useEffect(() => {
@@ -1373,286 +1328,48 @@ function TimeTrackerPage() {
             </Paper>
 
             <Paper sx={{ py: 3, px: 0 }}>
-
-                <TableContainer>
-                    <Table size="small" sx={{ tableLayout: 'fixed' }}>
-                        <TableHead>
-                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
-                                {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
-                                {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}
-                                {renderHeaderCell('time', 'Время', 'center', 'total_work_seconds')}
-                                {renderHeaderCell('duration', 'Продолж.', 'right', 'total_amount')}
-                                {renderHeaderCell('description', 'Описание', 'left', 'description')}
-                                {renderHeaderCell('status', 'Статус', 'center', 'is_active')}
-                                {renderHeaderCell('payment', 'Платёж', 'center', 'payment_tracking_nr')}
-                                {renderHeaderCell('actions', 'Действия', 'right', null, { pr: 3 })}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredAssignments.map((assignment) => (
-                                <React.Fragment key={assignment.assignment_id}>
-                                    {/* Main assignment row */}
-                                    <TableRow
-                                        sx={{
-                                            '&:hover': { backgroundColor: '#f9f9f9' },
-                                            cursor: 'pointer',
-                                            backgroundColor: assignment.is_active ? '#e8f5e9' : 'inherit'
-                                        }}
-                                        onClick={() => {
-                                            if (assignment.segments && assignment.segments.length > 0) {
-                                                setExpandedRows(prev => ({
-                                                    ...prev,
-                                                    [assignment.assignment_id]: !prev[assignment.assignment_id]
-                                                }));
-                                            }
-                                        }}
-                                    >
-
-                                        <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap' }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
-                                                    {(assignment.segments && assignment.segments.length > 0) && (
-                                                        <IconButton size="small" onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setExpandedRows(prev => ({
-                                                                ...prev,
-                                                                [assignment.assignment_id]: !prev[assignment.assignment_id]
-                                                            }));
-                                                        }}>
-                                                            {expandedRows[assignment.assignment_id] ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
-                                                        </IconButton>
-                                                    )}
-                                                </Box>
-                                                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                                                    <span>{formatDate(assignment.assignment_date)}</span>
-                                                    <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                                                        {assignment.tracking_nr || ''}
-                                                    </span>
-                                                </Box>
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assignment.worker_name}>
-                                            {assignment.worker_name}
-                                        </TableCell>
-                                        <TableCell>
-                                            {(() => {
-                                                const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
-                                                const typeData = assignmentTypes.find(t => t.value === assignment.assignment_type) || { label: 'Смена' };
-                                                const Icon = iconConfig?.icon || Work;
-                                                return (
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                        <Icon sx={{ fontSize: 16, color: iconConfig?.color || '#666' }} />
-                                                        <span style={{ color: iconConfig?.color || '#666' }}>
-                                                            {typeData.label}
-                                                        </span>
-                                                    </Box>
-                                                );
-                                            })()}
-                                        </TableCell>
-                                        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                                            {assignment.assignment_type && assignment.assignment_type !== 'work'
-                                                ? '—'
-                                                : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
-                                            }
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {assignment.assignment_type === 'work' || !assignment.assignment_type ? (
-                                                <LiveTimer assignment={assignment} currentTime={currentTime} />
-                                            ) : (
-                                                <span style={{ color: '#666' }}>—</span>
-                                            )}
-                                        </TableCell>
-                                        <Tooltip title={assignment.description || ''} arrow placement="top">
-                                            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {assignment.description || '—'}
-                                            </TableCell>
-                                        </Tooltip>
-                                        <TableCell align="center">
-                                            {assignment.is_active ? (
-                                                <Chip label="В работе" color="warning" size="small" />
-                                            ) : (
-                                                <Chip label="Готово" color="success" size="small" />
-                                            )}
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            {assignment.payment_tracking_nr ? (
-                                                <Chip
-                                                    label={assignment.payment_tracking_nr}
-                                                    size="small"
-                                                    color={assignment.payment_status === 'paid' ? "success" : "warning"}
-                                                    clickable
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        navigate(`/payments?search=${assignment.payment_tracking_nr}`);
-                                                    }}
-                                                    sx={{ cursor: 'pointer' }}
-                                                />
-                                            ) : (
-                                                <Typography variant="caption" color="text.secondary">—</Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ pr: 1 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-                                                {/* Session control buttons for active sessions */}
-                                                {assignment.is_active && (
-                                                    <>
-                                                        <Tooltip title={(() => {
-                                                            const activeSegment = assignment.segments?.find(s => !s.end_time);
-                                                            return activeSegment?.session_type === 'pause' ? 'Продолжить' : 'Пауза';
-                                                        })()}>
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => handlePauseResumeAssignment(assignment, e)}
-                                                                sx={{
-                                                                    color: (() => {
-                                                                        const activeSegment = assignment.segments?.find(s => !s.end_time);
-                                                                        return activeSegment?.session_type === 'pause' ? 'success.main' : 'warning.main';
-                                                                    })()
-                                                                }}
-                                                            >
-                                                                {(() => {
-                                                                    const activeSegment = assignment.segments?.find(s => !s.end_time);
-                                                                    return activeSegment?.session_type === 'pause' ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />;
-                                                                })()}
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Завершить">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => handleStopAssignment(assignment, e)}
-                                                                sx={{ color: 'error.main' }}
-                                                            >
-                                                                <Stop fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Новое задание">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => handleNewTaskForAssignment(assignment, e)}
-                                                                sx={{ color: 'primary.main' }}
-                                                            >
-                                                                <Add fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    </>
-                                                )}
-                                                <Tooltip title="Клонировать">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => handleCloneAssignment(assignment, e)}
-                                                    >
-                                                        <Replay fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Редактировать">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => handleEditAssignment(assignment, e)}
-                                                    >
-                                                        <Edit fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                {!assignment.is_active && (
-                                                    <Tooltip title="Удалить">
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={(e) => handleDeleteAssignment(assignment, e)}
-                                                        >
-                                                            <Delete fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-                                    </TableRow>
-
-                                    {/* Expandable segments */}
-                                    <TableRow>
-                                        <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
-                                            <Collapse in={expandedRows[assignment.assignment_id]} timeout="auto" unmountOnExit>
-                                                <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
-
-                                                    <Table size="small">
-                                                        <TableBody>
-                                                            {assignment.segments.map((seg) => (
-                                                                <TableRow key={seg.id} sx={{
-                                                                    backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : '#e8f5e9'
-                                                                }}>
-                                                                    <TableCell width={80}>
-                                                                        <Chip
-                                                                            label={seg.session_type === 'pause' ? 'Пауза' : 'Работа'}
-                                                                            size="small"
-                                                                            sx={{
-                                                                                backgroundColor: seg.session_type === 'pause' ? '#ff9800' : '#4caf50',
-                                                                                color: 'white'
-                                                                            }}
-                                                                        />
-                                                                    </TableCell>
-                                                                    <TableCell>{formatTime(seg.start_time)} — {seg.end_time ? formatTime(seg.end_time) : 'сейчас'}</TableCell>
-                                                                    <TableCell>
-                                                                        {seg.duration_hours ? (
-                                                                            (() => {
-                                                                                const totalMinutes = Math.round(seg.duration_hours * 60);
-                                                                                const h = Math.floor(totalMinutes / 60);
-                                                                                const m = totalMinutes % 60;
-                                                                                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                                                                            })()
-                                                                        ) : '—'}
-                                                                    </TableCell>
-                                                                    <TableCell sx={{ fontStyle: 'italic', color: '#666' }}>
-                                                                        {seg.description || ''}
-                                                                    </TableCell>
-                                                                    <TableCell align="right">
-                                                                        <Tooltip title="Редактировать">
-                                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(seg); }}>
-                                                                                <Edit fontSize="small" />
-                                                                            </IconButton>
-                                                                        </Tooltip>
-                                                                        <Tooltip title="Удалить">
-                                                                            <IconButton size="small" onClick={(e) => handleDeleteClick(seg.id, e)}>
-                                                                                <Delete fontSize="small" />
-                                                                            </IconButton>
-                                                                        </Tooltip>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ))}
-                                                        </TableBody>
-                                                    </Table>
-                                                </Box>
-                                            </Collapse>
-                                        </TableCell>
-                                    </TableRow>
-                                </React.Fragment>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-
-                {/* Infinite scroll sentinel and loading indicator */}
-                <Box
-                    ref={sentinelRef}
-                    sx={{
-                        height: 1,
-                        visibility: 'hidden'
+                <VirtualizedTimeTable
+                    assignments={filteredAssignments}
+                    expandedRows={expandedRows}
+                    onToggleExpand={(assignmentId) => {
+                        setExpandedRows(prev => ({
+                            ...prev,
+                            [assignmentId]: !prev[assignmentId]
+                        }));
                     }}
+                    onPauseResume={handlePauseResumeAssignment}
+                    onStop={handleStopAssignment}
+                    onNewTask={handleNewTaskForAssignment}
+                    onClone={handleCloneAssignment}
+                    onEdit={handleEditAssignment}
+                    onDelete={handleDeleteAssignment}
+                    onEditSegment={handleEditClick}
+                    onDeleteSegment={handleDeleteClick}
+                    onNavigateToPayment={(trackingNr) => navigate(`/payments?search=${trackingNr}`)}
+                    formatDate={formatDate}
+                    formatTime={formatTime}
+                    formatCurrency={formatCurrency}
+                    LiveTimer={LiveTimer}
+                    currentTime={currentTime}
+                    assignmentTypes={assignmentTypes}
+                    columnWidths={columnWidths}
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    renderHeaderCell={renderHeaderCell}
+                    loading={loading}
                 />
-                {loadingMore && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                        <CircularProgress size={24} />
-                        <Typography variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-                            Загрузка...
-                        </Typography>
-                    </Box>
-                )}
-                {!hasMore && filteredAssignments.length > 0 && (
+
+                {/* Total records count */}
+                {filteredAssignments.length > 0 && (
                     <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary' }}>
                         <Typography variant="body2">
-                            Все записи загружены ({filteredAssignments.length})
+                            Всего записей: {filteredAssignments.length}
                         </Typography>
                     </Box>
                 )}
             </Paper>
+
 
             {/* Start Session Dialog */}
             <Dialog open={startDialogOpen} onClose={() => setStartDialogOpen(false)}>

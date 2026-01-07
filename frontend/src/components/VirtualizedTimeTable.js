@@ -1,0 +1,432 @@
+import React, { useRef, memo, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    Box, IconButton, Chip, Collapse, Tooltip, Typography
+} from '@mui/material';
+import {
+    PlayArrow, Stop, Edit, Delete, Pause,
+    KeyboardArrowDown, KeyboardArrowUp, Add, Replay, Work, BeachAccess, Sick, EventBusy, MoneyOff
+} from '@mui/icons-material';
+
+// Assignment type icon and color configuration
+const ASSIGNMENT_TYPE_ICONS = {
+    work: { icon: Work, color: '#4caf50' },
+    sick_leave: { icon: Sick, color: '#f44336' },
+    vacation: { icon: BeachAccess, color: '#2196f3' },
+    day_off: { icon: EventBusy, color: '#ff9800' },
+    unpaid_leave: { icon: MoneyOff, color: '#9e9e9e' }
+};
+
+const ROW_HEIGHT = 53;
+
+// Memoized row component for performance
+const AssignmentRow = memo(({
+    assignment,
+    isExpanded,
+    onToggleExpand,
+    onPauseResume,
+    onStop,
+    onNewTask,
+    onClone,
+    onEdit,
+    onDelete,
+    onEditSegment,
+    onDeleteSegment,
+    onNavigateToPayment,
+    formatDate,
+    formatTime,
+    LiveTimer,
+    currentTime,
+    assignmentTypes,
+    columnWidths
+}) => {
+    const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
+    const typeData = assignmentTypes?.find(t => t.value === assignment.assignment_type) || { label: 'Смена' };
+    const Icon = iconConfig?.icon || Work;
+    const hasSegments = assignment.segments && assignment.segments.length > 0;
+
+    // Find active segment for pause/resume state
+    const activeSegment = assignment.segments?.find(s => !s.end_time);
+    const isPaused = activeSegment?.session_type === 'pause';
+
+    return (
+        <>
+            {/* Main assignment row */}
+            <TableRow
+                sx={{
+                    '&:hover': { backgroundColor: '#f9f9f9' },
+                    cursor: hasSegments ? 'pointer' : 'default',
+                    backgroundColor: assignment.is_active ? '#e8f5e9' : 'inherit'
+                }}
+                onClick={() => hasSegments && onToggleExpand(assignment.assignment_id)}
+            >
+                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
+                            {hasSegments && (
+                                <IconButton size="small" onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleExpand(assignment.assignment_id);
+                                }}>
+                                    {isExpanded ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
+                                </IconButton>
+                            )}
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                            <span>{formatDate(assignment.assignment_date)}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#666' }}>
+                                {assignment.tracking_nr || ''}
+                            </span>
+                        </Box>
+                    </Box>
+                </TableCell>
+                <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.worker }} title={assignment.worker_name}>
+                    {assignment.worker_name}
+                </TableCell>
+                <TableCell sx={{ width: columnWidths.type }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Icon sx={{ fontSize: 16, color: iconConfig?.color || '#666' }} />
+                        <span style={{ color: iconConfig?.color || '#666' }}>
+                            {typeData.label}
+                        </span>
+                    </Box>
+                </TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap', width: columnWidths.time }}>
+                    {assignment.assignment_type && assignment.assignment_type !== 'work'
+                        ? '—'
+                        : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
+                    }
+                </TableCell>
+                <TableCell align="right" sx={{ width: columnWidths.duration }}>
+                    {assignment.assignment_type === 'work' || !assignment.assignment_type ? (
+                        <LiveTimer assignment={assignment} currentTime={currentTime} />
+                    ) : (
+                        <span style={{ color: '#666' }}>—</span>
+                    )}
+                </TableCell>
+                <Tooltip title={assignment.description || ''} arrow placement="top">
+                    <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.description }}>
+                        {assignment.description || '—'}
+                    </TableCell>
+                </Tooltip>
+                <TableCell align="center" sx={{ width: columnWidths.status }}>
+                    {assignment.is_active ? (
+                        <Chip label="В работе" color="warning" size="small" />
+                    ) : (
+                        <Chip label="Готово" color="success" size="small" />
+                    )}
+                </TableCell>
+                <TableCell align="center" sx={{ width: columnWidths.payment }}>
+                    {assignment.payment_tracking_nr ? (
+                        <Chip
+                            label={assignment.payment_tracking_nr}
+                            size="small"
+                            color={assignment.payment_status === 'paid' ? "success" : "warning"}
+                            clickable
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToPayment(assignment.payment_tracking_nr);
+                            }}
+                            sx={{ cursor: 'pointer' }}
+                        />
+                    ) : (
+                        <Typography variant="caption" color="text.secondary">—</Typography>
+                    )}
+                </TableCell>
+                <TableCell align="right" sx={{ pr: 1, width: columnWidths.actions }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                        {/* Session control buttons for active sessions */}
+                        {assignment.is_active && (
+                            <>
+                                <Tooltip title={isPaused ? 'Продолжить' : 'Пауза'}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => onPauseResume(assignment, e)}
+                                        sx={{ color: isPaused ? 'success.main' : 'warning.main' }}
+                                    >
+                                        {isPaused ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />}
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Завершить">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => onStop(assignment, e)}
+                                        sx={{ color: 'error.main' }}
+                                    >
+                                        <Stop fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Новое задание">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => onNewTask(assignment, e)}
+                                        sx={{ color: 'primary.main' }}
+                                    >
+                                        <Add fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            </>
+                        )}
+                        <Tooltip title="Клонировать">
+                            <IconButton size="small" onClick={(e) => onClone(assignment, e)}>
+                                <Replay fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Редактировать">
+                            <IconButton size="small" onClick={(e) => onEdit(assignment, e)}>
+                                <Edit fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        {!assignment.is_active && (
+                            <Tooltip title="Удалить">
+                                <IconButton size="small" onClick={(e) => onDelete(assignment, e)}>
+                                    <Delete fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Box>
+                </TableCell>
+            </TableRow>
+
+            {/* Expandable segments */}
+            {hasSegments && (
+                <TableRow>
+                    <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                            <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
+                                <Table size="small">
+                                    <TableBody>
+                                        {assignment.segments.map((seg) => (
+                                            <TableRow key={seg.id} sx={{
+                                                backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : '#e8f5e9'
+                                            }}>
+                                                <TableCell width={80}>
+                                                    <Chip
+                                                        label={seg.session_type === 'pause' ? 'Пауза' : 'Работа'}
+                                                        size="small"
+                                                        sx={{
+                                                            backgroundColor: seg.session_type === 'pause' ? '#ff9800' : '#4caf50',
+                                                            color: 'white'
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{formatTime(seg.start_time)} — {seg.end_time ? formatTime(seg.end_time) : 'сейчас'}</TableCell>
+                                                <TableCell>
+                                                    {seg.duration_hours ? (
+                                                        (() => {
+                                                            const totalMinutes = Math.round(seg.duration_hours * 60);
+                                                            const h = Math.floor(totalMinutes / 60);
+                                                            const m = totalMinutes % 60;
+                                                            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                                        })()
+                                                    ) : '—'}
+                                                </TableCell>
+                                                <TableCell sx={{ fontStyle: 'italic', color: '#666' }}>
+                                                    {seg.description || ''}
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Tooltip title="Редактировать">
+                                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEditSegment(seg); }}>
+                                                            <Edit fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Удалить">
+                                                        <IconButton size="small" onClick={(e) => onDeleteSegment(seg.id, e)}>
+                                                            <Delete fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </Box>
+                        </Collapse>
+                    </TableCell>
+                </TableRow>
+            )}
+        </>
+    );
+});
+
+AssignmentRow.displayName = 'AssignmentRow';
+
+// Inner virtualized content component
+function VirtualizedContent({
+    assignments,
+    expandedRows,
+    onToggleExpand,
+    onPauseResume,
+    onStop,
+    onNewTask,
+    onClone,
+    onEdit,
+    onDelete,
+    onEditSegment,
+    onDeleteSegment,
+    onNavigateToPayment,
+    formatDate,
+    formatTime,
+    LiveTimer,
+    currentTime,
+    assignmentTypes,
+    columnWidths,
+    parentRef
+}) {
+    // Memoize virtualizer options to prevent re-creation
+    const virtualizerOptions = useMemo(() => ({
+        count: assignments.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: 10
+    }), [assignments.length, parentRef]);
+
+    const virtualizer = useVirtualizer(virtualizerOptions);
+    const virtualItems = virtualizer.getVirtualItems();
+
+    if (assignments.length === 0) {
+        return (
+            <TableRow>
+                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">Нет записей</Typography>
+                </TableCell>
+            </TableRow>
+        );
+
+    }
+
+    const totalSize = virtualizer.getTotalSize();
+    const firstItem = virtualItems[0];
+    const lastItem = virtualItems[virtualItems.length - 1];
+
+    return (
+        <>
+            {/* Top spacer */}
+            {firstItem && firstItem.start > 0 && (
+                <tr style={{ height: firstItem.start }} />
+            )}
+
+            {virtualItems.map((virtualRow) => {
+                const assignment = assignments[virtualRow.index];
+                if (!assignment) return null;
+
+                return (
+                    <AssignmentRow
+                        key={assignment.assignment_id}
+                        assignment={assignment}
+                        isExpanded={expandedRows[assignment.assignment_id]}
+                        onToggleExpand={onToggleExpand}
+                        onPauseResume={onPauseResume}
+                        onStop={onStop}
+                        onNewTask={onNewTask}
+                        onClone={onClone}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onEditSegment={onEditSegment}
+                        onDeleteSegment={onDeleteSegment}
+                        onNavigateToPayment={onNavigateToPayment}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        LiveTimer={LiveTimer}
+                        currentTime={currentTime}
+                        assignmentTypes={assignmentTypes}
+                        columnWidths={columnWidths}
+                    />
+                );
+            })}
+
+            {/* Bottom spacer */}
+            {lastItem && (
+                <tr style={{ height: totalSize - lastItem.end }} />
+            )}
+        </>
+    );
+}
+
+// Main virtualized table component
+function VirtualizedTimeTable({
+    assignments,
+    expandedRows,
+    onToggleExpand,
+    onPauseResume,
+    onStop,
+    onNewTask,
+    onClone,
+    onEdit,
+    onDelete,
+    onEditSegment,
+    onDeleteSegment,
+    onNavigateToPayment,
+    formatDate,
+    formatTime,
+    formatCurrency,
+    LiveTimer,
+    currentTime,
+    assignmentTypes,
+    columnWidths,
+    sortField,
+    sortDirection,
+    onSort,
+    renderHeaderCell,
+    loading
+}) {
+    const parentRef = useRef(null);
+
+    if (loading) {
+        return null;
+    }
+
+    return (
+        <Box
+            ref={parentRef}
+            sx={{
+                maxHeight: 'calc(100vh - 400px)',
+                minHeight: 400,
+                overflowY: 'auto',
+                overflowX: 'hidden'
+            }}
+        >
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f5f5f5' }}>
+                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
+                        {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
+                        {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}
+                        {renderHeaderCell('time', 'Время', 'center', 'total_work_seconds')}
+                        {renderHeaderCell('duration', 'Продолж.', 'right', 'total_amount')}
+                        {renderHeaderCell('description', 'Описание', 'left', 'description')}
+                        {renderHeaderCell('status', 'Статус', 'center', 'is_active')}
+                        {renderHeaderCell('payment', 'Платёж', 'center', 'payment_tracking_nr')}
+                        {renderHeaderCell('actions', 'Действия', 'right', null, { pr: 3 })}
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    <VirtualizedContent
+                        assignments={assignments}
+                        expandedRows={expandedRows}
+                        onToggleExpand={onToggleExpand}
+                        onPauseResume={onPauseResume}
+                        onStop={onStop}
+                        onNewTask={onNewTask}
+                        onClone={onClone}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onEditSegment={onEditSegment}
+                        onDeleteSegment={onDeleteSegment}
+                        onNavigateToPayment={onNavigateToPayment}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        LiveTimer={LiveTimer}
+                        currentTime={currentTime}
+                        assignmentTypes={assignmentTypes}
+                        columnWidths={columnWidths}
+                        parentRef={parentRef}
+                    />
+                </TableBody>
+            </Table>
+        </Box>
+    );
+}
+
+export default VirtualizedTimeTable;

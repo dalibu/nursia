@@ -1312,7 +1312,7 @@ async def get_grouped_sessions(
     worker_id: Optional[int] = Query(None),
     employer_id: Optional[int] = Query(None),
     period: str = Query("month", pattern="^(all|day|week|month|year)$"),
-    limit: int = Query(50, le=200),
+    limit: Optional[int] = Query(None),  # No limit by default - virtualization handles rendering
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1361,8 +1361,14 @@ async def get_grouped_sessions(
     result = await db.execute(query)
     assignments = result.scalars().unique().all()
     
+    # Apply pagination - if limit is None, return all (from offset)
+    if limit is not None:
+        paginated = assignments[offset:offset + limit]
+    else:
+        paginated = assignments[offset:] if offset > 0 else assignments
+    
     responses = []
-    for assignment in assignments[offset:offset + limit]:
+    for assignment in paginated:
         tasks = sorted(assignment.tasks, key=lambda t: (t.start_time, t.id))
         
         # Time-off assignments may have no tasks
