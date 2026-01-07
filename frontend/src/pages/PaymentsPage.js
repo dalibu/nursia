@@ -296,6 +296,18 @@ function PaymentsPage() {
     // Применяем фильтры
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
+
+      // Helper для форматирования даты в DD.MM.YYYY
+      const formatDateForSearch = (dateInput) => {
+        if (!dateInput) return '';
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '';
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
+      };
+
       filtered = filtered.filter(payment => {
         const searchFields = [
           payment.tracking_nr,
@@ -306,7 +318,8 @@ function PaymentsPage() {
           payment.payer?.name || payment.payer?.full_name,
           payment.recipient?.full_name,
           payment.description,
-          new Date(payment.payment_date).toLocaleDateString(),
+          formatDateForSearch(payment.payment_date),
+          formatDateForSearch(payment.modified_at),
           payment.payment_status === 'paid' ? 'оплачено' : 'к оплате'
         ];
 
