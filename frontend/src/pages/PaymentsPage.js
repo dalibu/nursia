@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
-  Typography, Button, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Paper, IconButton, Box, TextField, MenuItem,
+  Typography, Button, TableCell,
+  Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
   DialogContentText, Chip, Popover, Tooltip,
   Grid, Card, CardContent
@@ -16,6 +16,8 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
+import VirtualizedPaymentsTable from '../components/VirtualizedPaymentsTable';
+
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -150,13 +152,65 @@ function PaymentsPage() {
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
 
-  // Infinite scroll pagination state
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Loading state
   const [loading, setLoading] = useState(true);
-  const sentinelRef = useRef(null);
-  const PAGE_SIZE = 50;
+
+  // Column Resizing Logic (same as TimeTrackerPage)
+  const [columnWidths, setColumnWidths] = useState(() => {
+    try {
+      const saved = localStorage.getItem('payments_columnWidths');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { }
+    return {
+      tracking_nr: 55,
+      payment_date: 150,
+      payer: 120,
+      recipient: 100,
+      amount: 100,
+      category: 100,
+      description: 200,
+      assignment: 100,
+      status: 130,
+      actions: 130
+    };
+  });
+
+  const [resizing, setResizing] = useState(null);
+
+  const startResizing = (column, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing({
+      column,
+      startX: e.pageX,
+      startWidth: columnWidths[column]
+    });
+  };
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    const handleMouseMove = (e) => {
+      const delta = e.pageX - resizing.startX;
+      const newWidth = Math.max(40, resizing.startWidth + delta);
+      setColumnWidths(prev => {
+        const updated = { ...prev, [resizing.column]: newWidth };
+        localStorage.setItem('payments_columnWidths', JSON.stringify(updated));
+        return updated;
+      });
+    };
+
+    const handleMouseUp = () => setResizing(null);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizing]);
+
 
   // Sync filters to URL params AND localStorage
   useEffect(() => {
@@ -195,12 +249,8 @@ function PaymentsPage() {
   const loadPayments = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // Reset pagination when loading fresh data
-      setOffset(0);
-      setHasMore(true);
-
       const [paymentsRes, categoriesRes, userRes] = await Promise.all([
-        payments.list({ skip: 0, limit: PAGE_SIZE }),
+        payments.list({ limit: 100000 }), // Load all payments for virtualization
         payments.categories(),
         payments.getUserInfo()
       ]);
@@ -231,8 +281,6 @@ function PaymentsPage() {
         userRes.data.role === 'employer';
       setCanManagePaymentStatus(hasPermission);
 
-      // Check if there might be more data
-      setHasMore(paymentsRes.data.length >= PAGE_SIZE);
     } catch (error) {
       console.error('Failed to load payments:', error);
     } finally {
@@ -240,34 +288,7 @@ function PaymentsPage() {
     }
   }, []);
 
-  // Load more data for infinite scroll
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
 
-    setLoadingMore(true);
-    try {
-      const newOffset = offset + PAGE_SIZE;
-      const paymentsRes = await payments.list({ skip: newOffset, limit: PAGE_SIZE });
-
-      if (paymentsRes.data.length > 0) {
-        // Add row numbers to new payments (continuing from current count)
-        const newPayments = paymentsRes.data.map((payment, index) => ({
-          ...payment,
-          rowNumber: paymentList.length + index + 1
-        }));
-
-        setPaymentList(prev => [...prev, ...newPayments]);
-        setOffset(newOffset);
-        setHasMore(paymentsRes.data.length >= PAGE_SIZE);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Failed to load more payments:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMore, offset, paymentList.length]);
 
   const applyFiltersAndSort = useCallback(() => {
     let filtered = [...paymentList];
@@ -358,8 +379,8 @@ function PaymentsPage() {
           bVal = b.recipient?.full_name || '';
           break;
         case 'payer':
-          aVal = a.payer?.name || '';
-          bVal = b.payer?.name || '';
+          aVal = a.payer?.name || a.payer?.full_name || '';
+          bVal = b.payer?.name || b.payer?.full_name || '';
           break;
         case 'payment_status':
           const statusOrder = { 'paid': 1, 'unpaid': 0 };
@@ -426,23 +447,7 @@ function PaymentsPage() {
     return unsubscribe;
   }, [subscribe, loadPayments]);
 
-  // Infinite scroll - IntersectionObserver to load more when sentinel becomes visible
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          loadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, loadMore]);
 
   // Apply filters when data or filters change
   useEffect(() => {
@@ -741,254 +746,78 @@ function PaymentsPage() {
         </Box>
       </Paper>
 
-      <TableContainer component={Paper}>
-        <Table size="small" sx={{ tableLayout: 'fixed' }}>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ width: 55, minWidth: 55, px: 0.5 }}>
-                <TableSortLabel
-                  active={sortField === 'tracking_nr'}
-                  direction={sortField === 'tracking_nr' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('tracking_nr')}
-                >
-                  <strong>Номер</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'payment_date'}
-                  direction={sortField === 'payment_date' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('payment_date')}
-                >
-                  <strong>Когда</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 120 }}>
-                <TableSortLabel
-                  active={sortField === 'payer'}
-                  direction={sortField === 'payer' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('payer')}
-                >
-                  <strong>От кого</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 100 }}>
-                <TableSortLabel
-                  active={sortField === 'recipient'}
-                  direction={sortField === 'recipient' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('recipient')}
-                >
-                  <strong>Кому</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'amount'}
-                  direction={sortField === 'amount' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('amount')}
-                >
-                  <strong>Сумма</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 100 }}>
-                <TableSortLabel
-                  active={sortField === 'category'}
-                  direction={sortField === 'category' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('category')}
-                >
-                  <strong>Категория</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'description'}
-                  direction={sortField === 'description' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('description')}
-                >
-                  <strong>Комментарий</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="center">
-                <TableSortLabel
-                  active={sortField === 'assignment_tracking_nr'}
-                  direction={sortField === 'assignment_tracking_nr' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('assignment_tracking_nr')}
-                >
-                  <strong>Смена</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 130 }}>
-                <TableSortLabel
-                  active={sortField === 'payment_status'}
-                  direction={sortField === 'payment_status' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('payment_status')}
-                >
-                  <strong>Статус</strong>
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 130, minWidth: 130 }}><strong>Действия</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+      <VirtualizedPaymentsTable
+        payments={filteredList}
+        canManagePaymentStatus={canManagePaymentStatus}
+        currencies={currencies}
+        isAdmin={isAdmin}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        onEdit={handleEdit}
+        onDelete={handleDeleteClick}
+        onRepeat={handleRepeat}
+        onToggleStatus={handlePaymentToggle}
+        columnWidths={columnWidths}
+        renderHeaderCell={(id, label, align, sortKey, extraSx = {}) => {
+          const isResizingThis = resizing?.column === id;
 
-            {filteredList.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={10} align="center">
-                  Нет данных для отображения
-                </TableCell>
-              </TableRow>
-            )}
-            {filteredList.map((payment, index) => (
-              <TableRow key={payment.id} sx={{ '& td': { verticalAlign: 'middle' } }}>
-                <TableCell sx={{ width: 55, minWidth: 55, px: 0.5, fontSize: '0.75rem' }}>{payment.tracking_nr || '-'}</TableCell>
-                <TableCell>
-                  <div style={{ lineHeight: 1 }}>
-                    {payment.modified_at ? (
-                      <Tooltip title={`Отредактировано: ${formatDateFull(payment.modified_at)} ${formatTimeFull(payment.modified_at)}`} arrow placement="top">
-                        <div>
-                          <div style={{ color: '#ff9800' }}>{formatDateFull(payment.modified_at)}</div>
-                          <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeFull(payment.modified_at)}</div>
-                        </div>
-                      </Tooltip>
-                    ) : (
-                      <>
-                        <div>{formatDateFull(payment.payment_date)}</div>
-                        <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeFull(payment.payment_date)}</div>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell
-                  sx={{
-                    cursor: 'default'
-                  }}
+          return (
+            <TableCell
+              align={align || 'left'}
+              sx={{
+                width: columnWidths[id],
+                minWidth: columnWidths[id],
+                position: 'relative',
+                borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                backgroundColor: '#f5f5f5',
+                ...extraSx,
+                '&:hover .resizer': { opacity: 1 }
+              }}
+            >
+              {sortKey ? (
+                <TableSortLabel
+                  active={sortField === sortKey}
+                  direction={sortField === sortKey ? sortDirection : 'asc'}
+                  onClick={() => handleSort(sortKey)}
                 >
-                  <span
-                    style={{
-                      textDecoration: payment.payer?.name || payment.payer?.full_name && isAdmin ? 'underline' : 'none',
-                      textDecorationStyle: 'dotted',
-                      textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                    }}
-                  >
-                    {payment.payer?.name || payment.payer?.full_name || '-'}
-                  </span>
-                </TableCell>
-                <TableCell
-                  sx={{
-                    cursor: 'default'
-                  }}
-                >
-                  <span
-                    style={{
-                      textDecoration: payment.recipient?.full_name && isAdmin ? 'underline' : 'none',
-                      textDecorationStyle: 'dotted',
-                      textDecorationColor: 'rgba(25, 118, 210, 0.5)'
-                    }}
-                  >
-                    {payment.recipient?.full_name || '-'}
-                  </span>
-                </TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{payment.amount} {currencies.find(c => c.code === payment.currency)?.symbol || payment.currency}</TableCell>
-                <TableCell>
-                  {['Аванс', 'Долг'].includes(payment.category?.name)
-                    ? (
-                      <Chip
-                        label={payment.category.name}
-                        size="small"
-                        sx={{
-                          backgroundColor: '#FFEB3B',
-                          color: '#000',
-                        }}
-                      />
-                    )
-                    : (payment.category?.name || '-')}
-                </TableCell>
-                <Tooltip title={payment.description || ''} arrow placement="top">
-                  <TableCell sx={{ width: 200, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.description || '-'}</TableCell>
-                </Tooltip>
-                <TableCell align="center">
-                  {payment.assignment_tracking_nr ? (
-                    <Chip
-                      label={payment.assignment_tracking_nr}
-                      size="small"
-                      color="primary"
-                      clickable
-                      onClick={() => navigate(`/time-tracker?search=${payment.assignment_tracking_nr}`)}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                  ) : (
-                    <Typography variant="caption" color="text.secondary">—</Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
-                    color={payment.payment_status === 'paid' ? 'success' : 'warning'}
-                    size="small"
-                    clickable={canManagePaymentStatus}
-                    onClick={canManagePaymentStatus ? () => {
-                      const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
-                      handlePaymentToggle(payment.id, nextStatus);
-                    } : undefined}
-                    icon={<Payment />}
-                    sx={{
-                      cursor: canManagePaymentStatus ? 'pointer' : 'default',
-                      '&:hover': canManagePaymentStatus ? { opacity: 0.8 } : {}
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'nowrap' }}>
-                    <IconButton title="Повторить платёж" onClick={() => handleRepeat(payment)} size="small">
-                      <Replay fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      title={payment.payment_status === 'paid' && !isAdmin ? "Оплаченные платежи может редактировать только администратор" : "Редактировать"}
-                      onClick={() => handleEdit(payment)}
-                      size="small"
-                      disabled={payment.payment_status === 'paid' && !isAdmin}
-                    >
-                      <Edit fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      title={payment.payment_status === 'paid' && !isAdmin ? "Оплаченные платежи может удалять только администратор" : "Удалить"}
-                      onClick={() => handleDeleteClick(payment)}
-                      size="small"
-                      disabled={payment.payment_status === 'paid' && !isAdmin}
-                    >
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            )
-            )}
-
-          </TableBody>
-
-        </Table>
-      </TableContainer>
-
-      {/* Infinite scroll sentinel and loading indicator */}
-      <Box
-        ref={sentinelRef}
-        sx={{
-          height: 1,
-          visibility: 'hidden'
+                  <strong>{label}</strong>
+                </TableSortLabel>
+              ) : (
+                <strong>{label}</strong>
+              )}
+              <Box
+                className="resizer"
+                onMouseDown={(e) => startResizing(id, e)}
+                sx={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '15%',
+                  height: '70%',
+                  width: '3px',
+                  cursor: 'col-resize',
+                  backgroundColor: isResizingThis ? '#1976d2' : 'divider',
+                  opacity: isResizingThis ? 1 : 0,
+                  borderRadius: '2px',
+                  transition: 'opacity 0.2s, background-color 0.2s',
+                  zIndex: 10,
+                  '&:hover': {
+                    opacity: 1,
+                    backgroundColor: '#1976d2',
+                    width: '5px'
+                  }
+                }}
+              />
+            </TableCell>
+          );
         }}
       />
-      {loadingMore && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress size={24} />
-          <Typography variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-            Загрузка...
-          </Typography>
-        </Box>
-      )}
-      {!hasMore && filteredList.length > 0 && (
+
+      {/* Total records count */}
+      {filteredList.length > 0 && (
         <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary' }}>
           <Typography variant="body2">
-            Все записи загружены ({filteredList.length})
+            Всего записей: {filteredList.length}
           </Typography>
         </Box>
       )}

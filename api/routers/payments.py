@@ -210,7 +210,7 @@ async def create_payment(
 @router.get("/", response_model=List[PaymentSchema])
 async def get_payments(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: Optional[int] = Query(None),
     category_id: Optional[int] = Query(None),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
@@ -241,7 +241,11 @@ async def get_payments(
     if end_date:
         query = query.where(Payment.payment_date <= end_date)
     
-    query = query.offset(skip).limit(limit).order_by(Payment.payment_date.desc())
+    query = query.offset(skip)
+    if limit is not None:
+        query = query.limit(limit)
+    
+    query = query.order_by(Payment.payment_date.desc())
     result = await db.execute(query)
     payments = result.scalars().all()
     
