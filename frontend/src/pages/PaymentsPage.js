@@ -304,6 +304,7 @@ function PaymentsPage() {
           payment.category?.name,
           '-',
           payment.payer?.name || payment.payer?.full_name,
+          payment.recipient?.full_name,
           payment.description,
           new Date(payment.payment_date).toLocaleDateString(),
           payment.payment_status === 'paid' ? 'оплачено' : 'к оплате'
