@@ -163,16 +163,16 @@ function PaymentsPage() {
       if (saved) return JSON.parse(saved);
     } catch (e) { }
     return {
-      tracking_nr: 55,
-      payment_date: 150,
-      payer: 120,
-      recipient: 100,
-      amount: 100,
-      category: 100,
-      description: 200,
-      assignment: 100,
-      status: 130,
-      actions: 130
+      tracking_nr: 50,
+      payment_date: 120,
+      payer: 100,
+      recipient: 90,
+      amount: 90,
+      category: 90,
+      description: 150,
+      assignment: 80,
+      status: 100,
+      actions: 100
     };
   });
 

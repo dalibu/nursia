@@ -180,7 +180,6 @@ const PaymentRow = memo(({
                         title={payment.payment_status === 'paid' && !isAdmin ? "Оплаченные платежи может удалять только администратор" : "Удалить"}
                         onClick={() => onDelete(payment)}
                         size="small"
-                        color="error"
                         disabled={payment.payment_status === 'paid' && !isAdmin}
                     >
                         <Delete fontSize="small" />
@@ -309,7 +308,7 @@ function VirtualizedPaymentsTable({
                 maxHeight: 'calc(100vh - 400px)',
                 minHeight: 400,
                 overflowY: 'auto',
-                overflowX: 'hidden'
+                overflowX: 'auto'
             }}
         >
             <Table size="small" sx={{ tableLayout: 'fixed' }}>
