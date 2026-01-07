@@ -322,17 +322,27 @@ function PaymentsPage() {
       );
 
     }
-    if (dateRange[0].startDate) {
-      const startStr = toLocalDateString(dateRange[0].startDate);
-      filtered = filtered.filter(payment =>
-        toLocalDateString(new Date(payment.payment_date)) >= startStr
-      );
-    }
-    if (dateRange[0].endDate) {
-      const endStr = toLocalDateString(dateRange[0].endDate);
-      filtered = filtered.filter(payment =>
-        toLocalDateString(new Date(payment.payment_date)) <= endStr
-      );
+    if (dateRange[0].startDate || dateRange[0].endDate) {
+      const startStr = dateRange[0].startDate ? toLocalDateString(dateRange[0].startDate) : null;
+      const endStr = dateRange[0].endDate ? toLocalDateString(dateRange[0].endDate) : null;
+
+      filtered = filtered.filter(payment => {
+        const paymentDateStr = toLocalDateString(new Date(payment.payment_date));
+        const modifiedDateStr = payment.modified_at ? toLocalDateString(new Date(payment.modified_at)) : null;
+
+        // Проверяем, попадает ли payment_date в диапазон
+        const paymentDateInRange =
+          (!startStr || paymentDateStr >= startStr) &&
+          (!endStr || paymentDateStr <= endStr);
+
+        // Проверяем, попадает ли modified_at в диапазон
+        const modifiedDateInRange = modifiedDateStr &&
+          (!startStr || modifiedDateStr >= startStr) &&
+          (!endStr || modifiedDateStr <= endStr);
+
+        // Платеж попадает если хотя бы одна из дат в диапазоне
+        return paymentDateInRange || modifiedDateInRange;
+      });
     }
     if (filters.paymentStatus !== 'all') {
       filtered = filtered.filter(payment => {

@@ -56,21 +56,32 @@ const PaymentRow = memo(({
 
             {/* Когда */}
             <TableCell sx={{ width: columnWidths.payment_date }}>
-                <div style={{ lineHeight: 1 }}>
-                    {payment.modified_at ? (
-                        <Tooltip title={`Отредактировано: ${formatDateFull(payment.modified_at)} ${formatTimeFull(payment.modified_at)}`} arrow placement="top">
-                            <div>
+                <Tooltip
+                    title={
+                        <div>
+                            <div>Создан: {formatDateFull(payment.payment_date)} {formatTimeFull(payment.payment_date)}</div>
+                            {payment.modified_at && (
+                                <div style={{ color: '#ffcc80' }}>Изменен: {formatDateFull(payment.modified_at)} {formatTimeFull(payment.modified_at)}</div>
+                            )}
+                        </div>
+                    }
+                    arrow
+                    placement="top"
+                >
+                    <div style={{ lineHeight: 1, cursor: 'help' }}>
+                        {payment.modified_at ? (
+                            <>
                                 <div style={{ color: '#ff9800' }}>{formatDateFull(payment.modified_at)}</div>
                                 <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeFull(payment.modified_at)}</div>
-                            </div>
-                        </Tooltip>
-                    ) : (
-                        <>
-                            <div>{formatDateFull(payment.payment_date)}</div>
-                            <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeFull(payment.payment_date)}</div>
-                        </>
-                    )}
-                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div>{formatDateFull(payment.payment_date)}</div>
+                                <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeFull(payment.payment_date)}</div>
+                            </>
+                        )}
+                    </div>
+                </Tooltip>
             </TableCell>
 
             {/* От кого */}
