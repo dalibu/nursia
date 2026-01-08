@@ -21,8 +21,7 @@ import {
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
-import ManualAssignmentDialog from '../components/ManualAssignmentDialog';
-import TimeOffDialog from '../components/TimeOffDialog';
+import CreateAssignmentDialog from '../components/CreateAssignmentDialog';
 import VirtualizedTimeTable from '../components/VirtualizedTimeTable';
 
 // Russian localized static ranges for DateRangePicker
@@ -345,12 +344,9 @@ function TimeTrackerPage() {
         );
     };
 
-    // Manual assignment dialog
-    const [manualDialogOpen, setManualDialogOpen] = useState(false);
+    // Create assignment dialog (unified for work and time-off)
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [cloneData, setCloneData] = useState(null); // Data for cloning assignment
-
-    // Time-off dialog (vacation, sick leave, etc.)
-    const [timeOffDialogOpen, setTimeOffDialogOpen] = useState(false);
 
     // New task dialog (for switching tasks)
     const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -693,7 +689,7 @@ function TimeTrackerPage() {
     const handleManualAddClick = () => {
         handleStartMenuClose();
         setCloneData(null);  // Reset clone data for new assignment
-        setManualDialogOpen(true);
+        setCreateDialogOpen(true);
     };
 
     // Handle cloning an assignment
@@ -731,7 +727,7 @@ function TimeTrackerPage() {
             })) || []
         };
         setCloneData(cloneInfo);
-        setManualDialogOpen(true);
+        setCreateDialogOpen(true);
     };
 
     // Handle saving manual assignment
@@ -751,11 +747,14 @@ function TimeTrackerPage() {
         return result.data;
     };
 
-    // Handle payment edit after manual assignment creation
-    const handlePaymentEditFromManual = (paymentId, assignmentResult) => {
-        // Navigate to payments page with the new payment
-        navigate(`/payments?search=${assignmentResult.payment_tracking_nr}`);
-        showSuccess(`Смена ${assignmentResult.tracking_nr} создана! Перейдите к платежу для редактирования.`);
+    // Handle assignment created - expand the row to show tasks
+    const handleAssignmentCreated = (assignmentId) => {
+        // Expand the created assignment row to show its tasks
+        setExpandedRows(prev => ({
+            ...prev,
+            [assignmentId]: true
+        }));
+        showSuccess('Смена создана!');
     };
 
     // Handle new task creation (switch to new task in current or specified session)
@@ -1230,11 +1229,7 @@ function TimeTrackerPage() {
                         </MenuItem>
                         <MenuItem onClick={handleManualAddClick}>
                             <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
-                            Добавить вручную
-                        </MenuItem>
-                        <MenuItem onClick={() => { setStartMenuAnchor(null); setTimeOffDialogOpen(true); }}>
-                            <BeachAccess sx={{ mr: 1, color: 'warning.main' }} />
-                            Отпуск/Больничный
+                            Создать запись
                         </MenuItem>
                     </Menu>
                     <Button
@@ -1857,25 +1852,18 @@ function TimeTrackerPage() {
                 </DialogActions>
             </Dialog>
 
-            {/* Manual Assignment Dialog */}
-            <ManualAssignmentDialog
-                open={manualDialogOpen}
-                onClose={() => { setManualDialogOpen(false); setCloneData(null); }}
+            {/* Create Assignment Dialog (unified for work and time-off) */}
+            <CreateAssignmentDialog
+                open={createDialogOpen}
+                onClose={() => { setCreateDialogOpen(false); setCloneData(null); }}
                 onSave={handleSaveManualAssignment}
+                onRefresh={() => { loadData(true); loadSummary(); }}
+                onAssignmentCreated={handleAssignmentCreated}
                 employmentList={employmentList}
                 isAdmin={isAdmin}
-                onPaymentEdit={handlePaymentEditFromManual}
                 initialData={cloneData}
             />
 
-            {/* Time Off Dialog (Vacation, Sick Leave, etc.) */}
-            <TimeOffDialog
-                open={timeOffDialogOpen}
-                onClose={() => setTimeOffDialogOpen(false)}
-                onSave={() => { setTimeOffDialogOpen(false); loadData(true); }}
-                employmentList={employmentList}
-                isAdmin={isAdmin}
-            />
 
             {/* Snackbar for notifications */}
             <Snackbar

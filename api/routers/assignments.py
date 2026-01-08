@@ -134,6 +134,7 @@ class TimeOffCreate(BaseModel):
     start_time: datetime  # Начало периода (полная дата+время)
     end_time: datetime  # Конец периода (полная дата+время)
     description: Optional[str] = None
+    is_paid: bool = False  # Оплачиваемое ли отсутствие (по умолчанию нет)
 
 
 class ManualAssignmentResponse(BaseModel):
@@ -662,7 +663,9 @@ async def create_time_off(
     
     # Calculate hours for response
     total_hours = duration.total_seconds() / 3600
-    total_amount = float(hourly_rate) * total_hours if data.assignment_type != "unpaid_leave" else 0.0
+    # Amount is 0 if unpaid_leave OR if is_paid is False
+    is_paid_type = data.assignment_type != "unpaid_leave" and data.is_paid
+    total_amount = float(hourly_rate) * total_hours if is_paid_type else 0.0
     
     # Формируем ответ
     response = ManualAssignmentResponse(
