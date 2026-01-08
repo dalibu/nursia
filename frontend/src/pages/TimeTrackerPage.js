@@ -985,9 +985,19 @@ function TimeTrackerPage() {
 
     const handleConfirmDeleteAssignment = async () => {
         if (!assignmentToDelete) return;
+
+        // Optimistic update: remove from local state immediately to preserve scroll position
+        const deletedId = assignmentToDelete.assignment_id;
+        const previousAssignments = [...groupedAssignments];
+
+        setGroupedAssignments(prev => prev.filter(a => a.assignment_id !== deletedId));
+        setFilteredAssignments(prev => prev.filter(a => a.assignment_id !== deletedId));
+        setAssignmentDeleteOpen(false);
+        setAssignmentToDelete(null);
+
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/assignments/assignment/${assignmentToDelete.assignment_id}`, {
+            const response = await fetch(`/api/assignments/assignment/${deletedId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -996,13 +1006,12 @@ function TimeTrackerPage() {
                 throw new Error(data.detail || 'Ошибка удаления');
             }
             showSuccess('Смена удалена');
-            loadData();
-            loadSummary();
+            loadSummary(); // Only reload summary, not the table data
         } catch (error) {
+            // Rollback on error
+            setGroupedAssignments(previousAssignments);
+            setFilteredAssignments(previousAssignments);
             showError(error.message);
-        } finally {
-            setAssignmentDeleteOpen(false);
-            setAssignmentToDelete(null);
         }
     };
 
