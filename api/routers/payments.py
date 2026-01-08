@@ -5,6 +5,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
@@ -455,3 +456,73 @@ async def delete_payment(
     }, user_ids=target_users)
     
     return {"message": "Payment deleted"}
+
+
+class BulkDeleteRequest(BaseModel):
+    """Запрос на массовое удаление"""
+    ids: List[int]
+
+
+class BulkDeleteResponse(BaseModel):
+    """Ответ на массовое удаление"""
+    deleted_count: int
+    failed_ids: List[int] = []
+    errors: List[str] = []
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_payments(
+    request: BulkDeleteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Массовое удаление платежей. Только админ может удалять массово."""
+    
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Только администратор может удалять массово")
+    
+    deleted_count = 0
+    failed_ids = []
+    errors = []
+    affected_user_ids = set()
+    
+    for payment_id in request.ids:
+        try:
+            result = await db.execute(
+                select(Payment).where(Payment.id == payment_id)
+            )
+            payment = result.scalar_one_or_none()
+            
+            if not payment:
+                failed_ids.append(payment_id)
+                errors.append(f"ID {payment_id}: не найден")
+                continue
+            
+            # Проверяем статус - оплаченные тоже удаляем (админ может)
+            # но сохраняем информацию
+            affected_user_ids.add(payment.payer_id)
+            affected_user_ids.add(payment.recipient_id)
+            
+            await db.delete(payment)
+            deleted_count += 1
+            
+        except Exception as e:
+            failed_ids.append(payment_id)
+            errors.append(f"ID {payment_id}: {str(e)}")
+    
+    await db.commit()
+    
+    # WebSocket broadcast
+    if deleted_count > 0:
+        from api.routers.websocket import manager, get_admin_ids
+        target_users = list(set(list(affected_user_ids) + await get_admin_ids()))
+        await manager.broadcast({
+            "type": "payments_bulk_deleted",
+            "count": deleted_count
+        }, user_ids=target_users)
+    
+    return BulkDeleteResponse(
+        deleted_count=deleted_count,
+        failed_ids=failed_ids,
+        errors=errors
+    )

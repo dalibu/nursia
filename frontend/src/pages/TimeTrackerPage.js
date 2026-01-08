@@ -6,7 +6,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
     TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
-    Popover, Tooltip, Menu
+    Popover, Tooltip, Menu, Checkbox
 } from '@mui/material';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -17,7 +17,7 @@ import {
     PlayArrow, Stop, AccessTime, Person, Work, Add,
     Refresh, Timer, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Search, DateRange,
-    ArrowDropDown, NoteAdd, Replay, BeachAccess, Sick, EventBusy, MoneyOff
+    ArrowDropDown, NoteAdd, Replay, BeachAccess, Sick, EventBusy, MoneyOff, DeleteSweep
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
@@ -389,6 +389,11 @@ function TimeTrackerPage() {
     // Assignment delete dialog
     const [assignmentDeleteOpen, setAssignmentDeleteOpen] = useState(false);
     const [assignmentToDelete, setAssignmentToDelete] = useState(null);
+
+    // Bulk selection and deletion
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
 
     // Snackbar for error messages
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
@@ -1015,6 +1020,95 @@ function TimeTrackerPage() {
         }
     };
 
+    // Bulk selection handlers
+    const handleToggleSelect = (assignmentId, e) => {
+        if (e) e.stopPropagation();
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(assignmentId)) {
+                newSet.delete(assignmentId);
+            } else {
+                newSet.add(assignmentId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        // Only non-active and unpaid assignments can be selected
+        const selectableIds = filteredAssignments
+            .filter(a => !a.is_active && a.payment_status !== 'paid')
+            .map(a => a.assignment_id);
+
+        if (selectedIds.size === selectableIds.length && selectableIds.length > 0) {
+            // All selectable are selected -> deselect all
+            setSelectedIds(new Set());
+        } else {
+            // Select all selectable
+            setSelectedIds(new Set(selectableIds));
+        }
+    };
+
+    const handleClearSelection = () => {
+        setSelectedIds(new Set());
+    };
+
+    const handleBulkDeleteConfirm = async () => {
+        if (selectedIds.size === 0) return;
+
+        setBulkDeleting(true);
+        const idsToDelete = Array.from(selectedIds);
+        const previousAssignments = [...groupedAssignments];
+
+        // Optimistic update
+        setGroupedAssignments(prev => prev.filter(a => !selectedIds.has(a.assignment_id)));
+        setFilteredAssignments(prev => prev.filter(a => !selectedIds.has(a.assignment_id)));
+        setSelectedIds(new Set());
+        setBulkDeleteOpen(false);
+
+        try {
+            const response = await assignmentsService.bulkDelete(idsToDelete);
+            const { deleted_count, failed_ids, errors } = response.data;
+
+            if (deleted_count > 0) {
+                showSuccess(`Удалено ${deleted_count} смен`);
+            }
+
+            if (failed_ids.length > 0) {
+                // Restore failed items
+                const failedSet = new Set(failed_ids);
+                const restoredItems = previousAssignments.filter(a => failedSet.has(a.assignment_id));
+                setGroupedAssignments(prev => [...prev, ...restoredItems]);
+                setFilteredAssignments(prev => [...prev, ...restoredItems]);
+                showError(`Не удалось удалить: ${errors.join(', ')}`);
+            }
+
+            loadSummary();
+        } catch (error) {
+            // Full rollback on error
+            setGroupedAssignments(previousAssignments);
+            setFilteredAssignments(previousAssignments);
+            // Handle various error formats
+            let errorMessage = 'Ошибка массового удаления';
+            if (error.response?.data?.detail) {
+                const detail = error.response.data.detail;
+                if (typeof detail === 'string') {
+                    errorMessage = detail;
+                } else if (Array.isArray(detail)) {
+                    // Pydantic validation errors
+                    errorMessage = detail.map(e => e.msg || JSON.stringify(e)).join(', ');
+                } else {
+                    errorMessage = JSON.stringify(detail);
+                }
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            showError(errorMessage);
+        } finally {
+            setBulkDeleting(false);
+        }
+    };
+
     const formatCurrency = (amount, currency = 'UAH') => {
         const symbol = currencySymbols[currency] || currency;
         return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -1351,6 +1445,50 @@ function TimeTrackerPage() {
             </Paper>
 
             <Paper sx={{ py: 3, px: 0 }}>
+                {/* Bulk actions toolbar */}
+                {isAdmin && selectedIds.size > 0 && (
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        px: 2,
+                        py: 1,
+                        mb: 2,
+                        backgroundColor: 'primary.light',
+                        borderRadius: 1,
+                        mx: 2
+                    }}>
+                        <Checkbox
+                            checked={selectedIds.size === filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                            indeterminate={selectedIds.size > 0 && selectedIds.size < filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                            onChange={handleSelectAll}
+                            sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                        />
+                        <Typography sx={{ color: 'white', fontWeight: 600 }}>
+                            Выбрано: {selectedIds.size}
+                        </Typography>
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleClearSelection}
+                            sx={{ color: 'white', borderColor: 'white' }}
+                        >
+                            Снять выбор
+                        </Button>
+                        <Button
+                            variant="contained"
+                            color="error"
+                            size="small"
+                            startIcon={<DeleteSweep />}
+                            onClick={() => setBulkDeleteOpen(true)}
+                            disabled={bulkDeleting}
+                        >
+                            Удалить выбранные
+                        </Button>
+                    </Box>
+                )}
+
                 <VirtualizedTimeTable
                     assignments={filteredAssignments}
                     expandedRows={expandedRows}
@@ -1381,6 +1519,11 @@ function TimeTrackerPage() {
                     onSort={handleSort}
                     renderHeaderCell={renderHeaderCell}
                     loading={loading}
+                    // Bulk selection props
+                    isAdmin={isAdmin}
+                    selectedIds={selectedIds}
+                    onToggleSelect={handleToggleSelect}
+                    onSelectAll={handleSelectAll}
                 />
 
                 {/* Total records count */}
@@ -1676,6 +1819,37 @@ function TimeTrackerPage() {
                     <Button variant="outlined" onClick={() => setAssignmentDeleteOpen(false)}>Отмена</Button>
                     <Button variant="contained" color="error" onClick={handleConfirmDeleteAssignment}>
                         Удалить всё
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <Dialog open={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)}>
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #ff5252 0%, #f44336 100%)',
+                    color: 'white',
+                    fontWeight: 'bold'
+                }}>
+                    🗑️ Массовое удаление
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                        Вы уверены, что хотите удалить <strong>{selectedIds.size}</strong> смен?
+                    </Typography>
+                    <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
+                        Все связанные задания и неоплаченные платежи будут удалены!
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
+                    <Button variant="outlined" onClick={() => setBulkDeleteOpen(false)}>Отмена</Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleBulkDeleteConfirm}
+                        disabled={bulkDeleting}
+                        startIcon={bulkDeleting ? <CircularProgress size={16} color="inherit" /> : <DeleteSweep />}
+                    >
+                        {bulkDeleting ? 'Удаление...' : 'Удалить всё'}
                     </Button>
                 </DialogActions>
             </Dialog>

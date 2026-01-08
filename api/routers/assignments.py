@@ -542,7 +542,19 @@ class TimeOffResponse(BaseModel):
     """Ответ на создание записей отсутствия"""
     created_count: int
     assignments: List[ManualAssignmentResponse]
-    skipped_dates: List[str] = []  # Даты, которые были пропущены (уже существуют)
+    skipped_dates: List[str] = []
+
+
+class BulkDeleteRequest(BaseModel):
+    """Запрос на массовое удаление"""
+    ids: List[int]
+
+
+class BulkDeleteResponse(BaseModel):
+    """Ответ на массовое удаление"""
+    deleted_count: int
+    failed_ids: List[int] = []
+    errors: List[str] = []  # Даты, которые были пропущены (уже существуют)
 
 
 @router.post("/time-off", response_model=TimeOffResponse)
@@ -1146,6 +1158,80 @@ async def delete_assignment(
     }, user_ids=target_users)
     
     return {"message": "Assignment удалён", "id": assignment_id}
+
+
+@router.post("/assignment/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_assignments(
+    request: BulkDeleteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Массовое удаление assignments. Только админ может удалять массово."""
+    
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Только администратор может удалять массово")
+    
+    deleted_count = 0
+    failed_ids = []
+    errors = []
+    deleted_user_ids = set()
+    
+    for assignment_id in request.ids:
+        try:
+            result = await db.execute(
+                select(Assignment)
+                .options(
+                    joinedload(Assignment.tasks),
+                    joinedload(Assignment.payment)
+                )
+                .where(Assignment.id == assignment_id)
+            )
+            assignment = result.unique().scalar_one_or_none()
+            
+            if not assignment:
+                failed_ids.append(assignment_id)
+                errors.append(f"ID {assignment_id}: не найден")
+                continue
+            
+            # Проверяем платёж
+            if assignment.payment and assignment.payment.payment_status != 'unpaid':
+                failed_ids.append(assignment_id)
+                errors.append(f"ID {assignment_id}: платёж уже оплачен")
+                continue
+            
+            # Удаляем платёж если есть
+            if assignment.payment:
+                await db.delete(assignment.payment)
+            
+            # Удаляем все tasks
+            for task in assignment.tasks:
+                await db.delete(task)
+            
+            # Удаляем assignment
+            await db.delete(assignment)
+            deleted_count += 1
+            deleted_user_ids.add(assignment.user_id)
+            
+        except Exception as e:
+            failed_ids.append(assignment_id)
+            errors.append(f"ID {assignment_id}: {str(e)}")
+    
+    await db.commit()
+    
+    # WebSocket broadcast
+    if deleted_count > 0:
+        from api.routers.websocket import manager, get_admin_ids
+        target_users = list(set(list(deleted_user_ids) + await get_admin_ids()))
+        await manager.broadcast({
+            "type": "assignments_bulk_deleted",
+            "count": deleted_count
+        }, user_ids=target_users)
+    
+    return BulkDeleteResponse(
+        deleted_count=deleted_count,
+        failed_ids=failed_ids,
+        errors=errors
+    )
 
 
 @router.put("/tasks/{task_id}")

@@ -2,7 +2,7 @@ import React, { useRef, memo, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Box, IconButton, Chip, Collapse, Tooltip, Typography
+    Box, IconButton, Chip, Collapse, Tooltip, Typography, Checkbox
 } from '@mui/material';
 import {
     PlayArrow, Stop, Edit, Delete, Pause, Coffee,
@@ -39,7 +39,11 @@ const AssignmentRow = memo(({
     LiveTimer,
     currentTime,
     assignmentTypes,
-    columnWidths
+    columnWidths,
+    // Bulk selection props
+    isAdmin,
+    isSelected,
+    onToggleSelect
 }) => {
     const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
     const typeData = assignmentTypes?.find(t => t.value === assignment.assignment_type) || { label: 'Смена' };
@@ -50,6 +54,9 @@ const AssignmentRow = memo(({
     const activeSegment = assignment.segments?.find(s => !s.end_time);
     const isPaused = activeSegment?.session_type === 'pause';
 
+    // Can select: admin only, non-active, non-paid
+    const canSelect = isAdmin && !assignment.is_active && assignment.payment_status !== 'paid';
+
     return (
         <>
             {/* Main assignment row */}
@@ -57,12 +64,28 @@ const AssignmentRow = memo(({
                 sx={{
                     '&:hover': { backgroundColor: '#f9f9f9' },
                     cursor: hasSegments ? 'pointer' : 'default',
-                    backgroundColor: assignment.is_active ? '#e8f5e9' : 'inherit'
+                    backgroundColor: assignment.is_active ? '#e8f5e9' : (isSelected ? '#e3f2fd' : 'inherit')
                 }}
                 onClick={() => hasSegments && onToggleExpand(assignment.assignment_id)}
             >
                 <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {/* Checkbox for bulk selection (admin only) */}
+                        {isAdmin && (
+                            <Box sx={{ width: 28, minWidth: 28, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                                {canSelect ? (
+                                    <Checkbox
+                                        size="small"
+                                        checked={isSelected}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => onToggleSelect(assignment.assignment_id, e)}
+                                        sx={{ p: 0.25 }}
+                                    />
+                                ) : (
+                                    <Box sx={{ width: 18 }} />
+                                )}
+                            </Box>
+                        )}
                         <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
                             {hasSegments && (
                                 <IconButton size="small" onClick={(e) => {
@@ -281,7 +304,11 @@ function VirtualizedContent({
     currentTime,
     assignmentTypes,
     columnWidths,
-    parentRef
+    parentRef,
+    // Bulk selection props
+    isAdmin,
+    selectedIds,
+    onToggleSelect
 }) {
     // Memoize virtualizer options to prevent re-creation
     const virtualizerOptions = useMemo(() => ({
@@ -341,6 +368,10 @@ function VirtualizedContent({
                         currentTime={currentTime}
                         assignmentTypes={assignmentTypes}
                         columnWidths={columnWidths}
+                        // Bulk selection props
+                        isAdmin={isAdmin}
+                        isSelected={selectedIds?.has(assignment.assignment_id)}
+                        onToggleSelect={onToggleSelect}
                     />
                 );
             })}
@@ -378,7 +409,12 @@ function VirtualizedTimeTable({
     sortDirection,
     onSort,
     renderHeaderCell,
-    loading
+    loading,
+    // Bulk selection props
+    isAdmin,
+    selectedIds,
+    onToggleSelect,
+    onSelectAll
 }) {
     const parentRef = useRef(null);
 
@@ -431,6 +467,10 @@ function VirtualizedTimeTable({
                         assignmentTypes={assignmentTypes}
                         columnWidths={columnWidths}
                         parentRef={parentRef}
+                        // Bulk selection props
+                        isAdmin={isAdmin}
+                        selectedIds={selectedIds}
+                        onToggleSelect={onToggleSelect}
                     />
                 </TableBody>
             </Table>
