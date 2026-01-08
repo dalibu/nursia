@@ -356,11 +356,12 @@ function CreateAssignmentDialog({
 
             setLoading(true);
             try {
+                // Use noon to avoid timezone date shifts when backend extracts date
                 const startDateTime = new Date(assignmentDate);
-                startDateTime.setHours(0, 0, 0, 0);
+                startDateTime.setHours(12, 0, 0, 0);
 
                 const endDateTime = new Date(endDate);
-                endDateTime.setHours(parseInt(hoursPerDay) || 8, 0, 0, 0);
+                endDateTime.setHours(12, 0, 0, 0);
 
                 const payload = {
                     worker_id: workerId,
@@ -368,7 +369,8 @@ function CreateAssignmentDialog({
                     start_time: startDateTime.toISOString(),
                     end_time: endDateTime.toISOString(),
                     description: description || null,
-                    is_paid: isPaid
+                    is_paid: isPaid,
+                    hours_per_day: parseFloat(hoursPerDay) || 8.0
                 };
 
                 const response = await api.post('/assignments/time-off', payload);

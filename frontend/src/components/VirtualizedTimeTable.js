@@ -98,8 +98,36 @@ const AssignmentRow = memo(({
                         <span>{assignment.tracking_nr || '-'}</span>
                     </Box>
                 </TableCell>
-                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
-                    {formatDate(assignment.assignment_date)}
+                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }} title={`Start: ${assignment.start_time}\nEnd: ${assignment.end_time}`}>
+                    {(() => {
+                        const dateStr = formatDate(assignment.assignment_date);
+
+                        // Check for multi-day range
+                        if (assignment.start_time && assignment.end_time) {
+                            const start = new Date(assignment.start_time);
+                            const end = new Date(assignment.end_time);
+
+                            // Use local date components to avoid UTC shift
+                            const toLocalYMD = (d) => {
+                                const year = d.getFullYear();
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                return `${year}-${month}-${day}`;
+                            };
+
+                            const startD = toLocalYMD(start);
+                            const endD = toLocalYMD(end);
+
+                            if (startD !== endD) {
+                                const formatLocal = (ymd) => {
+                                    const [y, m, d] = ymd.split('-');
+                                    return `${d}.${m}.${y}`;
+                                };
+                                return `${formatLocal(startD)}-${formatLocal(endD)}`;
+                            }
+                        }
+                        return dateStr;
+                    })()}
                 </TableCell>
                 <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.worker }} title={assignment.worker_name}>
                     {assignment.worker_name}

@@ -16,7 +16,7 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory, AssignmentType
+from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory, AssignmentType, TaskType
 from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -135,6 +135,7 @@ class TimeOffCreate(BaseModel):
     end_time: datetime  # Конец периода (полная дата+время)
     description: Optional[str] = None
     is_paid: bool = False  # Оплачиваемое ли отсутствие (по умолчанию нет)
+    hours_per_day: float = 8.0  # Количество часов отсутствия в день
 
 
 class ManualAssignmentResponse(BaseModel):
@@ -626,7 +627,7 @@ async def create_time_off(
             detail=f"Запись типа '{data.assignment_type}' уже существует и пересекается с указанным периодом"
         )
     
-    # Создаём один Assignment с одним Task на весь период
+    # Создаём один Assignment для группировки всех дней отсутствия
     from utils.tracking import format_assignment_tracking_nr
     
     new_assignment = Assignment(
@@ -638,18 +639,77 @@ async def create_time_off(
     await db.flush()
     new_assignment.tracking_nr = format_assignment_tracking_nr(new_assignment.id)
     
-    # Создаём Task на весь период
-    new_task = Task(
-        assignment_id=new_assignment.id,
-        start_time=data.start_time,
-        end_time=data.end_time,
-        task_type="work",  # Time-off uses work type for the task
-        description=data.description
-    )
-    db.add(new_task)
+    # Создаём отдельные задачи (TaskType.ABSENT) на каждый день периода
+    # Начинаем в 8:00 утра каждого дня и длится hours_per_day
+    
+    start_date = data.start_time.date()
+    end_date = data.end_time.date()
+    
+    current_date = start_date
+    tasks_count = 0
+    
+    while current_date <= end_date:
+        task_start = datetime.combine(current_date, time(8, 0))
+        task_end = task_start + timedelta(hours=data.hours_per_day)
+        
+        task = Task(
+            assignment_id=new_assignment.id,
+            start_time=task_start,
+            end_time=task_end,
+            task_type=TaskType.ABSENT,
+            description=data.description
+        )
+        db.add(task)
+        tasks_count += 1
+        current_date += timedelta(days=1)
+    
+    # Calculate totals
+    total_hours = tasks_count * data.hours_per_day
+    
+    # Amount is 0 if unpaid_leave OR if is_paid is False
+    is_paid_type = data.assignment_type != "unpaid_leave" and data.is_paid
+    total_amount = float(hourly_rate) * total_hours if is_paid_type else 0.0
+    
+    payment = None
+    if total_amount > 0:
+        from utils.tracking import format_payment_tracking_nr
+        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
+        
+        # Get employer
+        employer_result = await db.execute(
+            select(User).join(User.roles).where(Role.name == "employer")
+        )
+        employer = employer_result.scalar_one_or_none()
+        payer_id = employer.id if employer else target_worker_id
+        
+        # Get salary category
+        salary_cat_result = await db.execute(
+            select(PaymentCategory).join(PaymentCategoryGroup).where(
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
+            )
+        )
+        salary_category = salary_cat_result.scalars().first()
+        
+        if salary_category:
+            payment = Payment(
+                payer_id=payer_id,
+                recipient_id=target_worker_id,
+                category_id=salary_category.id,
+                amount=round(total_amount, 2),
+                currency=currency,
+                description=f"Оплата: {data.description or data.assignment_type}",
+                payment_date=datetime.combine(start_date, time(0, 0)),
+                payment_status='unpaid',
+                assignment_id=new_assignment.id
+            )
+            db.add(payment)
+            await db.flush()
+            payment.tracking_nr = format_payment_tracking_nr(payment.id)
     
     await db.commit()
     await db.refresh(new_assignment)
+    if payment:
+        await db.refresh(payment)
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
@@ -660,27 +720,21 @@ async def create_time_off(
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
     }, user_ids=target_users)
-    
-    # Calculate hours for response
-    total_hours = duration.total_seconds() / 3600
-    # Amount is 0 if unpaid_leave OR if is_paid is False
-    is_paid_type = data.assignment_type != "unpaid_leave" and data.is_paid
-    total_amount = float(hourly_rate) * total_hours if is_paid_type else 0.0
-    
+
     # Формируем ответ
     response = ManualAssignmentResponse(
         assignment_id=new_assignment.id,
         tracking_nr=new_assignment.tracking_nr,
         assignment_type=new_assignment.assignment_type,
-        payment_id=None,
-        payment_tracking_nr=None,
+        payment_id=payment.id if payment else None,
+        payment_tracking_nr=payment.tracking_nr if payment else None,
         total_hours=round(total_hours, 2),
         total_amount=round(total_amount, 2),
         currency=currency
     )
     
     return TimeOffResponse(
-        created_count=1,
+        created_count=tasks_count,
         assignments=[response],
         skipped_dates=[]
     )
@@ -1496,14 +1550,18 @@ async def get_grouped_sessions(
             else:
                 seg_seconds = 0
             
-            if task.task_type == "work":
+            if task.task_type == "work" or task.task_type == "absent":
                 total_work_seconds += seg_seconds
-                if task.end_time:
+                if task.task_type == "work" and task.end_time:
                     # Calculate amount manually: hours * hourly_rate
                     task_hours = task.duration_hours
                     total_amount += task_hours * hourly_rate
             else:
                 total_pause_seconds += seg_seconds
+        
+        # Override calculated amount with real payment amount if exists
+        if assignment.payment:
+            total_amount = float(assignment.payment.amount)
         
         first_task = tasks[0] if tasks else None
         last_task = tasks[-1] if tasks else None

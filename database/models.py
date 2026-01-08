@@ -310,6 +310,7 @@ class EmploymentRelation(Base):
 class TaskType(str, Enum):
     WORK = "work"
     PAUSE = "pause"
+    ABSENT = "absent"
 
 
 class AssignmentType(str, Enum):
