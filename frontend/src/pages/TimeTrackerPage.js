@@ -1299,13 +1299,13 @@ function TimeTrackerPage() {
                         {/* Часы */}
                         <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
-                                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                                 color: 'white',
                                 height: '100%'
                             }}>
                                 <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Часы</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalHours.toFixed(1)}</Typography>
+                                    <Typography variant="caption">Готово</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{completedSessions}</Typography>
                                 </CardContent>
                             </Card>
                         </Grid>
@@ -1324,16 +1324,16 @@ function TimeTrackerPage() {
                             </Card>
                         </Grid>
 
-                        {/* Готово */}
+                        {/* Часы */}
                         <Grid item xs={6} sm={3} md={3}>
                             <Card sx={{
-                                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                                 color: 'white',
                                 height: '100%'
                             }}>
                                 <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Готово</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{completedSessions}</Typography>
+                                    <Typography variant="caption">Часы</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalHours.toFixed(1)}</Typography>
                                 </CardContent>
                             </Card>
                         </Grid>

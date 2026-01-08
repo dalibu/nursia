@@ -731,7 +731,7 @@ function PaymentsPage() {
             {/* К оплате */}
             <Grid item xs={6} sm={3}>
               <Card sx={{
-                background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+                background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
                 color: 'white',
                 height: '100%'
               }}>
