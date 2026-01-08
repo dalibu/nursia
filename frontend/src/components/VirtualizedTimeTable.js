@@ -68,24 +68,22 @@ const AssignmentRow = memo(({
                 }}
                 onClick={() => hasSegments && onToggleExpand(assignment.assignment_id)}
             >
+                {/* Checkbox column for bulk selection (admin only) */}
+                {isAdmin && (
+                    <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center' }}>
+                        {canSelect ? (
+                            <Checkbox
+                                size="small"
+                                checked={isSelected}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => onToggleSelect(assignment.assignment_id, e)}
+                                sx={{ p: 0.25 }}
+                            />
+                        ) : null}
+                    </TableCell>
+                )}
                 <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {/* Checkbox for bulk selection (admin only) */}
-                        {isAdmin && (
-                            <Box sx={{ width: 28, minWidth: 28, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
-                                {canSelect ? (
-                                    <Checkbox
-                                        size="small"
-                                        checked={isSelected}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onChange={(e) => onToggleSelect(assignment.assignment_id, e)}
-                                        sx={{ p: 0.25 }}
-                                    />
-                                ) : (
-                                    <Box sx={{ width: 18 }} />
-                                )}
-                            </Box>
-                        )}
                         <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
                             {hasSegments && (
                                 <IconButton size="small" onClick={(e) => {
@@ -429,12 +427,24 @@ function VirtualizedTimeTable({
                 maxHeight: 'calc(100vh - 400px)',
                 minHeight: 400,
                 overflowY: 'auto',
-                overflowX: 'hidden'
+                overflowX: 'auto'
             }}
         >
-            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+            <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1100 }}>
                 <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f5f5f5' }}>
                     <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        {/* Checkbox column header for admin */}
+                        {isAdmin && (
+                            <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: '#f5f5f5' }}>
+                                <Checkbox
+                                    size="small"
+                                    checked={selectedIds?.size > 0 && selectedIds?.size === assignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                                    indeterminate={selectedIds?.size > 0 && selectedIds?.size < assignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                                    onChange={onSelectAll}
+                                    sx={{ p: 0.25 }}
+                                />
+                            </TableCell>
+                        )}
                         {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
                         {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
                         {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}

@@ -6,9 +6,9 @@ import {
   Paper, IconButton, Box, TextField, MenuItem,
   TableSortLabel, Dialog, DialogTitle, DialogContent, DialogActions,
   DialogContentText, Chip, Popover, Tooltip,
-  Grid, Card, CardContent
+  Grid, Card, CardContent, Checkbox, Snackbar, Alert, CircularProgress
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay, Search, DateRange } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep } from '@mui/icons-material';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, addMonths } from 'date-fns';
@@ -152,6 +152,16 @@ function PaymentsPage() {
   const [repeatTemplate, setRepeatTemplate] = useState(null);
   const [totals, setTotals] = useState({});
 
+  // Bulk selection and deletion
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Snackbar for messages
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
+  const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
+  const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   // Loading state
   const [loading, setLoading] = useState(true);
@@ -164,7 +174,7 @@ function PaymentsPage() {
     } catch (e) { }
     return {
       tracking_nr: 50,
-      payment_date: 120,
+      payment_date: 90,
       payer: 100,
       recipient: 90,
       amount: 90,
@@ -586,6 +596,83 @@ function PaymentsPage() {
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
+  // Bulk selection handlers
+  const handleToggleSelect = (paymentId, e) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(paymentId)) {
+        newSet.delete(paymentId);
+      } else {
+        newSet.add(paymentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    // All payments can be selected (admin can delete any)
+    const selectableIds = filteredList.map(p => p.id);
+
+    if (selectedIds.size === selectableIds.length && selectableIds.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.size === 0) return;
+
+    setBulkDeleting(true);
+    const idsToDelete = Array.from(selectedIds);
+    const previousPayments = [...paymentList];
+
+    // Optimistic update
+    setPaymentList(prev => prev.filter(p => !selectedIds.has(p.id)));
+    setFilteredList(prev => prev.filter(p => !selectedIds.has(p.id)));
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+
+    try {
+      const response = await payments.bulkDelete(idsToDelete);
+      const { deleted_count, failed_ids, errors } = response.data;
+
+      if (deleted_count > 0) {
+        showSuccess(`Удалено ${deleted_count} платежей`);
+      }
+
+      if (failed_ids.length > 0) {
+        // Restore failed items
+        const failedSet = new Set(failed_ids);
+        const restoredItems = previousPayments.filter(p => failedSet.has(p.id));
+        setPaymentList(prev => [...prev, ...restoredItems]);
+        showError(`Не удалось удалить: ${errors.join(', ')}`);
+      }
+    } catch (error) {
+      // Full rollback on error
+      setPaymentList(previousPayments);
+      let errorMessage = 'Ошибка массового удаления';
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          errorMessage = detail.map(e => e.msg || JSON.stringify(e)).join(', ');
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      showError(errorMessage);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
 
   return (
     <Box>
@@ -770,6 +857,49 @@ function PaymentsPage() {
         </Box>
       </Paper>
 
+      {/* Bulk actions toolbar */}
+      {isAdmin && selectedIds.size > 0 && (
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          px: 2,
+          py: 1,
+          mb: 2,
+          backgroundColor: 'primary.light',
+          borderRadius: 1
+        }}>
+          <Checkbox
+            checked={selectedIds.size === filteredList.length}
+            indeterminate={selectedIds.size > 0 && selectedIds.size < filteredList.length}
+            onChange={handleSelectAll}
+            sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+          />
+          <Typography sx={{ color: 'white', fontWeight: 600 }}>
+            Выбрано: {selectedIds.size}
+          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleClearSelection}
+            sx={{ color: 'white', borderColor: 'white' }}
+          >
+            Снять выбор
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<DeleteSweep />}
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={bulkDeleting}
+          >
+            Удалить выбранные
+          </Button>
+        </Box>
+      )}
+
       <VirtualizedPaymentsTable
         payments={filteredList}
         canManagePaymentStatus={canManagePaymentStatus}
@@ -783,6 +913,10 @@ function PaymentsPage() {
         onRepeat={handleRepeat}
         onToggleStatus={handlePaymentToggle}
         columnWidths={columnWidths}
+        // Bulk selection props
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
+        onSelectAll={handleSelectAll}
         renderHeaderCell={(id, label, align, sortKey, extraSx = {}) => {
           const isResizingThis = resizing?.column === id;
 
@@ -871,6 +1005,49 @@ function PaymentsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)}>
+        <DialogTitle sx={{
+          background: 'linear-gradient(135deg, #ff5252 0%, #f44336 100%)',
+          color: 'white',
+          fontWeight: 'bold'
+        }}>
+          🗑️ Массовое удаление
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            Вы уверены, что хотите удалить <strong>{selectedIds.size}</strong> платежей?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
+            Это действие нельзя отменить!
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
+          <Button variant="outlined" onClick={() => setBulkDeleteOpen(false)}>Отмена</Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleBulkDeleteConfirm}
+            disabled={bulkDeleting}
+            startIcon={bulkDeleting ? <CircularProgress size={16} color="inherit" /> : <DeleteSweep />}
+          >
+            {bulkDeleting ? 'Удаление...' : 'Удалить всё'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for messages */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={closeSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

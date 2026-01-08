@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useNavigate } from 'react-router-dom';
 import {
     Table, TableBody, TableCell, TableHead, TableRow,
-    Box, IconButton, Chip, Tooltip, Typography
+    Box, IconButton, Chip, Tooltip, Typography, Checkbox
 } from '@mui/material';
 import {
     Edit, Delete, Replay, Payment
@@ -42,13 +42,28 @@ const PaymentRow = memo(({
     canManagePaymentStatus,
     currencies,
     isAdmin,
-    columnWidths
+    columnWidths,
+    // Bulk selection props
+    isSelected,
+    onToggleSelect
 }) => {
     const navigate = useNavigate();
     const symbol = currencies.find(c => c.code === payment.currency)?.symbol || payment.currency;
 
     return (
-        <TableRow sx={{ '& td': { verticalAlign: 'middle' } }}>
+        <TableRow sx={{ '& td': { verticalAlign: 'middle' }, backgroundColor: isSelected ? '#e3f2fd' : 'inherit' }}>
+            {/* Checkbox for bulk selection (admin only) */}
+            {isAdmin && (
+                <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center' }}>
+                    <Checkbox
+                        size="small"
+                        checked={isSelected}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => onToggleSelect(payment.id, e)}
+                        sx={{ p: 0.25 }}
+                    />
+                </TableCell>
+            )}
             {/* Номер */}
             <TableCell sx={{ width: columnWidths.tracking_nr, minWidth: columnWidths.tracking_nr, px: 0.5, fontSize: '0.75rem' }}>
                 {payment.tracking_nr || '-'}
@@ -214,7 +229,10 @@ function VirtualizedContent({
     currencies,
     isAdmin,
     columnWidths,
-    parentRef
+    parentRef,
+    // Bulk selection props
+    selectedIds,
+    onToggleSelect
 }) {
     const virtualizerOptions = useMemo(() => ({
         count: payments.length,
@@ -263,6 +281,9 @@ function VirtualizedContent({
                         currencies={currencies}
                         isAdmin={isAdmin}
                         columnWidths={columnWidths}
+                        // Bulk selection props
+                        isSelected={selectedIds?.has(payment.id)}
+                        onToggleSelect={onToggleSelect}
                     />
                 );
             })}
@@ -304,7 +325,11 @@ function VirtualizedPaymentsTable({
     onSort,
     renderHeaderCell,
     columnWidths = DEFAULT_COLUMN_WIDTHS,
-    loading
+    loading,
+    // Bulk selection props
+    selectedIds,
+    onToggleSelect,
+    onSelectAll
 }) {
     const parentRef = useRef(null);
 
@@ -322,9 +347,21 @@ function VirtualizedPaymentsTable({
                 overflowX: 'auto'
             }}
         >
-            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+            <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1050 }}>
                 <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f5f5f5' }}>
                     <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        {/* Checkbox column header for admin */}
+                        {isAdmin && (
+                            <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: '#f5f5f5' }}>
+                                <Checkbox
+                                    size="small"
+                                    checked={selectedIds?.size === payments.length && payments.length > 0}
+                                    indeterminate={selectedIds?.size > 0 && selectedIds?.size < payments.length}
+                                    onChange={onSelectAll}
+                                    sx={{ p: 0.25 }}
+                                />
+                            </TableCell>
+                        )}
                         {renderHeaderCell('tracking_nr', '№', 'left', 'tracking_nr', { px: 0.5 })}
                         {renderHeaderCell('payment_date', 'Когда', 'left', 'payment_date')}
                         {renderHeaderCell('payer', 'От кого', 'left', 'payer')}
@@ -349,6 +386,9 @@ function VirtualizedPaymentsTable({
                         isAdmin={isAdmin}
                         columnWidths={columnWidths}
                         parentRef={parentRef}
+                        // Bulk selection props
+                        selectedIds={selectedIds}
+                        onToggleSelect={onToggleSelect}
                     />
                 </TableBody>
             </Table>
