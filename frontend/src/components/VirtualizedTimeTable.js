@@ -82,9 +82,10 @@ const AssignmentRow = memo(({
                         ) : null}
                     </TableCell>
                 )}
-                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
+                {/* Номер с accordion */}
+                <TableCell sx={{ width: columnWidths.tracking_nr || 70, minWidth: 60, px: 0.5, fontSize: '0.75rem' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, mr: 1, display: 'flex', justifyContent: 'center' }}>
+                        <Box sx={{ width: 24, minWidth: 24, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
                             {hasSegments && (
                                 <IconButton size="small" onClick={(e) => {
                                     e.stopPropagation();
@@ -94,13 +95,11 @@ const AssignmentRow = memo(({
                                 </IconButton>
                             )}
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                            <span>{formatDate(assignment.assignment_date)}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                                {assignment.tracking_nr || ''}
-                            </span>
-                        </Box>
+                        <span>{assignment.tracking_nr || '-'}</span>
                     </Box>
+                </TableCell>
+                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }}>
+                    {formatDate(assignment.assignment_date)}
                 </TableCell>
                 <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.worker }} title={assignment.worker_name}>
                     {assignment.worker_name}
@@ -113,13 +112,13 @@ const AssignmentRow = memo(({
                         </span>
                     </Box>
                 </TableCell>
-                <TableCell align="center" sx={{ whiteSpace: 'nowrap', width: columnWidths.time }}>
+                <TableCell sx={{ whiteSpace: 'nowrap', width: columnWidths.time }}>
                     {assignment.assignment_type && assignment.assignment_type !== 'work'
                         ? '—'
                         : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
                     }
                 </TableCell>
-                <TableCell align="right" sx={{ width: columnWidths.duration }}>
+                <TableCell sx={{ width: columnWidths.duration, whiteSpace: 'nowrap' }}>
                     {assignment.assignment_type === 'work' || !assignment.assignment_type ? (
                         <LiveTimer assignment={assignment} currentTime={currentTime} />
                     ) : (
@@ -127,26 +126,10 @@ const AssignmentRow = memo(({
                     )}
                 </TableCell>
                 <Tooltip title={assignment.description || ''} arrow placement="top">
-                    <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.description }}>
+                    <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: columnWidths.description, pl: 2 }}>
                         {assignment.description || '—'}
                     </TableCell>
                 </Tooltip>
-                <TableCell align="center" sx={{ width: columnWidths.status }}>
-                    {assignment.is_active ? (
-                        isPaused ? (
-                            <Chip
-                                icon={<Coffee sx={{ fontSize: '1rem !important' }} />}
-                                label="Пауза"
-                                color="warning"
-                                size="small"
-                            />
-                        ) : (
-                            <Chip label="В работе" color="warning" size="small" />
-                        )
-                    ) : (
-                        <Chip label="Готово" color="success" size="small" />
-                    )}
-                </TableCell>
                 <TableCell align="center" sx={{ width: columnWidths.payment }}>
                     {assignment.payment_tracking_nr ? (
                         <Chip
@@ -164,8 +147,24 @@ const AssignmentRow = memo(({
                         <Typography variant="caption" color="text.secondary">—</Typography>
                     )}
                 </TableCell>
-                <TableCell align="right" sx={{ pr: 1, width: columnWidths.actions }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                <TableCell align="center" sx={{ width: columnWidths.status }}>
+                    {assignment.is_active ? (
+                        isPaused ? (
+                            <Chip
+                                icon={<Coffee sx={{ fontSize: '1rem !important' }} />}
+                                label="Пауза"
+                                color="warning"
+                                size="small"
+                            />
+                        ) : (
+                            <Chip label="В работе" color="warning" size="small" />
+                        )
+                    ) : (
+                        <Chip label="Готово" color="success" size="small" />
+                    )}
+                </TableCell>
+                <TableCell sx={{ width: columnWidths.actions }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', gap: 0.5 }}>
                         {/* Session control buttons for active sessions */}
                         {assignment.is_active && (
                             <>
@@ -430,7 +429,7 @@ function VirtualizedTimeTable({
                 overflowX: 'auto'
             }}
         >
-            <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1100 }}>
+            <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1000 }}>
                 <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f5f5f5' }}>
                     <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         {/* Checkbox column header for admin */}
@@ -445,15 +444,16 @@ function VirtualizedTimeTable({
                                 />
                             </TableCell>
                         )}
+                        {renderHeaderCell('tracking_nr', '№', 'left', 'tracking_nr', { px: 0.5 })}
                         {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
                         {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
                         {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}
-                        {renderHeaderCell('time', 'Время', 'center', 'total_work_seconds')}
-                        {renderHeaderCell('duration', 'Продолж.', 'right', 'total_amount')}
-                        {renderHeaderCell('description', 'Описание', 'left', 'description')}
-                        {renderHeaderCell('status', 'Статус', 'center', 'is_active')}
-                        {renderHeaderCell('payment', 'Платёж', 'center', 'payment_tracking_nr')}
-                        {renderHeaderCell('actions', 'Действия', 'right', null, { pr: 3 })}
+                        {renderHeaderCell('time', 'Время', 'left', 'total_work_seconds')}
+                        {renderHeaderCell('duration', 'Продолж.', 'left', 'total_amount')}
+                        {renderHeaderCell('description', 'Комментарий', 'left', 'description')}
+                        {renderHeaderCell('payment', 'Платёж', 'left', 'payment_tracking_nr')}
+                        {renderHeaderCell('status', 'Статус', 'left', 'is_active')}
+                        {renderHeaderCell('actions', 'Действия', 'left', null)}
                     </TableRow>
                 </TableHead>
                 <TableBody>

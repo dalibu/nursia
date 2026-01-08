@@ -760,7 +760,6 @@ function PaymentsPage() {
       })()}
 
       <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
-        <Typography variant="h6" gutterBottom>Фильтры</Typography>
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
           <TextField
             label="Поиск"

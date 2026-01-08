@@ -214,7 +214,7 @@ function TimeTrackerPage() {
     });
     const [dateRangeAnchor, setDateRangeAnchor] = useState(null);
     const [filteredAssignments, setFilteredAssignments] = useState([]);
-    const [sortField, setSortField] = useState('assignment_date');
+    const [sortField, setSortField] = useState('tracking_nr');
     const [sortDirection, setSortDirection] = useState('desc');
 
 
@@ -246,15 +246,16 @@ function TimeTrackerPage() {
             if (saved) return JSON.parse(saved);
         } catch (e) { }
         return {
-            date: 160,
-            worker: 150,
-            type: 110,
-            time: 135,
-            duration: 110,
-            description: 180,
-            status: 100,
-            payment: 125,
-            actions: 150
+            tracking_nr: 70,
+            date: 100,
+            worker: 120,
+            type: 100,
+            time: 100,
+            duration: 100,
+            description: 140,
+            status: 90,
+            payment: 80,
+            actions: 110
         };
     });
 
@@ -294,18 +295,15 @@ function TimeTrackerPage() {
     }, [resizing]);
 
     const renderHeaderCell = (id, label, align = 'left', sortKey = null, extraSx = {}) => {
-        const isDateColumn = id === 'date';
         const isResizing = resizing?.column === id;
 
         return (
             <TableCell
                 align={align}
-                padding={isDateColumn ? "none" : "normal"}
                 sx={{
                     width: columnWidths[id],
                     minWidth: columnWidths[id],
                     position: 'relative',
-                    ...(isDateColumn ? { pl: 5 } : {}),
                     ...extraSx,
                     '&:hover .resizer': { opacity: 1 }
                 }}
@@ -531,6 +529,11 @@ function TimeTrackerPage() {
         filtered.sort((a, b) => {
             let aVal, bVal;
             switch (sortField) {
+                case 'tracking_nr':
+                    // Extract numeric ID from tracking_nr (A-17 -> 17)
+                    aVal = parseInt((a.tracking_nr || '').replace(/\D/g, '')) || 0;
+                    bVal = parseInt((b.tracking_nr || '').replace(/\D/g, '')) || 0;
+                    break;
                 case 'assignment_date':
                     aVal = a.assignment_date;
                     bVal = b.assignment_date;
@@ -1444,7 +1447,7 @@ function TimeTrackerPage() {
                 </Box>
             </Paper>
 
-            <Paper sx={{ py: 3, px: 0 }}>
+            <Paper sx={{ py: 0, px: 0 }}>
                 {/* Bulk actions toolbar */}
                 {isAdmin && selectedIds.size > 0 && (
                     <Box sx={{
