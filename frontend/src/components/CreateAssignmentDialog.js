@@ -35,6 +35,9 @@ import { ru } from 'date-fns/locale';
 import api from '../services/api';
 import { toLocalDateString } from '../utils/dateFormat';
 
+const DEFAULT_START_TIME = '08:00';
+const DEFAULT_END_TIME = '17:00';
+
 // Assignment types configuration
 const ASSIGNMENT_TYPES = [
     { value: 'work', label: 'Рабочая смена', icon: WorkIcon, color: '#4caf50', category: 'work' },
@@ -121,15 +124,37 @@ function CreateAssignmentDialog({
 
             // Clone tasks if available (for work type)
             if (initialData.tasks && initialData.tasks.length > 0) {
-                setTasks(initialData.tasks.map(t => ({
-                    start_time: t.start_time || '09:00',
-                    end_time: t.end_time || '18:00',
-                    task_type: t.task_type || 'work',
-                    description: t.description || ''
-                })));
+                setTasks(initialData.tasks.map(t => {
+                    // Extract local HH:MM from ISO string if needed
+                    let start = t.start_time || DEFAULT_START_TIME;
+                    let end = t.end_time || DEFAULT_END_TIME;
+
+                    if (start.includes('T') || start.includes('-')) {
+                        const d = new Date(start);
+                        if (!isNaN(d.getTime())) {
+                            start = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                        }
+                    }
+                    if (end.includes('T') || end.includes('-')) {
+                        const d = new Date(end);
+                        if (!isNaN(d.getTime())) {
+                            end = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                        }
+                    }
+
+                    // Enforce valid task types
+                    const validType = ['work', 'pause'].includes(t.task_type) ? t.task_type : 'work';
+
+                    return {
+                        start_time: start,
+                        end_time: end,
+                        task_type: validType,
+                        description: t.description || ''
+                    };
+                }));
             } else {
                 setTasks([
-                    { start_time: '09:00', end_time: '18:00', task_type: 'work', description: initialData.description || '' }
+                    { start_time: DEFAULT_START_TIME, end_time: DEFAULT_END_TIME, task_type: 'work', description: initialData.description || '' }
                 ]);
             }
         } else {
@@ -141,7 +166,7 @@ function CreateAssignmentDialog({
             setIsPaid(true);
             setDescription('');
             setTasks([
-                { start_time: '09:00', end_time: '18:00', task_type: 'work', description: '' }
+                { start_time: DEFAULT_START_TIME, end_time: DEFAULT_END_TIME, task_type: 'work', description: '' }
             ]);
 
             // Auto-select employment if only one exists
@@ -332,7 +357,11 @@ function CreateAssignmentDialog({
                 }
             } catch (err) {
                 console.error('Failed to create assignment:', err);
-                setError(err.response?.data?.detail || 'Ошибка при создании смены');
+                console.error('Server error details:', err.response?.data);
+
+                const detail = err.response?.data?.detail;
+                const errorMsg = typeof detail === 'object' ? JSON.stringify(detail) : (detail || 'Ошибка при создании смены');
+                setError(errorMsg);
             } finally {
                 setLoading(false);
             }
