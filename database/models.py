@@ -132,9 +132,9 @@ class User(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     force_password_change: Mapped[bool] = mapped_column(default=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
-    last_failed_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failed_login: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(CleanDateTime(), onupdate=func.now(), server_default=func.now())
 
     roles: Mapped[list["Role"]] = relationship("Role", secondary="user_roles", back_populates="users")
     payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="Payment.payer_id", back_populates="payer")
@@ -177,7 +177,7 @@ class UserStatus(Base):
     changed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(CleanDateTime(), onupdate=func.now(), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     changed_by_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[changed_by])
@@ -196,7 +196,7 @@ class RegistrationRequest(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), nullable=True)
     reviewed_by: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     def __repr__(self) -> str:
@@ -296,7 +296,7 @@ class SystemSetting(Base):
     value: Mapped[str] = mapped_column(String(500))
     value_type: Mapped[str] = mapped_column(String(20), default="string")  # string, boolean, number
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(CleanDateTime(), onupdate=func.now(), server_default=func.now())
 
     def __repr__(self) -> str:
         return f"<SystemSetting(key={self.key}, value={self.value})>"
@@ -331,7 +331,7 @@ class EmploymentRelation(Base):
     currency: Mapped[str] = mapped_column(String(3), default="UAH")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), onupdate=func.now(), nullable=True)
 
     user: Mapped["User"] = relationship("User")
 
