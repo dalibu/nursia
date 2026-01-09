@@ -14,13 +14,21 @@ class CleanDateTime(TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         if value is not None:
-            # Ensure microsecond is 0
-            value = value.replace(microsecond=0)
-            if dialect.name == 'sqlite':
-                # Enforce clean string format for SQLite
+            # If value is already a string (from DB), parse it first
+            if isinstance(value, str):
+                try:
+                    value = datetime.fromisoformat(value)
+                except ValueError:
+                    value = datetime.fromisoformat(value.replace(" ", "T"))
+            
+            # Now value is a datetime object - ensure microsecond is 0
+            if isinstance(value, datetime):
+                value = value.replace(microsecond=0)
+                if dialect.name == 'sqlite':
+                    # Enforce clean string format for SQLite
+                    return value.strftime('%Y-%m-%d %H:%M:%S')
+                # For other dialects, can default to standard behavior or string
                 return value.strftime('%Y-%m-%d %H:%M:%S')
-            # For other dialects, can default to standard behavior or string
-            return value.strftime('%Y-%m-%d %H:%M:%S')
         return value
 
     def process_result_value(self, value, dialect):
