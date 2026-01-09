@@ -256,14 +256,14 @@ const AssignmentRow = memo(({
                                     <TableBody>
                                         {assignment.segments.map((seg) => (
                                             <TableRow key={seg.id} sx={{
-                                                backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : '#e8f5e9'
+                                                backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : (seg.session_type === 'absent' ? '#e3f2fd' : '#e8f5e9')
                                             }}>
                                                 <TableCell width={80}>
                                                     <Chip
-                                                        label={seg.session_type === 'pause' ? 'Пауза' : 'Работа'}
+                                                        label={seg.session_type === 'pause' ? 'Пауза' : (seg.session_type === 'absent' ? 'Отсутств.' : 'Работа')}
                                                         size="small"
                                                         sx={{
-                                                            backgroundColor: seg.session_type === 'pause' ? '#ff9800' : '#4caf50',
+                                                            backgroundColor: seg.session_type === 'pause' ? '#ff9800' : (seg.session_type === 'absent' ? '#2196f3' : '#4caf50'),
                                                             color: 'white'
                                                         }}
                                                     />
