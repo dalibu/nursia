@@ -186,7 +186,7 @@ async def broadcast_timer_updates():
     from database.models import Task, Assignment, User
     from sqlalchemy import select
     from sqlalchemy.orm import joinedload
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     
     logger.info("Timer broadcast task started")
     

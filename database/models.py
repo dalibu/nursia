@@ -1,10 +1,42 @@
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean, Table, Column, Integer
+from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean, Table, Column, Integer, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class CleanDateTime(TypeDecorator):
+    """DateTime that ensures no microseconds are stored in SQLite"""
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            # Ensure microsecond is 0
+            value = value.replace(microsecond=0)
+            if dialect.name == 'sqlite':
+                # Enforce clean string format for SQLite
+                return value.strftime('%Y-%m-%d %H:%M:%S')
+            # For other dialects, can default to standard behavior or string
+            return value.strftime('%Y-%m-%d %H:%M:%S')
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            # Parse back to datetime
+            try:
+                dt = datetime.fromisoformat(value)
+            except ValueError:
+                dt = datetime.fromisoformat(value.replace(" ", "T"))
+            
+            # Since we store as simple strings without TZ info in SQLite, 
+            # we need to attach UTC timezone when reading back to match application logic
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        return value
 
 
 class Base(DeclarativeBase):
@@ -374,8 +406,8 @@ class Task(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"))
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # Полная дата+время
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)  # Полная дата+время
+    start_time: Mapped[datetime] = mapped_column(CleanDateTime())  # Полная дата+время
+    end_time: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), nullable=True)  # Полная дата+время
     task_type: Mapped[str] = mapped_column(String(10), default="work")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tracking_nr: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)  # Txxx

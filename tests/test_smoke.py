@@ -39,6 +39,25 @@ def test_schemas_import():
     assert PaymentCategoryGroupBase is not None
 
 
+def test_utils_import():
+    """Утилиты импортируются и работают корректно"""
+    from utils.timeutil import now_server, strip_microseconds
+    from datetime import datetime
+    
+    assert now_server is not None
+    assert strip_microseconds is not None
+    
+    # Check functionality
+    now = now_server()
+    assert isinstance(now, datetime)
+    assert now.microsecond == 0
+    
+    dt_with_ms = datetime(2023, 1, 1, 12, 0, 0, 123456)
+    dt_without_ms = strip_microseconds(dt_with_ms)
+    assert dt_without_ms.microsecond == 0
+    assert dt_without_ms.year == 2023
+
+
 def test_routers_import():
     """Все роутеры импортируются без ошибок"""
     from api.routers.auth import router as auth_router
@@ -106,4 +125,3 @@ def test_app_import():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v", "--tb=short"]))
-

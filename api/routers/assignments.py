@@ -65,7 +65,7 @@ class WorkSessionSummary(BaseModel):
 class AssignmentResponse(BaseModel):
     """Группировка сегментов по assignment"""
     assignment_id: int
-    tracking_nr: str
+    tracking_nr: Optional[str] = None
     assignment_type: str = "work"  # work, sick_leave, vacation, day_off, unpaid_leave
     assignment_date: Optional[date] = None  # Вычисляется из tasks.start_time
     worker_id: int
@@ -141,7 +141,7 @@ class TimeOffCreate(BaseModel):
 class ManualAssignmentResponse(BaseModel):
     """Ответ на ручное создание смены"""
     assignment_id: int
-    tracking_nr: str
+    tracking_nr: Optional[str] = None
     assignment_type: str = "work"
     payment_id: Optional[int] = None
     payment_tracking_nr: Optional[str] = None
@@ -251,7 +251,8 @@ async def start_work_session(
     if active_task:
         raise HTTPException(status_code=400, detail="У работника уже есть активная сессия")
     
-    now = datetime.now()
+    from utils.timeutil import now_server
+    now = now_server()
     
     # Создаём Assignment (без assignment_date, hourly_rate, currency, is_active)
     new_assignment = Assignment(
@@ -432,10 +433,11 @@ async def create_manual_assignment(
     # Создаём Tasks
     total_work_seconds = 0
     for task_data in data.tasks:
+        from utils.timeutil import strip_microseconds
         new_task = Task(
             assignment_id=new_assignment.id,
-            start_time=task_data.start_time,  # Now full datetime
-            end_time=task_data.end_time,  # Now full datetime
+            start_time=strip_microseconds(task_data.start_time),  # Now full datetime
+            end_time=strip_microseconds(task_data.end_time),  # Now full datetime
             task_type=task_data.task_type,
             description=task_data.description
         )
@@ -488,9 +490,10 @@ async def create_manual_assignment(
         if not salary_category:
             raise HTTPException(status_code=500, detail="Категория зарплаты не найдена")
         
+        from utils.timeutil import strip_microseconds, now_server
         # Payment date = first task's start_time
         first_task = data.tasks[0] if data.tasks else None
-        payment_date = first_task.start_time if first_task else datetime.now()
+        payment_date = strip_microseconds(first_task.start_time) if first_task else now_server()
         
         payment = Payment(
             payer_id=payer_id,
@@ -648,9 +651,11 @@ async def create_time_off(
     current_date = start_date
     tasks_count = 0
     
+    from utils.timeutil import strip_microseconds
+    
     while current_date <= end_date:
-        task_start = datetime.combine(current_date, time(8, 0))
-        task_end = task_start + timedelta(hours=data.hours_per_day)
+        task_start = strip_microseconds(datetime.combine(current_date, time(8, 0)))
+        task_end = strip_microseconds(task_start + timedelta(hours=data.hours_per_day))
         
         task = Task(
             assignment_id=new_assignment.id,
@@ -762,7 +767,8 @@ async def stop_work_session(
         raise HTTPException(status_code=400, detail="Сессия уже завершена")
     
     assignment = task.assignment
-    now = datetime.now()
+    from utils.timeutil import now_server
+    now = now_server()
     task.end_time = now  # Full datetime now
     
     # is_active is now a computed property, no need to set it
@@ -923,7 +929,8 @@ async def switch_task(
     )
     current_task = result.scalar_one_or_none()
     
-    now = datetime.now()
+    from utils.timeutil import now_server
+    now = now_server()
     if current_task:
         current_task.end_time = now  # Full datetime now
     
@@ -1020,10 +1027,20 @@ async def update_work_session(
             )
     
     # Обновляем поля Task
+    from utils.timeutil import strip_microseconds
+    from datetime import datetime as dt
     if update_data.start_time is not None:
-        task.start_time = update_data.start_time
+        # update_data.start_time is time, task.start_time is datetime
+        new_start_dt = dt.combine(task.start_time.date(), update_data.start_time)
+        task.start_time = strip_microseconds(new_start_dt)
     if update_data.end_time is not None:
-        task.end_time = update_data.end_time
+        # update_data.end_time is time
+        # If task.end_time is None (active), what date to use? Assuming same as start date or today?
+        # But end_time cannot be set if it was None via this endpoint usually, or if it was, it uses assignment_date?
+        # For safety, use task.end_time.date() if exists, else task.start_time.date()
+        base_date = task.end_time.date() if task.end_time else task.start_time.date()
+        new_end_dt = dt.combine(base_date, update_data.end_time)
+        task.end_time = strip_microseconds(new_end_dt)
     if update_data.description is not None:
         task.description = update_data.description
     
@@ -1352,10 +1369,11 @@ async def update_task(
             )
     
     # Обновляем поля
+    from utils.timeutil import strip_microseconds
     if update_data.start_time is not None:
-        task.start_time = update_data.start_time
+        task.start_time = strip_microseconds(update_data.start_time)
     if update_data.end_time is not None:
-        task.end_time = update_data.end_time
+        task.end_time = strip_microseconds(update_data.end_time)
     if update_data.task_type is not None:
         if update_data.task_type not in ["work", "pause"]:
             raise HTTPException(status_code=400, detail="task_type должен быть 'work' или 'pause'")
@@ -1449,7 +1467,7 @@ async def get_grouped_sessions(
     current_user: User = Depends(get_current_user)
 ):
     """Получить сессии сгруппированные по assignment_id"""
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     now = now_server()
     
     # Calculate date range (None = no filter)
@@ -1625,7 +1643,7 @@ async def get_active_sessions(
     result = await db.execute(query)
     active_tasks = result.scalars().unique().all()
     
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     now = now_server()
     
     # Pre-load employment relations for rate lookup
@@ -1694,7 +1712,7 @@ async def get_sessions_summary(
     current_user: User = Depends(get_current_user)
 ):                                                       
     """Получить сводку по рабочим сессиям"""
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     
     # Автофильтрация для не-админов
     if not current_user.is_admin:
@@ -1800,7 +1818,7 @@ async def pause_work_session(
     current_user: User = Depends(get_current_user)
 ):
     """Pause active work session - ends current 'work' task and starts 'pause' task"""
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     
     # session_id is Task ID
     result = await db.execute(
@@ -1859,7 +1877,7 @@ async def resume_work_session(
     current_user: User = Depends(get_current_user)
 ):
     """Resume paused session - ends 'pause' task and starts new 'work' task"""
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     
     # session_id is Task ID
     result = await db.execute(

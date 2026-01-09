@@ -18,7 +18,7 @@ from api.schemas.payment import (
     PaymentReport
 )
 from api.auth.oauth import get_current_user, get_admin_user
-from utils.timezone import now_server
+from utils.timeutil import now_server
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 

@@ -368,7 +368,7 @@ async def get_monthly_summary(
     current_user: User = Depends(get_current_user)
 ):
     """Получить помесячную сводку (как в Übersicht из Excel)"""
-    from utils.timezone import now_server
+    from utils.timeutil import now_server
     import logging
     logger = logging.getLogger(__name__)
     
