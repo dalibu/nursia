@@ -120,11 +120,16 @@ const AssignmentRow = memo(({
                             const endD = toLocalYMD(end);
 
                             if (startD !== endD) {
-                                const formatLocal = (ymd) => {
-                                    const [y, m, d] = ymd.split('-');
-                                    return `${d}.${m}.${y}`;
-                                };
-                                return `${formatLocal(startD)}-${formatLocal(endD)}`;
+                                const [startY, startM, startDay] = startD.split('-');
+                                const [endY, endM, endDay] = endD.split('-');
+
+                                // Compact format: if same year, show DD.MM-DD.MM.YYYY
+                                if (startY === endY) {
+                                    return `${startDay}.${startM}-${endDay}.${endM}.${startY}`;
+                                } else {
+                                    // Different years: show full dates
+                                    return `${startDay}.${startM}.${startY}-${endDay}.${endM}.${endY}`;
+                                }
                             }
                         }
                         return dateStr;
