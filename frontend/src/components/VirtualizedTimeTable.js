@@ -8,7 +8,7 @@ import {
     PlayArrow, Stop, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Add, Replay, Work, BeachAccess, Sick, EventBusy, MoneyOff
 } from '@mui/icons-material';
-import { formatDate as formatDateUtil, formatTime as formatTimeUtil } from '../utils/dateFormat';
+import { formatDate as formatDateUtil, formatTime as formatTimeUtil, getDaysDifference, formatDurationHours } from '../utils/dateFormat';
 
 // Assignment type icon and color configuration
 const ASSIGNMENT_TYPE_ICONS = {
@@ -148,7 +148,13 @@ const AssignmentRow = memo(({
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', width: columnWidths.time }}>
                     {assignment.assignment_type && assignment.assignment_type !== 'work'
-                        ? '—'
+                        ? (() => {
+                            if (assignment.segments && assignment.segments.length > 0) {
+                                const firstSeg = assignment.segments[0];
+                                return `${formatTimeUtil(firstSeg.start_time)} — ${firstSeg.end_time ? formatTimeUtil(firstSeg.end_time) : '...'}`;
+                            }
+                            return '—';
+                        })()
                         : `${formatTime(assignment.start_time)} — ${assignment.end_time ? formatTime(assignment.end_time) : '...'}`
                     }
                 </TableCell>
@@ -156,7 +162,19 @@ const AssignmentRow = memo(({
                     {assignment.assignment_type === 'work' || !assignment.assignment_type ? (
                         <LiveTimer assignment={assignment} currentTime={currentTime} />
                     ) : (
-                        <span style={{ color: '#666' }}>—</span>
+                        (() => {
+                            const days = getDaysDifference(assignment.start_time, assignment.end_time);
+                            // Try to get hours from assignment property or calculate from first segment
+                            let hoursPerDay = assignment.hours_per_day;
+                            if (!hoursPerDay && assignment.segments && assignment.segments.length > 0) {
+                                hoursPerDay = assignment.segments[0].duration_hours;
+                            }
+                            // Default to 8 if not found
+                            if (!hoursPerDay) hoursPerDay = 8;
+
+                            const totalHours = days * hoursPerDay;
+                            return <span>{days} дн. ({formatDurationHours(totalHours)})</span>;
+                        })()
                     )}
                 </TableCell>
                 <Tooltip title={assignment.description || ''} arrow placement="top">

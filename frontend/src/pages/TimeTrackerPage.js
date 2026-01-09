@@ -23,6 +23,7 @@ import { assignments as assignmentsService, employment as employmentService, pay
 import { useActiveSession } from '../context/ActiveSessionContext';
 import CreateAssignmentDialog from '../components/CreateAssignmentDialog';
 import VirtualizedTimeTable from '../components/VirtualizedTimeTable';
+import { formatDurationHours } from '../utils/dateFormat';
 
 // Russian localized static ranges for DateRangePicker
 const ruStaticRanges = [
@@ -67,11 +68,11 @@ const LiveTimer = ({ assignment, currentTime }) => {
         const totalMinutes = Math.floor(assignment.total_work_seconds / 60);
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
-        const hours = (assignment.total_work_seconds / 3600).toFixed(2).replace('.', ',');
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${hours})`;
+        const hours = assignment.total_work_seconds / 3600;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${formatDurationHours(hours)})`;
     }
 
-    // Find active segment
+    // Find active activeSegment
     const activeSegment = assignment.segments?.find(s => !s.end_time);
     const isPaused = activeSegment?.session_type === 'pause';
 
@@ -97,7 +98,7 @@ const LiveTimer = ({ assignment, currentTime }) => {
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
     const sec = workSeconds % 60;
-    const hours = (workSeconds / 3600).toFixed(2).replace('.', ',');
+    const hours = workSeconds / 3600;
 
     return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -114,7 +115,7 @@ const LiveTimer = ({ assignment, currentTime }) => {
                 {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(sec).padStart(2, '0')}
             </Box>
             <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                ({hours})
+                ({formatDurationHours(hours)})
             </Box>
         </Box>
     );
