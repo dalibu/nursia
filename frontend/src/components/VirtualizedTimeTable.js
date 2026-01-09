@@ -274,7 +274,26 @@ const AssignmentRow = memo(({
                                                         }}
                                                     />
                                                 </TableCell>
-                                                <TableCell>{formatTime(seg.start_time)} — {seg.end_time ? formatTime(seg.end_time) : 'сейчас'}</TableCell>
+
+                                                {/* Date column (for multi-day assignments) */}
+                                                <TableCell width={100} sx={{ color: '#555', fontWeight: 500 }}>
+                                                    {(() => {
+                                                        if (assignment.start_time && assignment.end_time) {
+                                                            const assignStart = new Date(assignment.start_time);
+                                                            const assignEnd = new Date(assignment.end_time);
+                                                            const isMultiDay = assignStart.getDate() !== assignEnd.getDate() ||
+                                                                assignStart.getMonth() !== assignEnd.getMonth() ||
+                                                                assignStart.getFullYear() !== assignEnd.getFullYear();
+
+                                                            if (isMultiDay) {
+                                                                return formatDateUtil(seg.start_time);
+                                                            }
+                                                        }
+                                                        return '';
+                                                    })()}
+                                                </TableCell>
+
+                                                <TableCell>{formatTimeUtil(seg.start_time)} — {seg.end_time ? formatTimeUtil(seg.end_time) : 'сейчас'}</TableCell>
                                                 <TableCell>
                                                     {seg.duration_hours ? (
                                                         (() => {
