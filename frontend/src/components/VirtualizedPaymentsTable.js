@@ -74,7 +74,7 @@ const PaymentRow = memo(({
                 <Tooltip
                     title={
                         <div>
-                            <div>Создан: {formatDateFull(payment.payment_date)} {formatTimeFull(payment.payment_date)}</div>
+                            <div>Создан: {formatDateFull(payment.created_at)} {formatTimeFull(payment.created_at)}</div>
                             {payment.modified_at && (
                                 <div style={{ color: '#ffcc80' }}>Изменен: {formatDateFull(payment.modified_at)} {formatTimeFull(payment.modified_at)}</div>
                             )}
