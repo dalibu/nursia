@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from decimal import Decimal
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -381,11 +381,19 @@ async def create_manual_assignment(
     
     # Проверка пересечений с существующими сменами (для work типов)
     if not is_time_off and data.tasks:
+        from utils.timeutil import now_server
+        
         # Получаем диапазон новой смены
         new_tasks_sorted = sorted(data.tasks, key=lambda t: t.start_time)
         new_shift_start = new_tasks_sorted[0].start_time
         new_shift_end = new_tasks_sorted[-1].end_time
         
+        # Ensure input times are timezone-aware (UTC) to match DB
+        if new_shift_start.tzinfo is None:
+            new_shift_start = new_shift_start.replace(tzinfo=timezone.utc)
+        if new_shift_end.tzinfo is None:
+            new_shift_end = new_shift_end.replace(tzinfo=timezone.utc)
+            
         # Находим существующие assignments в том же временном диапазоне
         result = await db.execute(
             select(Assignment)
@@ -408,7 +416,8 @@ async def create_manual_assignment(
                 continue
             existing_tasks_sorted = sorted(existing.tasks, key=lambda t: t.start_time)
             existing_start = existing_tasks_sorted[0].start_time
-            existing_end = existing_tasks_sorted[-1].end_time if existing_tasks_sorted[-1].end_time else datetime.now()
+            # Fallback to current server time (UTC) if task is still active
+            existing_end = existing_tasks_sorted[-1].end_time if existing_tasks_sorted[-1].end_time else now_server()
             
             # Проверяем пересечение
             if new_shift_start < existing_end and new_shift_end > existing_start:

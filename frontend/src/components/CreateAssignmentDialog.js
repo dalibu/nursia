@@ -312,8 +312,6 @@ function CreateAssignmentDialog({
 
             setLoading(true);
             try {
-                const result = await onSave(payload);
-
                 if (keepOpen) {
                     // Prepare new clone data for next iteration
                     const newCloneData = {
@@ -328,8 +326,12 @@ function CreateAssignmentDialog({
                             description: t.description || ''
                         }))
                     };
+                    // Call save callback once with keepOpen=true
                     await onSave(payload, true, newCloneData);
                 } else {
+                    // Call save callback once with keepOpen=false
+                    const result = await onSave(payload);
+
                     // Close dialog and notify about created assignment
                     onClose();
                     if (result?.assignment_id && onAssignmentCreated) {
