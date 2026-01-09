@@ -33,6 +33,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { ru } from 'date-fns/locale';
 import api from '../services/api';
+import { toLocalDateString } from '../utils/dateFormat';
 
 // Assignment types configuration
 const ASSIGNMENT_TYPES = [
@@ -47,15 +48,6 @@ const ASSIGNMENT_TYPES = [
 const formatTimeDisplay = (timeStr) => {
     if (!timeStr) return '';
     return timeStr.substring(0, 5);
-};
-
-// Helper to format date as YYYY-MM-DD  
-const formatDateStr = (date) => {
-    if (!date) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
 };
 
 // Convert HH:MM to minutes for calculations
@@ -296,7 +288,7 @@ function CreateAssignmentDialog({
                 return;
             }
 
-            const dateStr = formatDateStr(assignmentDate);
+            const dateStr = toLocalDateString(assignmentDate);
 
             const payload = {
                 worker_id: workerId,
@@ -317,7 +309,7 @@ function CreateAssignmentDialog({
                     const newCloneData = {
                         employment_id: selectedEmployment,
                         assignment_type: assignmentType,
-                        assignment_date: formatDateStr(assignmentDate),
+                        assignment_date: toLocalDateString(assignmentDate),
                         description: description || '',
                         tasks: tasks.map(t => ({
                             start_time: t.start_time,

@@ -8,29 +8,9 @@ import {
 import {
     Edit, Delete, Replay, Payment
 } from '@mui/icons-material';
+import { formatDate, formatTimeWithSeconds } from '../utils/dateFormat';
 
 const ROW_HEIGHT = 53;
-
-// Date formatting helpers (same as original PaymentsPage)
-const formatDateFull = (dateInput) => {
-    if (!dateInput) return '—';
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '—';
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
-};
-
-const formatTimeFull = (dateInput) => {
-    if (!dateInput) return '';
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '';
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-};
 
 // Memoized row component for performance
 const PaymentRow = memo(({
@@ -74,9 +54,9 @@ const PaymentRow = memo(({
                 <Tooltip
                     title={
                         <div>
-                            <div>Создан: {formatDateFull(payment.created_at)} {formatTimeFull(payment.created_at)}</div>
+                            <div>Создан: {formatDate(payment.created_at)} {formatTimeWithSeconds(payment.created_at)}</div>
                             {payment.modified_at && (
-                                <div style={{ color: '#ffcc80' }}>Изменен: {formatDateFull(payment.modified_at)} {formatTimeFull(payment.modified_at)}</div>
+                                <div style={{ color: '#ffcc80' }}>Изменен: {formatDate(payment.modified_at)} {formatTimeWithSeconds(payment.modified_at)}</div>
                             )}
                         </div>
                     }
@@ -86,13 +66,13 @@ const PaymentRow = memo(({
                     <div style={{ lineHeight: 1, cursor: 'help' }}>
                         {payment.modified_at ? (
                             <>
-                                <div style={{ color: '#ff9800' }}>{formatDateFull(payment.modified_at)}</div>
-                                <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeFull(payment.modified_at)}</div>
+                                <div style={{ color: '#ff9800' }}>{formatDate(payment.modified_at)}</div>
+                                <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeWithSeconds(payment.modified_at)}</div>
                             </>
                         ) : (
                             <>
-                                <div>{formatDateFull(payment.payment_date)}</div>
-                                <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeFull(payment.payment_date)}</div>
+                                <div>{formatDate(payment.payment_date)}</div>
+                                <div style={{ fontSize: '0.85em', color: 'rgba(0,0,0,0.6)' }}>{formatTimeWithSeconds(payment.payment_date)}</div>
                             </>
                         )}
                     </div>

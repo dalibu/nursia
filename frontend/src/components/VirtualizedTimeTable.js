@@ -8,6 +8,7 @@ import {
     PlayArrow, Stop, Edit, Delete, Pause, Coffee,
     KeyboardArrowDown, KeyboardArrowUp, Add, Replay, Work, BeachAccess, Sick, EventBusy, MoneyOff
 } from '@mui/icons-material';
+import { formatDate as formatDateUtil, formatTime as formatTimeUtil } from '../utils/dateFormat';
 
 // Assignment type icon and color configuration
 const ASSIGNMENT_TYPE_ICONS = {
@@ -98,7 +99,7 @@ const AssignmentRow = memo(({
                         <span>{assignment.tracking_nr || '-'}</span>
                     </Box>
                 </TableCell>
-                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }} title={`Start: ${assignment.start_time}\nEnd: ${assignment.end_time}`}>
+                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }} title={`Начало: ${formatTimeUtil(assignment.start_time)} ${formatDateUtil(assignment.start_time)}\nОкончание: ${formatTimeUtil(assignment.end_time)} ${formatDateUtil(assignment.end_time)}`}>
                     {(() => {
                         const dateStr = formatDate(assignment.assignment_date);
 

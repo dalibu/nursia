@@ -17,6 +17,7 @@ import 'react-date-range/dist/theme/default.css';
 import { payments } from '../services/api';
 import PaymentForm from '../components/PaymentForm';
 import VirtualizedPaymentsTable from '../components/VirtualizedPaymentsTable';
+import { toLocalDateString, parseDateFromUrl, formatDate } from '../utils/dateFormat';
 
 
 // Russian localized static ranges for DateRangePicker
@@ -29,42 +30,6 @@ const ruStaticRanges = [
   { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false },
   { label: 'Этот год', range: () => ({ startDate: startOfYear(new Date()), endDate: endOfYear(new Date()) }), isSelected: () => false }
 ];
-
-// Helper to format Date to YYYY-MM-DD without timezone issues
-const toLocalDateString = (date) => {
-  if (!date) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const formatDateFull = (dateInput) => {
-  if (!dateInput) return '—';
-  const date = new Date(dateInput);
-  if (isNaN(date.getTime())) return '—';
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}.${month}.${year}`;
-};
-
-const formatTimeFull = (dateInput) => {
-  if (!dateInput) return '';
-  const date = new Date(dateInput);
-  if (isNaN(date.getTime())) return '';
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}`;
-};
-
-// Helper to parse date from URL string
-const parseDateFromUrl = (dateStr) => {
-  if (!dateStr) return null;
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
 
 // Storage key for persisting filters
 const FILTERS_STORAGE_KEY = 'payments_filters';
@@ -307,17 +272,6 @@ function PaymentsPage() {
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
 
-      // Helper для форматирования даты в DD.MM.YYYY
-      const formatDateForSearch = (dateInput) => {
-        if (!dateInput) return '';
-        const date = new Date(dateInput);
-        if (isNaN(date.getTime())) return '';
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}.${month}.${year}`;
-      };
-
       filtered = filtered.filter(payment => {
         const searchFields = [
           payment.tracking_nr,
@@ -328,8 +282,8 @@ function PaymentsPage() {
           payment.payer?.name || payment.payer?.full_name,
           payment.recipient?.full_name,
           payment.description,
-          formatDateForSearch(payment.payment_date),
-          formatDateForSearch(payment.modified_at),
+          formatDate(payment.payment_date),
+          formatDate(payment.modified_at),
           payment.payment_status === 'paid' ? 'оплачено' : 'к оплате'
         ];
 
