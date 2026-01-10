@@ -990,6 +990,7 @@ async def get_mutual_balances(
         debt_b_to_a = float(result.scalar() or 0)
         
         # Зарплата A→B (группа 'salary') — погашает долг B / создаёт долг A
+        # ВАЖНО: для погашения долга учитываем только OFFSET (зачтено в счет долга)
         salary_a_to_b_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
@@ -1001,7 +1002,7 @@ async def get_mutual_balances(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status.in_(['paid', 'offset']),
+                Payment.payment_status == PaymentStatus.OFFSET.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
             )
         )
@@ -1020,7 +1021,7 @@ async def get_mutual_balances(
                 Payment.payer_id == b_id,
                 Payment.recipient_id == a_id,
                 Payment.currency == currency,
-                Payment.payment_status.in_(['paid', 'offset']),
+                Payment.payment_status == PaymentStatus.OFFSET.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
             )
         )
@@ -1028,6 +1029,7 @@ async def get_mutual_balances(
         salary_b_to_a = float(result.scalar() or 0)
         
         # Расходы A→B (группа 'expense') — погашает долг B / создаёт долг A
+        # ВАЖНО: для погашения долга учитываем только OFFSET (зачтено в счет долга)
         expense_a_to_b_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
@@ -1039,7 +1041,7 @@ async def get_mutual_balances(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status.in_(['paid', 'offset']),
+                Payment.payment_status == PaymentStatus.OFFSET.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
             )
         )
@@ -1058,7 +1060,7 @@ async def get_mutual_balances(
                 Payment.payer_id == b_id,
                 Payment.recipient_id == a_id,
                 Payment.currency == currency,
-                Payment.payment_status.in_(['paid', 'offset']),
+                Payment.payment_status == PaymentStatus.OFFSET.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
             )
         )
