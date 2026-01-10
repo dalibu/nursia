@@ -3,10 +3,10 @@
     "salary": 350,
     "expenses": 0,
     "credits": 270,
-    "repayment": 0,
+    "repayment": 270,
     "to_pay": 0,
     "bonus": 0,
-    "total": 620,
+    "total": 270,
     "currency": "UAH"
   },
   "monthly": [
@@ -23,7 +23,7 @@
       "expenses_paid": 0,
       "bonus": 0,
       "expenses_unpaid": 0,
-      "total": 620,
+      "total": 270,
       "currency": "UAH"
     }
   ],
@@ -37,7 +37,7 @@
       "recipient_name": "Евгения",
       "amount": 150,
       "currency": "UAH",
-      "payment_status": "paid",
+      "payment_status": "offset",
       "payment_date": "2025-08-09T12:00:00",
       "category_name": "Зарплата",
       "category_group": "Зарплата",
@@ -52,7 +52,7 @@
       "recipient_name": "Евгения",
       "amount": 100,
       "currency": "UAH",
-      "payment_status": "paid",
+      "payment_status": "offset",
       "payment_date": "2025-08-09T12:00:00",
       "category_name": "Зарплата",
       "category_group": "Зарплата",
@@ -82,7 +82,7 @@
       "recipient_name": "Евгения",
       "amount": 100,
       "currency": "UAH",
-      "payment_status": "paid",
+      "payment_status": "offset",
       "payment_date": "2025-08-08T12:00:00",
       "category_name": "Зарплата",
       "category_group": "Зарплата",

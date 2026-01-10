@@ -200,13 +200,12 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
         )
         
         # Convert DashboardSummary to the format expected by tests
-        # Note: repayment is inverted to negative (as shown in GUI/debug export)
         return {
             "cards": {
                 "salary": summary_result.total_salary,
                 "expenses": summary_result.total_expenses,
                 "credits": summary_result.total_credits,
-                "repayment": -summary_result.total_repayment,  # Invert to match GUI format
+                "repayment": summary_result.total_repayment,
                 "bonus": summary_result.total_bonus,
                 "to_pay": summary_result.total_unpaid,
                 "total": summary_result.total

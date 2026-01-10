@@ -152,12 +152,23 @@ const PaymentRow = memo(({
             {/* Статус */}
             <TableCell sx={{ width: columnWidths.status }}>
                 <Chip
-                    label={payment.payment_status === 'paid' ? 'Оплачено' : 'К оплате'}
-                    color={payment.payment_status === 'paid' ? 'success' : 'warning'}
+                    label={
+                        payment.payment_status === 'paid' ? 'Оплачено' :
+                        payment.payment_status === 'offset' ? 'Зачтено' :
+                        'К оплате'
+                    }
+                    color={
+                        payment.payment_status === 'paid' ? 'success' :
+                        payment.payment_status === 'offset' ? 'info' :
+                        'warning'
+                    }
                     size="small"
                     clickable={canManagePaymentStatus}
                     onClick={canManagePaymentStatus ? () => {
-                        const nextStatus = payment.payment_status === 'unpaid' ? 'paid' : 'unpaid';
+                        const nextStatus = 
+                            payment.payment_status === 'unpaid' ? 'paid' :
+                            payment.payment_status === 'paid' ? 'offset' :
+                            'unpaid';
                         onToggleStatus(payment.id, nextStatus);
                     } : undefined}
                     icon={<Payment />}

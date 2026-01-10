@@ -139,7 +139,8 @@ async def get_balance_summary(
     
     currency = "UAH"
     
-    # 1. Зарплата — оплаченные платежи из группы "salary"
+    # 1. Зарплата — оплаченные и зачтенные платежи из группы "salary"
+    # Для карточки "Зарплата" учитываем paid + offset
     salary_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -153,6 +154,21 @@ async def get_balance_summary(
         salary_query = salary_query.where(Payment.recipient_id == worker_id)
     result = await db.execute(salary_query)
     total_salary = float(result.one().total or 0)
+    
+    # 1b. Зарплата только PAID (для расчета итого - реальные расходы)
+    salary_paid_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == 'paid')
+    )
+    if user_filter_id:
+        salary_paid_query = salary_paid_query.where(Payment.recipient_id == user_filter_id)
+    elif worker_id:
+        salary_paid_query = salary_paid_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(salary_paid_query)
+    total_salary_paid = float(result.one().total or 0)
     
     # 2. Расходы для карточек:
     # - Worker (user_filter_id): только UNPAID (что ему должны вернуть)
@@ -277,7 +293,8 @@ async def get_balance_summary(
 
 
     
-    # 6. Погашения (группа 'repayment')
+    # 6. Погашения = repayment платежи + зарплата со статусом offset
+    # Explicit repayment платежи
     repayment_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -288,23 +305,44 @@ async def get_balance_summary(
     elif worker_id:
         repayment_query = repayment_query.where(Payment.payer_id == worker_id)
     result = await db.execute(repayment_query)
-    total_repayment = float(result.one().total or 0)
+    repayment_explicit = float(result.one().total or 0)
     
-    # К оплате = только неоплаченные платежи
-    # Долг работника (credits) автоматически погашается оплаченной зарплатой,
-    # поэтому НЕ добавляем credits в to_pay для работодателя.
-    # to_pay показывает сколько работодатель ещё должен выплатить (unpaid payments).
-    total_unpaid = unpaid_amount
+    # Зарплата offset = тоже погашение (зачтено в счет долга)
+    salary_offset_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == 'offset'))
+    if user_filter_id:
+        salary_offset_query = salary_offset_query.where(Payment.recipient_id == user_filter_id)
+    elif worker_id:
+        salary_offset_query = salary_offset_query.where(Payment.recipient_id == worker_id)
+    result = await db.execute(salary_offset_query)
+    salary_offset = float(result.one().total or 0)
+    
+    # Погашение не может превышать размер долга
+    total_repayment = min(repayment_explicit + salary_offset, total_credits)
+    
+    # К оплате:
+    # - Для employer/admin: показываем остаток долга работника (credits - repayment)
+    # - Для worker: только неоплаченные платежи (unpaid)
+    if user_filter_id:
+        total_unpaid = unpaid_amount
+    else:
+        # Employer видит долг работника: credits - repayment
+        total_unpaid = max(0, total_credits - total_repayment)
     
     # 7. Всего:
     # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашения - Невозмещённые расходы
-    # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Расходы работников - Погашения
+    # - Employer: общие РАСХОДЫ = только РЕАЛЬНЫЕ выплаты (paid)
+    #   Offset платежи НЕ учитываются (это зачет, а не выплата)
+    #   Repayment НЕ вычитается (это возврат долга, не уменьшает расходы)
     if user_filter_id:
         # Worker: доход минус невозмещённые расходы
         total = total_salary + total_credits + total_bonus - total_repayment - total_expenses
     else:
-        # Employer: сумма всех расходов на работников
-        total = total_salary + total_credits + total_bonus + total_expenses - total_repayment
+        # Employer: сумма всех РЕАЛЬНЫХ расходов (только paid статусы)
+        total = total_salary_paid + total_credits + total_bonus + total_expenses
 
     
     # Балансы (неоплаченные долги)
@@ -452,7 +490,8 @@ async def get_monthly_summary(
         hours_row = result.first()
         hours = float(hours_row.hours) if hours_row and hours_row.hours else 0
         
-        # Зарплата из payments по дате платежа (группа "salary", только оплаченные)
+        # Зарплата из payments по дате платежа (группа "salary")
+        # Для карточки: учитываем paid + offset
         salary_query = select(
             func.sum(Payment.amount).label("salary")
         ).join(
@@ -464,7 +503,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
-                Payment.payment_status.in_(['paid', 'offset'])  # Только выплаченная зарплата
+                Payment.payment_status.in_(['paid', 'offset'])
             )
         )
         
@@ -476,6 +515,31 @@ async def get_monthly_summary(
         result = await db.execute(salary_query)
         salary_row = result.first()
         salary = float(salary_row.salary) if salary_row and salary_row.salary else 0
+        
+        # Зарплата только PAID (для расчета total - реальные выплаты)
+        salary_paid_query = select(
+            func.sum(Payment.amount).label("salary")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payment_date >= start_date,
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+                Payment.payment_status == 'paid'
+            )
+        )
+        
+        if worker_id:
+            salary_paid_query = salary_paid_query.where(Payment.recipient_id == worker_id)
+        if employer_id:
+            salary_paid_query = salary_paid_query.where(Payment.payer_id == employer_id)
+        
+        result = await db.execute(salary_paid_query)
+        salary_paid_row = result.first()
+        salary_paid = float(salary_paid_row.salary) if salary_paid_row and salary_paid_row.salary else 0
         
         # Кредит — выданные кредиты ('paid') из группы "debt"
         # Показываем за период (для таблицы)
@@ -502,7 +566,8 @@ async def get_monthly_summary(
         result = await db.execute(credits_given_query)
         credits_given = float(result.one().total or 0)
         
-        # Погашения (группа 'repayment') — за период
+        # Погашения = repayment платежи + зарплата offset
+        # Explicit repayment платежи за период
         credits_offset_query = select(
             func.sum(Payment.amount).label("total")
         ).select_from(
@@ -516,7 +581,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value,
-                Payment.payment_status == 'paid'  # Only count confirmed repayments
+                Payment.payment_status == 'paid'
             )
         )
         
@@ -530,7 +595,34 @@ async def get_monthly_summary(
             )
         
         result = await db.execute(credits_offset_query)
-        credits_offset = float(result.scalar() or 0)
+        repayment_explicit = float(result.scalar() or 0)
+        
+        # Зарплата offset = тоже погашение (зачтено в счет долга)
+        salary_offset_query = select(
+            func.sum(Payment.amount).label("total")
+        ).join(
+            PaymentCategory, Payment.category_id == PaymentCategory.id
+        ).join(
+            PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+        ).where(
+            and_(
+                Payment.payment_date >= start_date,
+                Payment.payment_date < next_month_start,
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+                Payment.payment_status == 'offset'
+            )
+        )
+        
+        if worker_id:
+            salary_offset_query = salary_offset_query.where(Payment.recipient_id == worker_id)
+        elif employer_id:
+            salary_offset_query = salary_offset_query.where(Payment.payer_id == employer_id)
+        
+        result = await db.execute(salary_offset_query)
+        salary_offset = float(result.one().total or 0)
+        
+        # Погашение не может превышать размер долга
+        credits_offset = min(repayment_explicit + salary_offset, credits_given)
         
         # НАКОПИТЕЛЬНЫЕ значения для to_pay (с начала времён до end_date)
         cumulative_credits_query = select(
@@ -703,16 +795,14 @@ async def get_monthly_summary(
         remaining = expenses - expenses_paid
         # Итого:
         # - Worker: чистый ДОХОД = Зарплата + Кредиты + Премии - Погашено - Невозмещённые расходы
-        # - Employer: общие РАСХОДЫ = Зарплата + Кредиты + Премии + Оплаченные расходы - Погашено
+        # - Employer: общие РАСХОДЫ = Только paid зарплата + Кредиты + Премии + Оплаченные расходы (без offset)
         if is_worker_view:
             total = salary + credits_given + bonus - credits_offset - remaining
         else:
-            total = salary + credits_given + bonus + expenses_paid - credits_offset
+            total = salary_paid + credits_given + bonus + expenses_paid
 
-        # Погашено = зарплата (до размера долга) + явные repayment платежи
-        # Если есть долг (credit), зарплата идёт на его погашение
-        salary_used_for_repayment = min(salary, credits_given) if credits_given > 0 else 0
-        total_repayment = salary_used_for_repayment + credits_offset
+        # Погашено = explicit repayment + salary offset (используем уже посчитанный credits_offset)
+        total_repayment = credits_offset
         
         # Остаток долга = кредит - погашено
         debt_remaining = max(0, credits_given - total_repayment)
@@ -1207,7 +1297,7 @@ async def get_debug_export(
         salary=summary.total_salary,
         expenses=summary.total_expenses,
         credits=summary.total_credits,
-        repayment=-summary.total_repayment,  # Показываем как отрицательное (как на GUI)
+        repayment=summary.total_repayment,
         to_pay=summary.total_unpaid,
         bonus=summary.total_bonus,
         total=summary.total,
