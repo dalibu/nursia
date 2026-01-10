@@ -55,8 +55,8 @@ const AssignmentRow = memo(({
     const activeSegment = assignment.segments?.find(s => !s.end_time);
     const isPaused = activeSegment?.session_type === 'pause';
 
-    // Can select: admin only, non-active, non-paid
-    const canSelect = isAdmin && !assignment.is_active && assignment.payment_status !== 'paid';
+    // Can select: admin only, non-active, non-paid, non-offset
+    const canSelect = isAdmin && !assignment.is_active && assignment.payment_status !== 'paid' && assignment.payment_status !== 'offset';
 
     return (
         <>
@@ -187,7 +187,11 @@ const AssignmentRow = memo(({
                         <Chip
                             label={assignment.payment_tracking_nr}
                             size="small"
-                            color={assignment.payment_status === 'paid' ? "success" : "warning"}
+                            color={
+                                assignment.payment_status === 'paid' ? "success" :
+                                assignment.payment_status === 'offset' ? "info" :
+                                "warning"
+                            }
                             clickable
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -259,7 +263,7 @@ const AssignmentRow = memo(({
                                 <Edit fontSize="small" />
                             </IconButton>
                         </Tooltip>
-                        {!assignment.is_active && (
+                        {!assignment.is_active && assignment.payment_status !== 'paid' && assignment.payment_status !== 'offset' && (
                             <Tooltip title="Удалить">
                                 <IconButton size="small" onClick={(e) => onDelete(assignment, e)}>
                                     <Delete fontSize="small" />
@@ -508,8 +512,8 @@ function VirtualizedTimeTable({
                             <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: '#f5f5f5' }}>
                                 <Checkbox
                                     size="small"
-                                    checked={selectedIds?.size > 0 && selectedIds?.size === assignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
-                                    indeterminate={selectedIds?.size > 0 && selectedIds?.size < assignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                                    checked={selectedIds?.size > 0 && selectedIds?.size === assignments.filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset').length}
+                                    indeterminate={selectedIds?.size > 0 && selectedIds?.size < assignments.filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset').length}
                                     onChange={onSelectAll}
                                     sx={{ p: 0.25 }}
                                 />

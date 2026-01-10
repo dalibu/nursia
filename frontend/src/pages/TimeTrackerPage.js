@@ -1038,9 +1038,9 @@ function TimeTrackerPage() {
     };
 
     const handleSelectAll = () => {
-        // Only non-active and unpaid assignments can be selected
+        // Only non-active, unpaid and non-offset assignments can be selected
         const selectableIds = filteredAssignments
-            .filter(a => !a.is_active && a.payment_status !== 'paid')
+            .filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset')
             .map(a => a.assignment_id);
 
         if (selectedIds.size === selectableIds.length && selectableIds.length > 0) {
@@ -1458,8 +1458,8 @@ function TimeTrackerPage() {
                         mx: 2
                     }}>
                         <Checkbox
-                            checked={selectedIds.size === filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
-                            indeterminate={selectedIds.size > 0 && selectedIds.size < filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid').length}
+                            checked={selectedIds.size === filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset').length}
+                            indeterminate={selectedIds.size > 0 && selectedIds.size < filteredAssignments.filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset').length}
                             onChange={handleSelectAll}
                             sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                         />
