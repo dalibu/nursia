@@ -133,12 +133,17 @@ async def calculate_cards_new(
     """
     currency = "UAH"
     
-    # 1. Зарплата начислено (вся: paid + offset + unpaid)
+    # 1. Зарплата начислено (только paid + offset). Неоплаченное выносим в unpaid
     salary_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value)
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+            Payment.payment_status.in_([PaymentStatus.PAID.value, PaymentStatus.OFFSET.value])
+        )
+    )
     
     if user_filter_id:
         salary_query = salary_query.where(Payment.recipient_id == user_filter_id)
@@ -1164,7 +1169,7 @@ async def get_mutual_balances(
         result = await db.execute(salary_paid_a_to_b_query)
         salary_paid_a_to_b = float(result.scalar() or 0)
         
-        # Вся зарплата A→B (начислено)
+        # Зарплата A→B (учитываем только paid + offset; unpaid не учитываем в покрытии)
         salary_total_a_to_b_query = select(func.sum(Payment.amount)).select_from(
             Payment
         ).join(
@@ -1176,7 +1181,8 @@ async def get_mutual_balances(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value
+                PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+                Payment.payment_status.in_([PaymentStatus.PAID.value, PaymentStatus.OFFSET.value])
             )
         )
         result = await db.execute(salary_total_a_to_b_query)

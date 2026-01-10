@@ -1,14 +1,26 @@
 {
   "cards": {
-    "salary": 450,
+    "salary": 350,
     "expenses": 0,
     "paid": 370,
-    "debt": 0,
+    "unpaid": 100,
+    "debt": 20,
     "bonus": 0,
     "total": 370,
     "currency": "UAH"
   },
-  "mutual_balances": [],
+  "mutual_balances": [
+    {
+      "creditor_id": 1,
+      "creditor_name": "Administrator",
+      "debtor_id": 2,
+      "debtor_name": "Евгения",
+      "paid": 370,
+      "salary": 350,
+      "debt": 20,
+      "currency": "UAH"
+    }
+  ],
   "monthly": [
     {
       "period": "2025-08",
@@ -41,7 +53,7 @@
       "payment_date": "2025-08-10T07:40:00+00:00",
       "category_name": "Зарплата",
       "category_group": "Зарплата",
-      "description": "Смена A4: x"
+      "description": "Смена A4"
     },
     {
       "id": 4,
@@ -104,5 +116,5 @@
       "description": "Смена A1: Стажировка"
     }
   ],
-  "export_timestamp": "2026-01-10T20:08:48.769058"
+  "export_timestamp": "2026-01-10T21:09:43.001977"
 }
