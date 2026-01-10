@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload, selectinload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment, Role
+from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment, Role, PaymentGroupCode, PaymentStatus
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
@@ -405,6 +405,49 @@ async def update_payment(
     # Устанавливаем время изменения принудительно ПОСЛЕ цикла
     db_payment.modified_at = now_server()
     
+    # Автоматическое зачисление предыдущих платежей при оплате долга
+    # Если платеж группы DEBT меняется на PAID, все предыдущие SALARY/EXPENSE UNPAID → OFFSET
+    if 'payment_status' in payment_data and payment_data['payment_status'] == PaymentStatus.PAID.value:
+        # Проверяем что это платеж группы DEBT
+        result = await db.execute(
+            select(PaymentCategoryGroup.code)
+            .join(PaymentCategory, PaymentCategory.group_id == PaymentCategoryGroup.id)
+            .where(PaymentCategory.id == db_payment.category_id)
+        )
+        category_group_code = result.scalar_one_or_none()
+        
+        if category_group_code == PaymentGroupCode.DEBT.value:
+            # Найти все SALARY и EXPENSE платежи с UNPAID и более ранней датой
+            auto_offset_query = select(Payment).join(
+                PaymentCategory, Payment.category_id == PaymentCategory.id
+            ).join(
+                PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+            ).where(
+                and_(
+                    Payment.payment_status == PaymentStatus.UNPAID.value,
+                    PaymentCategoryGroup.code.in_([PaymentGroupCode.SALARY.value, PaymentGroupCode.EXPENSE.value]),
+                    Payment.payment_date < db_payment.payment_date,
+                    # Только платежи между теми же пользователями
+                    Payment.payer_id == db_payment.payer_id,
+                    Payment.recipient_id == db_payment.recipient_id
+                )
+            )
+            
+            result = await db.execute(auto_offset_query)
+            payments_to_offset = result.scalars().all()
+            
+            # Обновляем статусы на OFFSET
+            for payment_to_offset in payments_to_offset:
+                payment_to_offset.payment_status = PaymentStatus.OFFSET.value
+                payment_to_offset.modified_at = now_server()
+            
+            # Сохраняем IDs для WebSocket уведомлений
+            auto_offset_ids = [p.id for p in payments_to_offset]
+        else:
+            auto_offset_ids = []
+    else:
+        auto_offset_ids = []
+    
     await db.commit()
     await db.refresh(db_payment)
     
@@ -416,6 +459,13 @@ async def update_payment(
         "type": "payment_updated",
         "payment_id": db_payment.id
     }, user_ids=target_users)
+    
+    # Уведомления об автоматически зачтенных платежах
+    for offset_payment_id in auto_offset_ids:
+        await manager.broadcast({
+            "type": "payment_updated",
+            "payment_id": offset_payment_id
+        }, user_ids=target_users)
     
     return {"id": db_payment.id, "message": "Payment updated successfully"}
 
