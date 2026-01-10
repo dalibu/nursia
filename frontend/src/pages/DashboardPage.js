@@ -52,16 +52,15 @@ function DashboardPage() {
     const loadData = useCallback(async (showLoading = true) => {
         if (showLoading) setLoading(true);
         try {
-            const [summaryRes, monthlyRes, mutualRes, userRes, settingsRes] = await Promise.all([
-                balances.getSummary({}),
-                balances.getMonthly({ months }),
-                balances.getMutual({}),
+            const [debugRes, userRes, settingsRes] = await Promise.all([
+                balances.getDebug({ months }),
                 payments.getUserInfo(),
                 settings.getDebug()
             ]);
-            setSummary(summaryRes.data);
-            setMonthly(monthlyRes.data);
-            setMutual(mutualRes.data);
+            // Debug endpoint returns cards, mutual_balances, monthly, payments
+            setSummary(debugRes.data.cards);  // cards now has new structure
+            setMonthly(debugRes.data.monthly);
+            setMutual(debugRes.data.mutual_balances);
             setUser(userRes.data);
             setShowExportJson(settingsRes.data.show_export_json ?? false);
         } catch (error) {
@@ -135,7 +134,7 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Зарплата</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_salary || 0, summary?.currency)}
+                                {formatCurrency(summary?.salary || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -151,13 +150,13 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Расходы</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_expenses || 0, summary?.currency)}
+                                {formatCurrency(summary?.expenses || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
                 </Box>
 
-                {/* Кредиты */}
+                {/* Выплачено */}
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -165,31 +164,15 @@ function DashboardPage() {
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Кредиты</Typography>
+                            <Typography variant="caption">Выплачено</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_credits || 0, summary?.currency)}
+                                {formatCurrency(summary?.paid || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
                 </Box>
 
-                {/* Погашения (orange) */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #27736dff 0%, #52c67fff 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Погашения</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_repayment ? summary.total_repayment : 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Долг */}
+                {/* Задолженность */}
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
@@ -197,9 +180,9 @@ function DashboardPage() {
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Долг</Typography>
+                            <Typography variant="caption">Задолженность</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_unpaid || 0, summary?.currency)}
+                                {formatCurrency(summary?.debt || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -215,7 +198,7 @@ function DashboardPage() {
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Премии</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_bonus || 0, summary?.currency)}
+                                {formatCurrency(summary?.bonus || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -251,9 +234,9 @@ function DashboardPage() {
                                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                                     <TableCell><strong>Кредитор</strong></TableCell>
                                     <TableCell><strong>Должник</strong></TableCell>
-                                    <TableCell align="right"><strong>Кредит/Аванс</strong></TableCell>
-                                    <TableCell align="right"><strong>Погашено</strong></TableCell>
-                                    <TableCell align="right"><strong>Долг</strong></TableCell>
+                                    <TableCell align="right"><strong>Выплачено</strong></TableCell>
+                                    <TableCell align="right"><strong>Покрыто</strong></TableCell>
+                                    <TableCell align="right"><strong>Задолженность</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -261,34 +244,34 @@ function DashboardPage() {
                                     <TableRow key={index}>
                                         <TableCell>{row.creditor_name}</TableCell>
                                         <TableCell>{row.debtor_name}</TableCell>
-                                        {/* Кредит/Аванс - фиолетовый */}
+                                        {/* Выплачено - фиолетовый */}
                                         <TableCell align="right">
-                                            {row.credit > 0 && (
+                                            {row.paid > 0 && (
                                                 <Chip
-                                                    label={formatCurrency(row.credit, row.currency)}
+                                                    label={formatCurrency(row.paid, row.currency)}
                                                     sx={{ backgroundColor: '#764ba2', color: 'white' }}
                                                     size="small"
                                                 />
                                             )}
                                         </TableCell>
-                                        {/* Погашено - зелёный для положительных, красный для отрицательных */}
+                                        {/* Покрыто (зарплатой) - зелёный */}
                                         <TableCell align="right">
-                                            {row.offset !== 0 && (
+                                            {row.salary !== 0 && (
                                                 <Chip
-                                                    label={formatCurrency(row.offset, row.currency)}
+                                                    label={formatCurrency(row.salary, row.currency)}
                                                     sx={{
-                                                        backgroundColor: row.offset > 0 ? '#27736dff' : '#ff6b6b',
-                                                        color: row.offset > 0 ? '#ffffffff' : 'white'
+                                                        backgroundColor: '#27736dff',
+                                                        color: '#ffffffff'
                                                     }}
                                                     size="small"
                                                 />
                                             )}
                                         </TableCell>
-                                        {/* К оплате - красный */}
+                                        {/* Задолженность - красный */}
                                         <TableCell align="right">
-                                            {row.remaining > 0 && (
+                                            {row.debt > 0 && (
                                                 <Chip
-                                                    label={formatCurrency(row.remaining, row.currency)}
+                                                    label={formatCurrency(row.debt, row.currency)}
                                                     size="small"
                                                     sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
                                                 />
@@ -328,12 +311,11 @@ function DashboardPage() {
                                 <TableCell><strong>Период</strong></TableCell>
                                 <TableCell align="center"><strong>Смены</strong></TableCell>
                                 <TableCell align="right"><strong>Часы</strong></TableCell>
-                                <TableCell align="right"><strong>Зарплата</strong></TableCell>
-                                <TableCell align="right"><strong>Расходы</strong></TableCell>
                                 <TableCell align="right"><strong>Кредиты</strong></TableCell>
-                                <TableCell align="right"><strong>Погашено</strong></TableCell>
-                                <TableCell align="right"><strong>Долг</strong></TableCell>
-                                <TableCell align="right"><strong>К оплате</strong></TableCell>
+                                <TableCell align="right"><strong>Зарплата</strong></TableCell>
+                                <TableCell align="right"><strong>Оплачено</strong></TableCell>
+                                <TableCell align="right"><strong>Задолженность</strong></TableCell>
+                                <TableCell align="right"><strong>Расходы</strong></TableCell>
                                 <TableCell align="right"><strong>Премии</strong></TableCell>
                                 <TableCell align="right"><strong>Итого</strong></TableCell>
                             </TableRow>
@@ -349,7 +331,19 @@ function DashboardPage() {
                                     </TableCell>
                                     <TableCell align="center">{row.sessions || ''}</TableCell>
                                     <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
-                                    {/* Зарплата - зелёный */}
+                                    
+                                    {/* Кредит (аванс) - фиолетовый */}
+                                    <TableCell align="right">
+                                        {row.credit > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.credit, row.currency)}
+                                                sx={{ backgroundColor: '#764ba2', color: 'white' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    
+                                    {/* Зарплата начислено - зелёный */}
                                     <TableCell align="right">
                                         {row.salary > 0 && (
                                             <Chip
@@ -359,6 +353,29 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
+                                    
+                                    {/* Оплачено (salary_paid) - зелёный темнее */}
+                                    <TableCell align="right">
+                                        {row.salary_paid > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.salary_paid, row.currency)}
+                                                sx={{ backgroundColor: '#27736dff', color: '#ffffffff' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    
+                                    {/* Задолженность - красный */}
+                                    <TableCell align="right">
+                                        {row.debt > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.debt, row.currency)}
+                                                sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+                                    
                                     {/* Расходы - розовый */}
                                     <TableCell align="right">
                                         {row.expenses > 0 && (
@@ -369,48 +386,8 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    {/* Кредит - фиолетовый */}
-                                    <TableCell align="right">
-                                        {row.credit > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.credit, row.currency)}
-                                                sx={{ backgroundColor: '#764ba2', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    {/* Погашено - зелёный */}
-                                    <TableCell align="right">
-                                        {row.repayment > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.repayment, row.currency)}
-                                                sx={{ backgroundColor: '#27736dff', color: '#ffffffff' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    {/* Долг - красный */}
-                                    <TableCell align="right">
-                                        {row.debt > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.debt, row.currency)}
-                                                sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    {/* К оплате (unpaid) - оранжевый */}
-                                    <TableCell align="right">
-                                        {row.unpaid > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.unpaid, row.currency)}
-                                                sx={{ backgroundColor: '#ff9800', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
 
-                                    {/* Премия - оранжевый */}
+                                    {/* Премия - жёлтый */}
                                     <TableCell align="right">
                                         {row.bonus > 0 && (
                                             <Chip
@@ -421,6 +398,7 @@ function DashboardPage() {
                                             />
                                         )}
                                     </TableCell>
+                                    
                                     {/* Итого - голубой */}
                                     <TableCell align="right">
                                         {row.total > 0 && (
