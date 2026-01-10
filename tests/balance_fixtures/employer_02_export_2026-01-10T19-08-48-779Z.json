@@ -1,0 +1,108 @@
+{
+  "cards": {
+    "salary": 450,
+    "expenses": 0,
+    "paid": 370,
+    "debt": 0,
+    "bonus": 0,
+    "total": 370,
+    "currency": "UAH"
+  },
+  "mutual_balances": [],
+  "monthly": [
+    {
+      "period": "2025-08",
+      "sessions": 4,
+      "hours": 4.5,
+      "credit": 270,
+      "salary": 350,
+      "salary_paid": 100,
+      "salary_unpaid": 100,
+      "expenses": 0,
+      "expenses_paid": 0,
+      "expenses_unpaid": 0,
+      "debt": 20,
+      "bonus": 0,
+      "total": 370,
+      "currency": "UAH"
+    }
+  ],
+  "payments": [
+    {
+      "id": 5,
+      "tracking_nr": "P5",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 100,
+      "currency": "UAH",
+      "payment_status": "unpaid",
+      "payment_date": "2025-08-10T07:40:00+00:00",
+      "category_name": "Зарплата",
+      "category_group": "Зарплата",
+      "description": "Смена A4: x"
+    },
+    {
+      "id": 4,
+      "tracking_nr": "P4",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 100,
+      "currency": "UAH",
+      "payment_status": "paid",
+      "payment_date": "2025-08-09T19:00:00+00:00",
+      "category_name": "Зарплата",
+      "category_group": "Зарплата",
+      "description": "Смена A3: Стажировка"
+    },
+    {
+      "id": 3,
+      "tracking_nr": "P3",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 270,
+      "currency": "UAH",
+      "payment_status": "paid",
+      "payment_date": "2025-08-09T09:58:00+00:00",
+      "category_name": "Аванс",
+      "category_group": "Долги",
+      "description": "Пополнил мобильный"
+    },
+    {
+      "id": 2,
+      "tracking_nr": "P2",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 150,
+      "currency": "UAH",
+      "payment_status": "offset",
+      "payment_date": "2025-08-09T08:00:00+00:00",
+      "category_name": "Зарплата",
+      "category_group": "Зарплата",
+      "description": "Смена A2: Стажировка"
+    },
+    {
+      "id": 1,
+      "tracking_nr": "P1",
+      "payer_id": 1,
+      "payer_name": "Administrator",
+      "recipient_id": 2,
+      "recipient_name": "Евгения",
+      "amount": 100,
+      "currency": "UAH",
+      "payment_status": "offset",
+      "payment_date": "2025-08-08T18:00:00+00:00",
+      "category_name": "Зарплата",
+      "category_group": "Зарплата",
+      "description": "Смена A1: Стажировка"
+    }
+  ],
+  "export_timestamp": "2026-01-10T20:08:48.769058"
+}

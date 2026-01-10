@@ -95,6 +95,7 @@ class CardsSummary(BaseModel):
     salary: float       # Зарплата начислено (зелёная карточка)
     expenses: float     # Расходы (розовая карточка)
     paid: float         # Выплачено: аванс + зарплата paid (фиолетовая карточка)
+    unpaid: float       # Не оплачено: сумма всех salary_unpaid (оранжевая карточка)
     debt: float         # Задолженность работника (красная карточка)
     bonus: float        # Премии (жёлтая карточка)
     total: float        # Всего выплачено (голубая карточка)
@@ -167,7 +168,27 @@ async def calculate_cards_new(
     result = await db.execute(salary_paid_query)
     salary_paid = float(result.one().total or 0)
     
-    # 3. Аванс (DEBT группа, paid статус)
+    # 3. Зарплата unpaid (не оплачено)
+    salary_unpaid_query = select(func.sum(Payment.amount).label("total")).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+            Payment.payment_status == PaymentStatus.UNPAID.value
+        )
+    )
+
+    if user_filter_id:
+        salary_unpaid_query = salary_unpaid_query.where(Payment.recipient_id == user_filter_id)
+    elif worker_id:
+        salary_unpaid_query = salary_unpaid_query.where(Payment.recipient_id == worker_id)
+
+    result = await db.execute(salary_unpaid_query)
+    salary_unpaid = float(result.one().total or 0)
+
+    # 4. Аванс (DEBT группа, paid статус)
     credit_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -187,7 +208,7 @@ async def calculate_cards_new(
     result = await db.execute(credit_query)
     credits_given = float(result.one().total or 0)
     
-    # 4. Расходы (оплаченные)
+    # 5. Расходы (оплаченные)
     expenses_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -207,7 +228,7 @@ async def calculate_cards_new(
     result = await db.execute(expenses_query)
     expenses_paid = float(result.one().total or 0)
     
-    # 5. Премии (оплаченные)
+    # 6. Премии (оплаченные)
     bonus_query = select(func.sum(Payment.amount).label("total")).join(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
@@ -236,6 +257,7 @@ async def calculate_cards_new(
         salary=round(total_salary, 2),
         expenses=round(expenses_paid, 2),
         paid=round(paid, 2),
+        unpaid=round(salary_unpaid, 2),
         debt=round(debt, 2),
         bonus=round(total_bonus, 2),
         total=round(total, 2),

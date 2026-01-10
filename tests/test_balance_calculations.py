@@ -194,6 +194,7 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
                 "salary": debug_result.cards.salary,
                 "expenses": debug_result.cards.expenses,
                 "paid": debug_result.cards.paid,
+                "unpaid": debug_result.cards.unpaid,
                 "debt": debug_result.cards.debt,
                 "bonus": debug_result.cards.bonus,
                 "total": debug_result.cards.total

@@ -122,7 +122,7 @@ function DashboardPage() {
                 )}
             </Box>
 
-            {/* Summary Cards - 7 cards in one row */}
+            {/* Summary Cards - 8 cards in one row */}
             <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 {/* Зарплата */}
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
@@ -167,6 +167,22 @@ function DashboardPage() {
                             <Typography variant="caption">Выплачено</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.paid || 0, summary?.currency)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Box>
+
+                {/* Не оплачено */}
+                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
+                    <Card sx={{
+                        background: 'linear-gradient(135deg, #ffb347 0%, #ff9800 100%)',
+                        color: 'white',
+                        height: '100%'
+                    }}>
+                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="caption">Не оплачено</Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                                {formatCurrency(summary?.unpaid || 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -314,6 +330,7 @@ function DashboardPage() {
                                 <TableCell align="right"><strong>Кредиты</strong></TableCell>
                                 <TableCell align="right"><strong>Зарплата</strong></TableCell>
                                 <TableCell align="right"><strong>Оплачено</strong></TableCell>
+                                <TableCell align="right"><strong>К оплате</strong></TableCell>
                                 <TableCell align="right"><strong>Задолженность</strong></TableCell>
                                 <TableCell align="right"><strong>Расходы</strong></TableCell>
                                 <TableCell align="right"><strong>Премии</strong></TableCell>
@@ -360,6 +377,17 @@ function DashboardPage() {
                                             <Chip
                                                 label={formatCurrency(row.salary_paid, row.currency)}
                                                 sx={{ backgroundColor: '#27736dff', color: '#ffffffff' }}
+                                                size="small"
+                                            />
+                                        )}
+                                    </TableCell>
+
+                                    {/* К оплате (salary_unpaid) - оранжевый */}
+                                    <TableCell align="right">
+                                        {row.salary_unpaid > 0 && (
+                                            <Chip
+                                                label={formatCurrency(row.salary_unpaid, row.currency)}
+                                                sx={{ backgroundColor: '#ff9800', color: 'white' }}
                                                 size="small"
                                             />
                                         )}
