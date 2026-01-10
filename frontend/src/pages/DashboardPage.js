@@ -176,20 +176,20 @@ function DashboardPage() {
                 {/* Погашения (orange) */}
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
-                        background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                        background: 'linear-gradient(135deg, #27736dff 0%, #52c67fff 100%)',
                         color: 'white',
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="caption">Погашения</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total_repayment ? -summary.total_repayment : 0, summary?.currency)}
+                                {formatCurrency(summary?.total_repayment ? summary.total_repayment : 0, summary?.currency)}
                             </Typography>
                         </CardContent>
                     </Card>
                 </Box>
 
-                {/* К оплате */}
+                {/* Долг */}
                 <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
                     <Card sx={{
                         background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
@@ -197,7 +197,7 @@ function DashboardPage() {
                         height: '100%'
                     }}>
                         <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">К оплате</Typography>
+                            <Typography variant="caption">Долг</Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700 }}>
                                 {formatCurrency(summary?.total_unpaid || 0, summary?.currency)}
                             </Typography>
@@ -253,7 +253,7 @@ function DashboardPage() {
                                     <TableCell><strong>Должник</strong></TableCell>
                                     <TableCell align="right"><strong>Кредит/Аванс</strong></TableCell>
                                     <TableCell align="right"><strong>Погашено</strong></TableCell>
-                                    <TableCell align="right"><strong>К оплате</strong></TableCell>
+                                    <TableCell align="right"><strong>Долг</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -277,8 +277,8 @@ function DashboardPage() {
                                                 <Chip
                                                     label={formatCurrency(row.offset, row.currency)}
                                                     sx={{
-                                                        backgroundColor: row.offset > 0 ? '#38ef7d' : '#ff6b6b',
-                                                        color: row.offset > 0 ? '#1a1a1a' : 'white'
+                                                        backgroundColor: row.offset > 0 ? '#27736dff' : '#ff6b6b',
+                                                        color: row.offset > 0 ? '#ffffffff' : 'white'
                                                     }}
                                                     size="small"
                                                 />
@@ -354,7 +354,7 @@ function DashboardPage() {
                                         {row.salary > 0 && (
                                             <Chip
                                                 label={formatCurrency(row.salary, row.currency)}
-                                                sx={{ backgroundColor: '#38ef7d', color: 'white' }}
+                                                sx={{ backgroundColor: '#11998e', color: 'white' }}
                                                 size="small"
                                             />
                                         )}
@@ -384,7 +384,7 @@ function DashboardPage() {
                                         {row.repayment > 0 && (
                                             <Chip
                                                 label={formatCurrency(row.repayment, row.currency)}
-                                                sx={{ backgroundColor: '#38ef7d', color: '#1a1a1a' }}
+                                                sx={{ backgroundColor: '#27736dff', color: '#ffffffff' }}
                                                 size="small"
                                             />
                                         )}
