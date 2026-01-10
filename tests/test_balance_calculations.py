@@ -159,8 +159,10 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
     Args:
         is_worker_view: If True, simulate a worker (without admin permissions)
                        If False, simulate admin who can see all data
+    
+    Now uses /debug endpoint which returns cards with new structure.
     """
-    from api.routers.balances import get_mutual_balances, get_monthly_summary
+    from api.routers.balances import get_debug_export
     
     async with async_session() as db:
         # Create a mock user
@@ -169,82 +171,69 @@ async def calculate_balance_using_real_function(engine, async_session, worker_id
         if is_worker_view and worker_id:
             # Worker view: user sees only their own data
             mock_user.id = worker_id
-            mock_user.has_permission = MagicMock(return_value=False)  # No admin perms
+            mock_user.has_permission = MagicMock(return_value=False)
+            mock_user.is_worker = True
         else:
-            # Admin view: can see all data
-            mock_user.id = 999  # Non-existent user to avoid filtering
-            mock_user.has_permission = MagicMock(return_value=True)  # Admin can see everything
+            # Admin view
+            mock_user.id = 999
+            mock_user.has_permission = MagicMock(return_value=True)
+            mock_user.is_worker = False
         
-        # If worker_id is specified and is_worker_view=False (admin), we pass worker_id to filter
-        # If is_worker_view=True, the filtering happens via user_filter_id in the function
-        summary_result = await get_balance_summary(
-            employer_id=None,
-            worker_id=worker_id if not is_worker_view else None,  # Admin can filter by worker_id
-            db=db,
-            current_user=mock_user
-        )
-        
-        # Also get mutual balances
-        mutual_result = await get_mutual_balances(
-            db=db,
-            current_user=mock_user
-        )
-        
-        # Get monthly summary (all months)
-        monthly_result = await get_monthly_summary(
-            months=24,  # Get maximum available months
+        # Use debug endpoint which returns complete structure with new fields
+        debug_result = await get_debug_export(
             employer_id=None,
             worker_id=worker_id,
+            months=24,
             db=db,
             current_user=mock_user
         )
         
-        # Convert DashboardSummary to the format expected by tests
+        # Convert to dict format expected by tests
         return {
             "cards": {
-                "salary": summary_result.total_salary,
-                "expenses": summary_result.total_expenses,
-                "credits": summary_result.total_credits,
-                "repayment": summary_result.total_repayment,
-                "bonus": summary_result.total_bonus,
-                "to_pay": summary_result.total_unpaid,
-                "total": summary_result.total
+                "salary": debug_result.cards.salary,
+                "expenses": debug_result.cards.expenses,
+                "paid": debug_result.cards.paid,
+                "debt": debug_result.cards.debt,
+                "bonus": debug_result.cards.bonus,
+                "total": debug_result.cards.total
             },
             "mutual_balances": [
                 {
                     "creditor_id": mb.creditor_id,
                     "debtor_id": mb.debtor_id,
-                    "credit": mb.credit,
-                    "offset": mb.offset,
-                    "remaining": mb.remaining,
+                    "paid": mb.paid,
+                    "salary": mb.salary,
+                    "debt": mb.debt,
                     "currency": mb.currency
                 }
-                for mb in mutual_result
+                for mb in debug_result.mutual_balances
             ],
             "monthly": [
                 {
                     "period": ms.period,
                     "sessions": ms.sessions,
                     "hours": ms.hours,
-                    "salary": ms.salary,
                     "credit": ms.credit,
-                    "repayment": ms.repayment,
-                    "debt": ms.debt,
-                    "unpaid": ms.unpaid,
+                    "salary": ms.salary,
+                    "salary_paid": ms.salary_paid,
+                    "salary_unpaid": ms.salary_unpaid,
                     "expenses": ms.expenses,
                     "expenses_paid": ms.expenses_paid,
-                    "bonus": ms.bonus,
                     "expenses_unpaid": ms.expenses_unpaid,
+                    "debt": ms.debt,
+                    "bonus": ms.bonus,
                     "total": ms.total,
                     "currency": ms.currency
                 }
-                for ms in monthly_result
+                for ms in debug_result.monthly
             ]
         }
 
 
 # Parametrize test with all fixture files
 fixture_files = get_fixture_files()
+
 
 @pytest.mark.parametrize("fixture_path", fixture_files, ids=[f.stem for f in fixture_files])
 @pytest.mark.asyncio
