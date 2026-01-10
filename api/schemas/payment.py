@@ -1,7 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
+
+from database.models import PaymentStatus
 
 
 # Payment Category Group schemas
@@ -49,7 +51,7 @@ class PaymentBase(BaseModel):
     currency: str = Field(max_length=3)
     description: Optional[str] = Field(None, max_length=1000)
     payment_date: datetime
-    payment_status: Literal['unpaid', 'paid', 'offset'] = 'unpaid'
+    payment_status: PaymentStatus = PaymentStatus.UNPAID
     modified_at: Optional[datetime] = None
 
 

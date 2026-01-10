@@ -223,6 +223,12 @@ class PaymentGroupCode(str, Enum):
     DEBT = "debt"          # Долги
     REPAYMENT = "repayment"  # Погашения
 
+class PaymentStatus(str, Enum):
+    """Статусы платежей"""
+    UNPAID = "unpaid"      # Не оплачено
+    PAID = "paid"          # Оплачено
+    OFFSET = "offset"      # Зачтено в счет долга
+
 class PaymentCategoryGroup(Base):
     """Группы категорий платежей (Зарплата, Расходы, Премии, Долги и т.д.)"""
     __tablename__ = "payment_category_groups"

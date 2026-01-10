@@ -14,7 +14,7 @@ from sqlalchemy import select, func, and_, case
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Payment, Assignment, Task, PaymentCategory, PaymentCategoryGroup, PaymentGroupCode
+from database.models import User, Payment, Assignment, Task, PaymentCategory, PaymentCategoryGroup, PaymentGroupCode, PaymentStatus
 from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/balances", tags=["balances"])
@@ -161,7 +161,7 @@ async def get_balance_summary(
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(
-        and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == 'paid')
+        and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == PaymentStatus.PAID.value)
     )
     if user_filter_id:
         salary_paid_query = salary_paid_query.where(Payment.recipient_id == user_filter_id)
@@ -182,7 +182,7 @@ async def get_balance_summary(
         ).where(
             and_(
                 PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value,
-                Payment.payment_status == 'unpaid'
+                Payment.payment_status == PaymentStatus.UNPAID.value
             )
         ).where(Payment.payer_id == user_filter_id)
     else:
@@ -229,7 +229,7 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value, Payment.payment_status == 'paid'))
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value, Payment.payment_status == PaymentStatus.PAID.value))
     if user_filter_id:
         credits_given_query = credits_given_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
@@ -238,7 +238,7 @@ async def get_balance_summary(
     credits_given = float(result.one().total or 0)
     
     # Зачтённые в счёт долга (все платежи со статусом 'offset')
-    credits_offset_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == 'offset')
+    credits_offset_query = select(func.sum(Payment.amount).label("total")).where(Payment.payment_status == PaymentStatus.OFFSET.value)
     if user_filter_id:
         credits_offset_query = credits_offset_query.where(
             (Payment.recipient_id == user_filter_id) | (Payment.payer_id == user_filter_id)
@@ -261,7 +261,7 @@ async def get_balance_summary(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
     ).where(
         and_(
-            Payment.payment_status == 'unpaid',
+            Payment.payment_status == PaymentStatus.UNPAID.value,
             PaymentCategoryGroup.code != PaymentGroupCode.REPAYMENT.value
         )
     )
@@ -299,7 +299,7 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value, Payment.payment_status == 'paid'))
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value, Payment.payment_status == PaymentStatus.PAID.value))
     if user_filter_id:
         repayment_query = repayment_query.where(Payment.payer_id == user_filter_id)
     elif worker_id:
@@ -312,7 +312,7 @@ async def get_balance_summary(
         PaymentCategory, Payment.category_id == PaymentCategory.id
     ).join(
         PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == 'offset'))
+    ).where(and_(PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value, Payment.payment_status == PaymentStatus.OFFSET.value))
     if user_filter_id:
         salary_offset_query = salary_offset_query.where(Payment.recipient_id == user_filter_id)
     elif worker_id:
@@ -350,7 +350,7 @@ async def get_balance_summary(
     debt_query = select(
         Payment.payer_id, Payment.recipient_id,
         func.sum(Payment.amount).label("total"), Payment.currency
-    ).where(Payment.payment_status == 'unpaid').group_by(
+    ).where(Payment.payment_status == PaymentStatus.UNPAID.value).group_by(
         Payment.payer_id, Payment.recipient_id, Payment.currency
     )
     if user_filter_id:
@@ -528,7 +528,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
-                Payment.payment_status == 'paid'
+                Payment.payment_status == PaymentStatus.PAID.value
             )
         )
         
@@ -553,7 +553,7 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
-                Payment.payment_status == 'paid',
+                Payment.payment_status == PaymentStatus.PAID.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
@@ -581,7 +581,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value,
-                Payment.payment_status == 'paid'
+                Payment.payment_status == PaymentStatus.PAID.value
             )
         )
         
@@ -609,7 +609,7 @@ async def get_monthly_summary(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
-                Payment.payment_status == 'offset'
+                Payment.payment_status == PaymentStatus.OFFSET.value
             )
         )
         
@@ -634,7 +634,7 @@ async def get_monthly_summary(
         ).where(
             and_(
                 Payment.payment_date < next_month_start,
-                Payment.payment_status == 'paid',
+                Payment.payment_status == PaymentStatus.PAID.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value
             )
         )
@@ -659,7 +659,7 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date < next_month_start,
                 PaymentCategoryGroup.code == PaymentGroupCode.REPAYMENT.value,
-                Payment.payment_status == 'paid'  # Only count confirmed repayments
+                Payment.payment_status == PaymentStatus.PAID.value  # Only count confirmed repayments
             )
         )
         
@@ -682,7 +682,7 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
-                Payment.payment_status == 'paid'
+                Payment.payment_status == PaymentStatus.PAID.value
             )
         )
         
@@ -774,7 +774,7 @@ async def get_monthly_summary(
             and_(
                 Payment.payment_date >= start_date,
                 Payment.payment_date < next_month_start,
-                Payment.payment_status == 'unpaid'
+                Payment.payment_status == PaymentStatus.UNPAID.value
             )
         )
         
@@ -863,7 +863,7 @@ async def get_mutual_balances(
         and_(
             Payment.recipient_id != None,
             PaymentCategoryGroup.code == PaymentGroupCode.DEBT.value,
-            Payment.payment_status == 'paid'  # Только выданные кредиты
+            Payment.payment_status == PaymentStatus.PAID.value  # Только выданные кредиты
         )
     ).distinct()
     
@@ -897,7 +897,7 @@ async def get_mutual_balances(
     ).where(
         and_(
             Payment.recipient_id != None,
-            Payment.payment_status == 'unpaid'
+            Payment.payment_status == PaymentStatus.UNPAID.value
         )
     ).group_by(
         Payment.payer_id,
@@ -1116,7 +1116,7 @@ async def get_mutual_balances(
                 Payment.payer_id == a_id,
                 Payment.recipient_id == b_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'unpaid',
+                Payment.payment_status == PaymentStatus.UNPAID.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
             )
         )
@@ -1135,7 +1135,7 @@ async def get_mutual_balances(
                 Payment.payer_id == b_id,
                 Payment.recipient_id == a_id,
                 Payment.currency == currency,
-                Payment.payment_status == 'unpaid',
+                Payment.payment_status == PaymentStatus.UNPAID.value,
                 PaymentCategoryGroup.code == PaymentGroupCode.EXPENSE.value
             )
         )
