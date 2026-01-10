@@ -1222,7 +1222,7 @@ async def get_debug_export(
     monthly = [
         m for m in monthly 
         if m.sessions > 0 or m.hours > 0 or m.salary > 0 or m.expenses > 0 or 
-           m.credit > 0 or m.bonus > 0 or m.repayment > 0 or m.debt > 0 or m.unpaid > 0
+           m.credit > 0 or m.bonus > 0 or m.salary_paid > 0 or m.debt > 0 or m.salary_unpaid > 0
     ]
     
     mutual = await get_mutual_balances(
