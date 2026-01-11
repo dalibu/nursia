@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учёт работників</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            padding: 16px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 20px 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .summary-card h3 {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summary-card .amount {
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .workers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+        }
+
+        .worker-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .worker-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .worker-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .worker-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .worker-rate {
+            font-size: 12px;
+            opacity: 0.9;
+            color: white;
+        }
+
+        .worker-body {
+            padding: 20px;
+        }
+
+        .balance-main {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            border: 2px solid;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .balance-main::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+        }
+
+        .balance-main.positive {
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .balance-main.negative {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .balance-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            opacity: 0.7;
+        }
+
+        .balance-amount {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .balance-breakdown {
+            font-size: 13px;
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+
+        .breakdown-divider {
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            margin: 8px 0;
+        }
+
+        .stats-compact {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-compact {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .stat-compact-label {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+
+        .stat-compact-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .expenses-compact {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .expenses-title {
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .expense-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .expense-row:not(:last-child) {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .expense-cat {
+            color: #cbd5e1;
+        }
+
+        .expense-amt {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .worker-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 10px;
+            font-size: 12px;
+            border-radius: 8px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 28px;
+            border-radius: 16px;
+            max-width: 480px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .modal-header h2 {
+            color: #e2e8f0;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #cbd5e1;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #e2e8f0;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .modal-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: rgba(148, 163, 184, 0.1);
+            color: #cbd5e1;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(148, 163, 184, 0.2);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 2000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💼 Учёт работников</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="openModal('timeModal')">⏱️ Время</button>
+                <button class="btn btn-secondary" onclick="openModal('expenseModal')">💳 Расход</button>
+                <button class="btn btn-primary" onclick="openModal('paymentModal')">💰 Выплата</button>
+            </div>
+        </header>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <h3>К выплате</h3>
+                <div class="amount" style="color: #f59e0b;">14 730 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Авансы</h3>
+                <div class="amount" style="color: #ef4444;">20 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Итого</h3>
+                <div class="amount" style="color: #10b981;">14 710 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Часов</h3>
+                <div class="amount" style="color: #3b82f6;">72.5</div>
+            </div>
+            <div class="summary-card">
+                <h3>Расходы</h3>
+                <div class="amount" style="color: #f59e0b;">2 850 ₴</div>
+            </div>
+        </div>
+
+        <div class="workers-grid">
+            <!-- Евгения -->
+            <div class="worker-card">
+                <div class="worker-header">
+                    <div>
+                        <div class="worker-name">👩‍🦰 Евгения</div>
+                        <div class="worker-rate">350 ₴/час</div>
+                    </div>
+                </div>
+                <div class="worker-body">
+                    <div class="balance-main positive">
+                        <div class="balance-label">Баланс</div>
+                        <div class="balance-amount">80 ₴</div>
+                        <div class="balance-breakdown">
+                            <div class="breakdown-item">
+                                <span>Зарплата</span>
+                                <span>100 ₴</span>
+                            </div>
+                            <div class="breakdown-item" style="color: #ef4444;">
+                                <span>Задолженность</span>
+                                <span>-20 ₴</span>
+                            </div>
+                            <div class="breakdown-divider"></div>
+                            <div class="breakdown-item" style="font-weight: 700;">
+                                <span>К выплате</span>
+                                <span>80 ₴</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-compact">
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Часов</div>
+                            <div class="stat-compact-value">4.5</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Начислено</div>
+                            <div class="stat-compact-value">100 ₴</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Выплачено</div>
+                            <div class="stat-compact-value">370 ₴</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Расходы</div>
+                            <div class="stat-compact-value">0 ₴</div>
+                        </div>
+                    </div>
+
+                    <div class="worker-actions">
+                        <button class="btn btn-primary btn-small" onclick="showDetails('Евгения')">📊 Детали</button>
+                        <button class="btn btn-secondary btn-small" onclick="makePayment('Евгения', 80)">💸 80₴</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Мария -->
+            <div class="worker-card">
+                <div class="worker-header">
+                    <div>
+                        <div class="worker-name">👩‍🦰 Мария</div>
+                        <div class="worker-rate">350 ₴/час</div>
+                    </div>
+                </div>
+                <div class="worker-body">
+                    <div class="balance-main positive">
+                        <div class="balance-label">Баланс</div>
+                        <div class="balance-amount">14 650 ₴</div>
+                        <div class="balance-breakdown">
+                            <div class="breakdown-item">
+                                <span>Зарплата</span>
+                                <span>11 800 ₴</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span>Расходы</span>
+                                <span>2 850 ₴</span>
+                            </div>
+                            <div class="breakdown-divider"></div>
+                            <div class="breakdown-item" style="font-weight: 700;">
+                                <span>К выплате</span>
+                                <span>14 650 ₴</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-compact">
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Часов</div>
+                            <div class="stat-compact-value">68</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Начислено</div>
+                            <div class="stat-compact-value">23 800 ₴</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Выплачено</div>
+                            <div class="stat-compact-value">12 000 ₴</div>
+                        </div>
+                        <div class="stat-compact">
+                            <div class="stat-compact-label">Расходы</div>
+                            <div class="stat-compact-value">2 850 ₴</div>
+                        </div>
+                    </div>
+
+                    <div class="expenses-compact">
+                        <div class="expenses-title">Расходы</div>
+                        <div class="expense-row">
+                            <span class="expense-cat">🛒 Продукты</span>
+                            <span class="expense-amt">1 450 ₴</span>
+                        </div>
+                        <div class="expense-row">
+                            <span class="expense-cat">🧹 Хоз. товары</span>
+                            <span class="expense-amt">1 400 ₴</span>
+                        </div>
+                    </div>
+
+                    <div class="worker-actions">
+                        <button class="btn btn-primary btn-small" onclick="showDetails('Мария')">📊 Детали</button>
+                        <button class="btn btn-secondary btn-small" onclick="makePayment('Мария', 14650)">💸 Выплатить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Modal -->
+    <div id="timeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⏱️ Добавить время</h2>
+            </div>
+            <form>
+                <div class="form-group">
+                    <label>Работник</label>
+                    <select>
+                        <option>Евгения</option>
+                        <option>Мария</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Дата</label>
+                    <input type="date" value="2026-01-11">
+                </div>
+                <div class="form-group">
+                    <label>Часов</label>
+                    <input type="number" placeholder="8" step="0.5">
+                </div>
+                <div class="form-group">
+                    <label>Тип работы</label>
+                    <select>
+                        <option>Уборка</option>
+                        <option>Готовка</option>
+                        <option>Стирка</option>
+                        <option>Покупки</option>
+                        <option>Другое</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Комментарий</label>
+                    <input type="text" placeholder="Описание">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal('timeModal')">Отмена</button>
+                    <button type="submit" class="btn btn-primary" onclick="event.preventDefault(); showNotification('Время добавлено'); closeModal('timeModal')">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Expense Modal -->
+    <div id="expenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💳 Добавить расход</h2>
+            </div>
+            <form>
+                <div class="form-group">
+                    <label>Работник</label>
+                    <select>
+                        <option>Евгения</option>
+                        <option>Мария</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Дата</label>
+                    <input type="date" value="2026-01-11">
+                </div>
+                <div class="form-group">
+                    <label>Категория</label>
+                    <select>
+                        <option>Продукты</option>
+                        <option>Медикаменты</option>
+                        <option>Хоз. товары</option>
+                        <option>Инструменты</option>
+                        <option>Транспорт</option>
+                        <option>Другое</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Сумма (₴)</label>
+                    <input type="number" placeholder="1500" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <input type="text" placeholder="Что куплено">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal('expenseModal')">Отмена</button>
+                    <button type="submit" class="btn btn-primary" onclick="event.preventDefault(); showNotification('Расход добавлен'); closeModal('expenseModal')">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💰 Выплата / Аванс</h2>
+            </div>
+            <form>
+                <div class="form-group">
+                    <label>Работник</label>
+                    <select id="paymentWorkerSelect">
+                        <option>Евгения</option>
+                        <option>Мария</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Тип выплаты</label>
+                    <select>
+                        <option>Зарплата</option>
+                        <option>Премия</option>
+                        <option>Аванс</option>
+                        <option>Подарок</option>
+                        <option>Компенсация расходов</option>
+                        <option>Полный расчёт</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Дата</label>
+                    <input type="date" value="2026-01-11">
+                </div>
+                <div class="form-group">
+                    <label>Сумма (₴)</label>
+                    <input type="number" id="paymentAmount" placeholder="10000" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Комментарий</label>
+                    <input type="text" placeholder="Причина выплаты">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal('paymentModal')">Отмена</button>
+                    <button type="submit" class="btn btn-primary" onclick="event.preventDefault(); showNotification('Выплата записана'); closeModal('paymentModal')">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('active');
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        function showDetails(workerName) {
+            showNotification(`Открыть детали: ${workerName}`);
+        }
+
+        function makePayment(workerName, amount) {
+            openModal('paymentModal');
+            const select = document.getElementById('paymentWorkerSelect');
+            const amountInput = document.getElementById('paymentAmount');
+            
+            if (select) {
+                for (let option of select.options) {
+                    if (option.text === workerName) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (amountInput) {
+                amountInput.value = amount;
+            }
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('active');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
