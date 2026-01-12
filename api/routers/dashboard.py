@@ -346,7 +346,7 @@ async def get_worker_stats(
     expenses = float(result.scalar() or 0)
     
     return WorkerStats(
-        hours=round(hours, 1),
+        hours=round(hours, 2),
         shifts=shifts,
         accrued=round(accrued, 2),
         paid=round(paid, 2),
@@ -454,7 +454,7 @@ async def get_dashboard(
     
     summary = DashboardSummary(
         shifts=total_shifts,
-        hours=round(total_hours, 1),
+        hours=round(total_hours, 2),
         salary=round(total_salary, 2),
         credits=round(total_credits, 2),
         unpaid=round(total_unpaid, 2),

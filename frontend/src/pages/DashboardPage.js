@@ -193,7 +193,7 @@ function DashboardPage() {
                 <div className="nursia-summary-card">
                     <h3>Часы</h3>
                     <div className="nursia-amount" style={{ color: '#3b82f6' }}>
-                        {summary?.hours?.toFixed(1) || 0}
+                        {summary?.hours?.toFixed(2) || 0}
                     </div>
                 </div>
                 <div className="nursia-summary-card">
