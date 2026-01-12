@@ -441,19 +441,14 @@ async def get_dashboard(
         total_paid += stats.paid
 
     
-    # Неоплаченная зарплата
-    unpaid_query = select(func.sum(Payment.amount)).join(
-        PaymentCategory, Payment.category_id == PaymentCategory.id
-    ).join(
-        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
-    ).where(
-        and_(
-            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
-            Payment.payment_status == PaymentStatus.UNPAID.value
-        )
+    # Все неоплаченные платежи (любых категорий)
+    unpaid_query = select(func.sum(Payment.amount)).where(
+        Payment.payment_status == PaymentStatus.UNPAID.value
     )
     if not is_employer:
-        unpaid_query = unpaid_query.where(Payment.recipient_id == current_user.id)
+        unpaid_query = unpaid_query.where(
+            or_(Payment.recipient_id == current_user.id, Payment.payer_id == current_user.id)
+        )
     result = await db.execute(unpaid_query)
     total_unpaid = float(result.scalar() or 0)
     
