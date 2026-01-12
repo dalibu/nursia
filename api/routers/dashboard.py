@@ -31,7 +31,11 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 class WorkerBalance(BaseModel):
     """Баланс работника"""
     salary: float           # Зарплата начислено
+    salary_unpaid: float    # Неоплаченная зарплата (для карточки)
+    paid: float             # НОВОЕ: Всего выплачено (зарплата paid + кредиты paid)
     credit: float           # Кредит (отрицательный = долг работника)
+    credits_given: float    # Всего выданных кредитов/авансов
+    debt: float             # Задолженность = Кредиты - Погашения
     expenses: float         # Расходы работника (к возмещению)
     bonuses: float          # Премии/подарки
     due: float              # К выплате (положительный) или К получению (отрицательный)
@@ -185,17 +189,55 @@ async def get_worker_balance(
     result = await db.execute(bonus_query)
     bonuses = float(result.scalar() or 0)
     
+    # Неоплаченная зарплата (UNPAID статус)
+    unpaid_salary_query = select(func.sum(Payment.amount)).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+            Payment.payment_status == PaymentStatus.UNPAID.value,
+            Payment.recipient_id == worker_id
+        )
+    )
+    result = await db.execute(unpaid_salary_query)
+    salary_unpaid = float(result.scalar() or 0)
+    
+    # Выплаченная зарплата (PAID статус)
+    paid_salary_query = select(func.sum(Payment.amount)).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+            Payment.payment_status == PaymentStatus.PAID.value,
+            Payment.recipient_id == worker_id
+        )
+    )
+    result = await db.execute(paid_salary_query)
+    paid_salary = float(result.scalar() or 0)
+    
+    # Всего выплачено = зарплата paid + кредиты paid
+    paid_total = paid_salary + credits
+    
     # Расчет: Кредит (задолженность работника) = кредиты - погашения
     worker_debt = max(0, credits - total_repayment)
     
-    # К выплате = Зарплата + Расходы + Премии - Кредит(долг)
-    # Положительное = работодатель должен работнику
-    # Отрицательное = работник должен работодателю
-    due = salary + expenses + bonuses - worker_debt
+    # К выплате = salary_unpaid - debt + expenses
+    # salary_unpaid = неоплаченная зарплата (работодатель должен)
+    # debt = задолженность (работник должен)
+    # expenses = расходы работника (работодатель должен вернуть)
+    due = salary_unpaid - worker_debt + expenses
     
     return WorkerBalance(
         salary=round(salary, 2),
+        salary_unpaid=round(salary_unpaid, 2),  # Неоплаченная зарплата
+        paid=round(paid_total, 2),  # Всего выплачено
         credit=round(-worker_debt, 2),  # Отрицательный = долг работника
+        credits_given=round(credits, 2),  # Всего выданных кредитов
+        debt=round(worker_debt, 2),  # Задолженность = Кредиты - Погашения
         expenses=round(expenses, 2),
         bonuses=round(bonuses, 2),
         due=round(due, 2),
@@ -378,15 +420,16 @@ async def get_dashboard(
         total_shifts += stats.shifts
         total_hours += stats.hours
         total_salary += balance.salary
-        total_credits += abs(balance.credit) if balance.credit < 0 else 0
+        total_credits += balance.credits_given  # Всего выданных кредитов
+        total_debt += balance.debt  # ИЗМЕНЕНО: используем задолженность из balance
         total_expenses += balance.expenses
         total_bonuses += balance.bonuses
         total_paid += stats.paid
         
+        # К выплате
         if balance.due > 0:
             total_due += balance.due
-        else:
-            total_debt += abs(balance.due)
+
     
     # Неоплаченная зарплата
     unpaid_query = select(func.sum(Payment.amount)).join(

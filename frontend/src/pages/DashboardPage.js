@@ -275,7 +275,11 @@ function DashboardPage() {
                                 <div className="nursia-balance-breakdown">
                                     <div className="nursia-breakdown-item">
                                         <span>Зарплата</span>
-                                        <span>{formatCurrency(worker.balance.salary)}</span>
+                                        <span>{formatCurrency(worker.balance.salary_unpaid || worker.balance.salary)}</span>
+                                    </div>
+                                    <div className="nursia-breakdown-item">
+                                        <span>Выплачено</span>
+                                        <span>{formatCurrency(worker.balance.paid || 0)}</span>
                                     </div>
                                     {worker.balance.credit !== 0 && (
                                         <div className="nursia-breakdown-item">
