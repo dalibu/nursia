@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Typography, Paper, Box, Card, CardContent, Grid,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    TextField, MenuItem, CircularProgress, Chip, Button, Tooltip
+    Box, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+    TextField, MenuItem, Button, IconButton, Tooltip
 } from '@mui/material';
-import {
-    TrendingUp, AccessTime, Payment, AccountBalance,
-    AttachMoney, CardGiftcard, ShoppingCart, SwapHoriz, Download
-} from '@mui/icons-material';
-import { balances, payments, settings } from '../services/api';
+import { Settings, AccountCircle, AccessTime, Payment, Info } from '@mui/icons-material';
+import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
+import { useActiveSession } from '../contexts/ActiveSessionContext';
+import './DashboardPage.css';
 
 // Символы валют
 const currencySymbols = {
@@ -19,431 +17,465 @@ const currencySymbols = {
 };
 
 function DashboardPage() {
-    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [summary, setSummary] = useState(null);
-    const [monthly, setMonthly] = useState([]);
-    const [mutual, setMutual] = useState([]);
-    const [months, setMonths] = useState(6);
-    const [exporting, setExporting] = useState(false);
-    const [showExportJson, setShowExportJson] = useState(false);
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+
+    // Диалоги
+    const [timeModalOpen, setTimeModalOpen] = useState(false);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [selectedWorker, setSelectedWorker] = useState(null);
+
+    // Форма времени
+    const [timeForm, setTimeForm] = useState({
+        worker_id: '',
+        date: new Date().toISOString().split('T')[0],
+        hours: '',
+        type: 'work',
+        comment: ''
+    });
+
+    // Форма платежа
+    const [paymentForm, setPaymentForm] = useState({
+        worker_id: '',
+        category: 'salary',
+        date: new Date().toISOString().split('T')[0],
+        amount: '',
+        comment: ''
+    });
+
+    // Категории платежей
+    const [categories, setCategories] = useState([]);
 
     const { subscribe } = useWebSocket();
+    const { activeSession } = useActiveSession();
 
-    const handleExportJSON = async () => {
-        setExporting(true);
-        try {
-            const response = await balances.getDebug({ months });
-            const jsonStr = JSON.stringify(response.data, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `dashboard_export_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Export failed:', error);
-        } finally {
-            setExporting(false);
-        }
+    const formatCurrency = (amount, currency = 'UAH') => {
+        const value = Number(amount);
+        const symbol = currencySymbols[currency] || currency;
+        return `${value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${symbol}`;
     };
 
     const loadData = useCallback(async (showLoading = true) => {
         if (showLoading) setLoading(true);
         try {
-            const [debugRes, userRes, settingsRes] = await Promise.all([
-                balances.getDebug({ months }),
-                payments.getUserInfo(),
-                settings.getDebug()
+            const [dashboardRes, categoriesRes] = await Promise.all([
+                dashboard.getData(),
+                payments.categories()
             ]);
-            // Debug endpoint returns cards, mutual_balances, monthly, payments
-            setSummary(debugRes.data.cards);  // cards now has new structure
-            setMonthly(debugRes.data.monthly);
-            setMutual(debugRes.data.mutual_balances);
-            setUser(userRes.data);
-            setShowExportJson(settingsRes.data.show_export_json ?? false);
-        } catch (error) {
-            console.error('Failed to load dashboard data:', error);
+            setData(dashboardRes.data);
+            setCategories(categoriesRes.data || []);
+            setError(null);
+        } catch (err) {
+            console.error('Failed to load dashboard data:', err);
+            setError('Ошибка загрузки данных');
         } finally {
             if (showLoading) setLoading(false);
         }
-    }, [months]);
+    }, []);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    // Subscribe to WebSocket events for real-time updates (silent refresh)
+    // WebSocket updates
     useEffect(() => {
         const unsubscribe = subscribe(
             ['payment_created', 'payment_updated', 'payment_deleted', 'assignment_started', 'assignment_stopped'],
-            (event) => {
-                // Silent reload - no loading spinner
-                loadData(false);
-            }
+            () => loadData(false)
         );
         return () => unsubscribe();
     }, [subscribe, loadData]);
 
-    const formatCurrency = (amount, currency = 'UAH', showAbsolute = false, hideZero = false) => {
-        const value = showAbsolute ? Math.abs(Number(amount)) : Number(amount);
-        if (hideZero && value === 0) return '';
-        const symbol = currencySymbols[currency] || currency;
-        return `${symbol}${value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    // Открыть модал времени для конкретного работника
+    const handleOpenTimeModal = (worker = null) => {
+        if (worker) {
+            setTimeForm(prev => ({ ...prev, worker_id: worker.id }));
+            setSelectedWorker(worker);
+        }
+        setTimeModalOpen(true);
+    };
+
+    // Открыть модал платежа для конкретного работника
+    const handleOpenPaymentModal = (worker = null, amount = null) => {
+        if (worker) {
+            setPaymentForm(prev => ({
+                ...prev,
+                worker_id: worker.id,
+                amount: amount ? Math.abs(amount).toString() : ''
+            }));
+            setSelectedWorker(worker);
+        }
+        setPaymentModalOpen(true);
+    };
+
+    // Сохранить время (заглушка)
+    const handleSaveTime = async () => {
+        console.log('Save time:', timeForm);
+        setTimeModalOpen(false);
+        // TODO: Implement time creation
+        loadData(false);
+    };
+
+    // Сохранить платеж (заглушка)
+    const handleSavePayment = async () => {
+        console.log('Save payment:', paymentForm);
+        setPaymentModalOpen(false);
+        // TODO: Implement payment creation
+        loadData(false);
+    };
+
+    // Показать детали работника
+    const handleShowDetails = (worker) => {
+        console.log('Show details:', worker);
+        // TODO: Navigate to details page or open modal
     };
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
+            <Box className="nursia-loading">
+                <CircularProgress sx={{ color: '#3b82f6' }} />
             </Box>
         );
     }
 
+    if (error) {
+        return (
+            <Box className="nursia-error">
+                <p>{error}</p>
+                <Button onClick={() => loadData()}>Повторить</Button>
+            </Box>
+        );
+    }
+
+    const { summary, workers, is_employer } = data || {};
+
     return (
-        <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    Обозрение
-                </Typography>
-                {showExportJson && (
-                    <Tooltip title="Экспорт всех данных в JSON">
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={exporting ? <CircularProgress size={16} /> : <Download />}
-                            onClick={handleExportJSON}
-                            disabled={exporting}
-                        >
-                            Экспорт JSON
-                        </Button>
+        <div className="nursia-container">
+            {/* Header */}
+            <header className="nursia-header">
+                <h1 className="nursia-title">
+                    <img src="/favicon.svg" alt="Nursia" width="40" height="40" />
+                    Nursia
+                </h1>
+                <div className="nursia-header-actions">
+                    {is_employer && (
+                        <Tooltip title="Настройки">
+                            <IconButton className="nursia-btn nursia-btn-secondary">
+                                <Settings />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                    <Tooltip title="Аккаунт">
+                        <IconButton className="nursia-btn nursia-btn-secondary">
+                            <AccountCircle />
+                        </IconButton>
                     </Tooltip>
-                )}
-            </Box>
+                </div>
+            </header>
 
-            {/* Summary Cards - 8 cards in one row */}
-            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
-                {/* Зарплата */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Зарплата</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.salary || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
+            {/* Summary Cards */}
+            <div className="nursia-summary-cards">
+                <div className="nursia-summary-card">
+                    <h3>Смены</h3>
+                    <div className="nursia-amount" style={{ color: '#3b82f6' }}>
+                        {summary?.shifts || 0}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Часы</h3>
+                    <div className="nursia-amount" style={{ color: '#3b82f6' }}>
+                        {summary?.hours?.toFixed(1) || 0}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Зарплата</h3>
+                    <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
+                        {formatCurrency(summary?.salary || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Кредиты / Авансы</h3>
+                    <div className="nursia-amount" style={{ color: '#7469eb' }}>
+                        {formatCurrency(summary?.credits || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Неоплачено</h3>
+                    <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+                        {formatCurrency(summary?.unpaid || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Задолженность</h3>
+                    <div className="nursia-amount" style={{ color: '#e2ea3f' }}>
+                        {formatCurrency(summary?.debt || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Расходы</h3>
+                    <div className="nursia-amount" style={{ color: '#bc1db4' }}>
+                        {formatCurrency(summary?.expenses || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>К выплате</h3>
+                    <div className="nursia-amount" style={{ color: '#fe4747' }}>
+                        {formatCurrency(summary?.due || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Премии / Подарки</h3>
+                    <div className="nursia-amount" style={{ color: '#2e54fe' }}>
+                        {formatCurrency(summary?.bonuses || 0)}
+                    </div>
+                </div>
+                <div className="nursia-summary-card">
+                    <h3>Выплачено</h3>
+                    <div className="nursia-amount" style={{ color: '#f9f9f9' }}>
+                        {formatCurrency(summary?.paid || 0)}
+                    </div>
+                </div>
+            </div>
 
-                {/* Расходы */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Расходы</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.expenses || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Выплачено */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Выплачено</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.paid || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Не оплачено */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #ffb347 0%, #ff9800 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Не оплачено</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.unpaid || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Задолженность */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Задолженность</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.debt || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Премии (yellow) */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #f7dc6f 0%, #f1c40f 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Премии</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.bonus || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-
-                {/* Всего */}
-                <Box sx={{ flex: { xs: '1 1 45%', md: 1 } }}>
-                    <Card sx={{
-                        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                        color: 'white',
-                        height: '100%'
-                    }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                            <Typography variant="caption">Всего</Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                {formatCurrency(summary?.total || 0, summary?.currency)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Box>
-            </Box>
-
-
-            {/* Mutual Balances - Взаимные расчёты */}
-            {mutual?.length > 0 && (
-                <Paper sx={{ p: 3, mb: 4 }}>
-                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <SwapHoriz color="primary" /> Взаимные расчёты
-                    </Typography>
-                    <TableContainer>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                    <TableCell><strong>Кредитор</strong></TableCell>
-                                    <TableCell><strong>Должник</strong></TableCell>
-                                    <TableCell align="right"><strong>Выплачено</strong></TableCell>
-                                    <TableCell align="right"><strong>Покрыто</strong></TableCell>
-                                    <TableCell align="right"><strong>Задолженность</strong></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {mutual.map((row, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{row.creditor_name}</TableCell>
-                                        <TableCell>{row.debtor_name}</TableCell>
-                                        {/* Выплачено - фиолетовый */}
-                                        <TableCell align="right">
-                                            {row.paid > 0 && (
-                                                <Chip
-                                                    label={formatCurrency(row.paid, row.currency)}
-                                                    sx={{ backgroundColor: '#764ba2', color: 'white' }}
-                                                    size="small"
-                                                />
-                                            )}
-                                        </TableCell>
-                                        {/* Покрыто (зарплатой) - зелёный */}
-                                        <TableCell align="right">
-                                            {row.salary !== 0 && (
-                                                <Chip
-                                                    label={formatCurrency(row.salary, row.currency)}
-                                                    sx={{
-                                                        backgroundColor: '#27736dff',
-                                                        color: '#ffffffff'
-                                                    }}
-                                                    size="small"
-                                                />
-                                            )}
-                                        </TableCell>
-                                        {/* Задолженность - красный */}
-                                        <TableCell align="right">
-                                            {row.debt > 0 && (
-                                                <Chip
-                                                    label={formatCurrency(row.debt, row.currency)}
-                                                    size="small"
-                                                    sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
-                                                />
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
-            )}
-
-            {/* Monthly Overview (Übersicht) */}
-            <Paper sx={{ p: 3 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AccessTime color="primary" /> Помесячный обзор
-                    </Typography>
-                    <TextField
-                        select
-                        size="small"
-                        value={months}
-                        onChange={(e) => setMonths(e.target.value)}
-                        sx={{ minWidth: 120 }}
-                    >
-                        <MenuItem value={3}>3 месяца</MenuItem>
-                        <MenuItem value={6}>6 месяцев</MenuItem>
-                        <MenuItem value={12}>12 месяцев</MenuItem>
-                    </TextField>
-                </Box>
-
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell><strong>Период</strong></TableCell>
-                                <TableCell align="center"><strong>Смены</strong></TableCell>
-                                <TableCell align="right"><strong>Часы</strong></TableCell>
-                                <TableCell align="right"><strong>Кредиты</strong></TableCell>
-                                <TableCell align="right"><strong>Зарплата</strong></TableCell>
-                                <TableCell align="right"><strong>Оплачено</strong></TableCell>
-                                <TableCell align="right"><strong>К оплате</strong></TableCell>
-                                <TableCell align="right"><strong>Задолженность</strong></TableCell>
-                                <TableCell align="right"><strong>Расходы</strong></TableCell>
-                                <TableCell align="right"><strong>Премии</strong></TableCell>
-                                <TableCell align="right"><strong>Итого</strong></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {monthly.map((row, index) => (
-                                <TableRow
-                                    key={index}
-                                    sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+            {/* Worker Cards */}
+            <div className="nursia-workers-grid">
+                {workers?.map(worker => (
+                    <div key={worker.id} className="nursia-worker-card">
+                        <div className="nursia-worker-header">
+                            <div className="nursia-worker-name">
+                                {worker.avatar} {worker.name}
+                            </div>
+                            <div className="nursia-worker-actions-header">
+                                <button
+                                    className="nursia-btn nursia-btn-secondary"
+                                    onClick={() => handleOpenTimeModal(worker)}
                                 >
-                                    <TableCell>
-                                        <strong>{row.period.split('-').reverse().join('.')}</strong>
-                                    </TableCell>
-                                    <TableCell align="center">{row.sessions || ''}</TableCell>
-                                    <TableCell align="right">{row.hours ? row.hours.toFixed(1) : ''}</TableCell>
-                                    
-                                    {/* Кредит (аванс) - фиолетовый */}
-                                    <TableCell align="right">
-                                        {row.credit > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.credit, row.currency)}
-                                                sx={{ backgroundColor: '#764ba2', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* Зарплата начислено - зелёный */}
-                                    <TableCell align="right">
-                                        {row.salary > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.salary, row.currency)}
-                                                sx={{ backgroundColor: '#11998e', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* Оплачено (salary_paid) - зелёный темнее */}
-                                    <TableCell align="right">
-                                        {row.salary_paid > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.salary_paid, row.currency)}
-                                                sx={{ backgroundColor: '#27736dff', color: '#ffffffff' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
+                                    <AccessTime fontSize="small" /> Время
+                                </button>
+                                <button
+                                    className="nursia-btn nursia-btn-secondary"
+                                    onClick={() => handleOpenPaymentModal(worker)}
+                                >
+                                    <Payment fontSize="small" /> Платеж
+                                </button>
+                            </div>
+                        </div>
 
-                                    {/* К оплате (salary_unpaid) - оранжевый */}
-                                    <TableCell align="right">
-                                        {row.salary_unpaid > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.salary_unpaid, row.currency)}
-                                                sx={{ backgroundColor: '#ff9800', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* Задолженность - красный */}
-                                    <TableCell align="right">
-                                        {row.debt > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.debt, row.currency)}
-                                                sx={{ backgroundColor: '#ff4b2b', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* Расходы - розовый */}
-                                    <TableCell align="right">
-                                        {row.expenses > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.expenses, row.currency)}
-                                                sx={{ backgroundColor: '#f093fb', color: 'white' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
+                        <div className="nursia-worker-body">
+                            {/* Balance Block */}
+                            <div className={`nursia-balance-main ${worker.balance.is_positive ? 'positive' : 'negative'}`}>
+                                <div className="nursia-balance-label">Баланс</div>
+                                <div
+                                    className="nursia-balance-amount"
+                                    style={{ color: worker.balance.is_positive ? '#10b981' : '#ef4444' }}
+                                >
+                                    {formatCurrency(Math.abs(worker.balance.due))}
+                                </div>
+                                <div className="nursia-balance-breakdown">
+                                    <div className="nursia-breakdown-item">
+                                        <span>Зарплата</span>
+                                        <span>{formatCurrency(worker.balance.salary)}</span>
+                                    </div>
+                                    {worker.balance.credit !== 0 && (
+                                        <div className="nursia-breakdown-item">
+                                            <span>Кредит</span>
+                                            <span>{worker.balance.credit < 0 ? '-' : ''} {formatCurrency(Math.abs(worker.balance.credit))}</span>
+                                        </div>
+                                    )}
+                                    {worker.balance.expenses > 0 && (
+                                        <div className="nursia-breakdown-item">
+                                            <span>Расходы</span>
+                                            <span>{formatCurrency(worker.balance.expenses)}</span>
+                                        </div>
+                                    )}
+                                    {worker.balance.bonuses > 0 && (
+                                        <div className="nursia-breakdown-item">
+                                            <span>Премии</span>
+                                            <span>{formatCurrency(worker.balance.bonuses)}</span>
+                                        </div>
+                                    )}
+                                    <div className="nursia-breakdown-divider"></div>
+                                    <div
+                                        className="nursia-breakdown-item nursia-breakdown-total"
+                                        style={{ color: worker.balance.is_positive ? '#10b981' : '#ef4444' }}
+                                    >
+                                        <span>{worker.balance.is_positive ? 'К выплате' : 'К получению'}</span>
+                                        <span>{formatCurrency(Math.abs(worker.balance.due))}</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                                    {/* Премия - жёлтый */}
-                                    <TableCell align="right">
-                                        {row.bonus > 0 && (
-                                            <Chip
-                                                icon={<CardGiftcard />}
-                                                label={formatCurrency(row.bonus, row.currency)}
-                                                sx={{ backgroundColor: '#FFD700', color: '#333' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* Итого - голубой */}
-                                    <TableCell align="right">
-                                        {row.total > 0 && (
-                                            <Chip
-                                                label={formatCurrency(row.total, row.currency)}
-                                                sx={{ backgroundColor: '#00f2fe', color: '#333' }}
-                                                size="small"
-                                            />
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                            {/* Stats Compact */}
+                            <div className="nursia-stats-compact">
+                                <div className="nursia-stat-compact">
+                                    <div className="nursia-stat-compact-label">Часов</div>
+                                    <div className="nursia-stat-compact-value">{worker.stats.hours}</div>
+                                </div>
+                                <div className="nursia-stat-compact">
+                                    <div className="nursia-stat-compact-label">Начислено</div>
+                                    <div className="nursia-stat-compact-value">{formatCurrency(worker.stats.accrued)}</div>
+                                </div>
+                                <div className="nursia-stat-compact">
+                                    <div className="nursia-stat-compact-label">Выплачено</div>
+                                    <div className="nursia-stat-compact-value">{formatCurrency(worker.stats.paid)}</div>
+                                </div>
+                                <div className="nursia-stat-compact">
+                                    <div className="nursia-stat-compact-label">Расходы</div>
+                                    <div className="nursia-stat-compact-value">{formatCurrency(worker.stats.expenses)}</div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="nursia-worker-actions">
+                                <button
+                                    className="nursia-btn nursia-btn-primary nursia-btn-small"
+                                    onClick={() => handleShowDetails(worker)}
+                                >
+                                    <Info fontSize="small" /> Детали
+                                </button>
+                                {is_employer && worker.balance.due > 0 && (
+                                    <button
+                                        className="nursia-btn nursia-btn-secondary nursia-btn-small"
+                                        onClick={() => handleOpenPaymentModal(worker, worker.balance.due)}
+                                    >
+                                        💸 {formatCurrency(worker.balance.due)}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Time Modal */}
+            <Dialog
+                open={timeModalOpen}
+                onClose={() => setTimeModalOpen(false)}
+                PaperProps={{ className: 'nursia-modal-content' }}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>⏱️ Добавить время</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            select
+                            label="Работник"
+                            value={timeForm.worker_id}
+                            onChange={(e) => setTimeForm({ ...timeForm, worker_id: e.target.value })}
+                            fullWidth
+                        >
+                            {workers?.map(w => (
+                                <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
                             ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-        </Box>
+                        </TextField>
+                        <TextField
+                            type="date"
+                            label="Дата"
+                            value={timeForm.date}
+                            onChange={(e) => setTimeForm({ ...timeForm, date: e.target.value })}
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            type="number"
+                            label="Часов"
+                            value={timeForm.hours}
+                            onChange={(e) => setTimeForm({ ...timeForm, hours: e.target.value })}
+                            fullWidth
+                            inputProps={{ step: 0.5 }}
+                        />
+                        <TextField
+                            select
+                            label="Тип записи"
+                            value={timeForm.type}
+                            onChange={(e) => setTimeForm({ ...timeForm, type: e.target.value })}
+                            fullWidth
+                        >
+                            <MenuItem value="work">Работа</MenuItem>
+                            <MenuItem value="vacation">Отпуск</MenuItem>
+                            <MenuItem value="day_off">Отгул</MenuItem>
+                            <MenuItem value="sick_leave">Больничный</MenuItem>
+                        </TextField>
+                        <TextField
+                            label="Комментарий"
+                            value={timeForm.comment}
+                            onChange={(e) => setTimeForm({ ...timeForm, comment: e.target.value })}
+                            fullWidth
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setTimeModalOpen(false)}>Отмена</Button>
+                    <Button onClick={handleSaveTime} variant="contained" color="primary">Сохранить</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Payment Modal */}
+            <Dialog
+                open={paymentModalOpen}
+                onClose={() => setPaymentModalOpen(false)}
+                PaperProps={{ className: 'nursia-modal-content' }}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>💰 Выплата / Аванс</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            select
+                            label="Работник"
+                            value={paymentForm.worker_id}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, worker_id: e.target.value })}
+                            fullWidth
+                        >
+                            {workers?.map(w => (
+                                <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            select
+                            label="Тип выплаты"
+                            value={paymentForm.category}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, category: e.target.value })}
+                            fullWidth
+                        >
+                            <MenuItem value="salary">Зарплата</MenuItem>
+                            <MenuItem value="bonus">Премия</MenuItem>
+                            <MenuItem value="debt">Аванс</MenuItem>
+                            <MenuItem value="expense">Компенсация расходов</MenuItem>
+                        </TextField>
+                        <TextField
+                            type="date"
+                            label="Дата"
+                            value={paymentForm.date}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            type="number"
+                            label="Сумма (₴)"
+                            value={paymentForm.amount}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                            fullWidth
+                            inputProps={{ step: 0.01 }}
+                        />
+                        <TextField
+                            label="Комментарий"
+                            value={paymentForm.comment}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, comment: e.target.value })}
+                            fullWidth
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPaymentModalOpen(false)}>Отмена</Button>
+                    <Button onClick={handleSavePayment} variant="contained" color="primary">Сохранить</Button>
+                </DialogActions>
+            </Dialog>
+        </div>
     );
 }
 

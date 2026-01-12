@@ -1,0 +1,357 @@
+/* Nursia Dashboard Styles */
+
+.nursia-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 16px;
+    color: #e2e8f0;
+}
+
+.nursia-loading,
+.nursia-error {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Header */
+.nursia-header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.nursia-title {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #06b6d4, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+.nursia-header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Buttons */
+.nursia-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: white;
+}
+
+.nursia-btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.nursia-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+.nursia-btn-secondary {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.nursia-btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+}
+
+.nursia-btn-small {
+    padding: 10px;
+    font-size: 12px;
+}
+
+/* Summary Cards */
+.nursia-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.nursia-summary-card {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    transition: all 0.3s;
+}
+
+.nursia-summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.nursia-summary-card h3 {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.nursia-amount {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* Workers Grid */
+.nursia-workers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+}
+
+/* Worker Card */
+.nursia-worker-card {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.nursia-worker-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.nursia-worker-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.nursia-worker-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+}
+
+.nursia-worker-actions-header {
+    display: flex;
+    gap: 8px;
+}
+
+.nursia-worker-body {
+    padding: 20px;
+}
+
+/* Balance Block */
+.nursia-balance-main {
+    background: rgba(15, 23, 42, 0.5);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 2px solid;
+    position: relative;
+    overflow: hidden;
+}
+
+.nursia-balance-main::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+}
+
+.nursia-balance-main.positive {
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.nursia-balance-main.negative {
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.nursia-balance-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    opacity: 0.7;
+    color: #94a3b8;
+}
+
+.nursia-balance-amount {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.nursia-balance-breakdown {
+    font-size: 13px;
+    opacity: 0.8;
+    line-height: 1.6;
+    color: #cbd5e1;
+}
+
+.nursia-breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+
+.nursia-breakdown-divider {
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    margin: 8px 0;
+}
+
+.nursia-breakdown-total {
+    font-weight: 700;
+}
+
+/* Stats Compact */
+.nursia-stats-compact {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.nursia-stat-compact {
+    background: rgba(15, 23, 42, 0.5);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.nursia-stat-compact-label {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+}
+
+.nursia-stat-compact-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+/* Worker Actions */
+.nursia-worker-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.nursia-worker-actions .nursia-btn:only-child {
+    grid-column: 1 / -1;
+}
+
+/* Modal Styling */
+.nursia-modal-content {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    color: #e2e8f0;
+    border-radius: 16px !important;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.nursia-modal-content .MuiDialogTitle-root {
+    color: #e2e8f0;
+}
+
+.nursia-modal-content .MuiInputBase-root {
+    color: #e2e8f0;
+    background: rgba(15, 23, 42, 0.5);
+}
+
+.nursia-modal-content .MuiInputLabel-root {
+    color: #94a3b8;
+}
+
+.nursia-modal-content .MuiOutlinedInput-notchedOutline {
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.nursia-modal-content .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: rgba(148, 163, 184, 0.5);
+}
+
+.nursia-modal-content .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: #3b82f6;
+}
+
+.nursia-modal-content .MuiMenuItem-root {
+    color: #e2e8f0;
+}
+
+.nursia-modal-content .MuiDialogActions-root .MuiButton-root {
+    color: #94a3b8;
+}
+
+.nursia-modal-content .MuiDialogActions-root .MuiButton-contained {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .nursia-summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .nursia-workers-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nursia-worker-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .nursia-worker-actions-header {
+        width: 100%;
+    }
+
+    .nursia-worker-actions-header .nursia-btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .nursia-amount {
+        font-size: 20px;
+    }
+
+    .nursia-balance-amount {
+        font-size: 28px;
+    }
+}

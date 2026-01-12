@@ -14,7 +14,7 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routers import auth, payments, settings as settings_router, currencies, admin, users
-from api.routers import assignments, employment, balances, websocket
+from api.routers import assignments, employment, balances, websocket, dashboard
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from config.settings import settings
@@ -60,6 +60,7 @@ app.include_router(assignments.router, prefix="/api")
 app.include_router(employment.router, prefix="/api")
 app.include_router(balances.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 
 # Startup/shutdown events for background tasks

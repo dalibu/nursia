@@ -113,6 +113,11 @@ export const balances = {
   getDebug: (params) => api.get('/balances/debug', { params })
 };
 
+// Dashboard API (Nursia Dashboard)
+export const dashboard = {
+  getData: () => api.get('/dashboard/')
+};
+
 export const settings = {
   getDebug: () => api.get('/settings/debug')
 };
