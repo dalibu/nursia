@@ -31,8 +31,9 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 class WorkerBalance(BaseModel):
     """Баланс работника"""
     salary: float           # Зарплата начислено
+    accrued: float          # Начислено (все статусы) - для показа в блоке Баланс
     salary_unpaid: float    # Неоплаченная зарплата (для карточки)
-    paid: float             # НОВОЕ: Всего выплачено (зарплата paid + кредиты paid)
+    paid: float             # Всего выплачено (зарплата paid + кредиты paid)
     credit: float           # Кредит (отрицательный = долг работника)
     credits_given: float    # Всего выданных кредитов/авансов
     debt: float             # Задолженность = Кредиты - Погашения
@@ -69,9 +70,8 @@ class DashboardSummary(BaseModel):
     salary: float           # Зарплата (начислено)
     credits: float          # Кредиты/Авансы
     unpaid: float           # Неоплачено
-    debt: float             # Задолженность
+    balance: float          # Сальдо (+ = работодатель должен, - = работник должен)
     expenses: float         # Расходы
-    due: float              # К выплате
     bonuses: float          # Премии/Подарки
     paid: float             # Выплачено
     currency: str
@@ -111,6 +111,20 @@ async def get_worker_balance(
     )
     result = await db.execute(salary_query)
     salary = float(result.scalar() or 0)
+    
+    # 1a. Начислено всего (все статусы) - для показа в Баланс
+    accrued_query = select(func.sum(Payment.amount)).join(
+        PaymentCategory, Payment.category_id == PaymentCategory.id
+    ).join(
+        PaymentCategoryGroup, PaymentCategory.group_id == PaymentCategoryGroup.id
+    ).where(
+        and_(
+            PaymentCategoryGroup.code == PaymentGroupCode.SALARY.value,
+            Payment.recipient_id == worker_id
+        )
+    )
+    result = await db.execute(accrued_query)
+    accrued = float(result.scalar() or 0)
     
     # 2. Кредиты/Авансы выданные (paid)
     credit_query = select(func.sum(Payment.amount)).join(
@@ -233,6 +247,7 @@ async def get_worker_balance(
     
     return WorkerBalance(
         salary=round(salary, 2),
+        accrued=round(accrued, 2),  # Начислено всего (для показа в Баланс)
         salary_unpaid=round(salary_unpaid, 2),  # Неоплаченная зарплата
         paid=round(paid_total, 2),  # Всего выплачено
         credit=round(-worker_debt, 2),  # Отрицательный = долг работника
@@ -390,7 +405,6 @@ async def get_dashboard(
     total_unpaid = 0.0
     total_debt = 0.0
     total_expenses = 0.0
-    total_due = 0.0
     total_bonuses = 0.0
     total_paid = 0.0
     
@@ -421,14 +435,10 @@ async def get_dashboard(
         total_hours += stats.hours
         total_salary += balance.salary
         total_credits += balance.credits_given  # Всего выданных кредитов
-        total_debt += balance.debt  # ИЗМЕНЕНО: используем задолженность из balance
+        total_debt += balance.due  # Сальдо: положительное = работодатель должен, отрицательное = работник должен
         total_expenses += balance.expenses
         total_bonuses += balance.bonuses
         total_paid += stats.paid
-        
-        # К выплате
-        if balance.due > 0:
-            total_due += balance.due
 
     
     # Неоплаченная зарплата
@@ -453,9 +463,8 @@ async def get_dashboard(
         salary=round(total_salary, 2),
         credits=round(total_credits, 2),
         unpaid=round(total_unpaid, 2),
-        debt=round(total_debt, 2),
+        balance=round(total_debt, 2),  # Сальдо
         expenses=round(total_expenses, 2),
-        due=round(total_due, 2),
         bonuses=round(total_bonuses, 2),
         paid=round(total_paid, 2),
         currency=currency

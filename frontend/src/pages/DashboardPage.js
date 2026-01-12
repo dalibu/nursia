@@ -150,6 +150,14 @@ function DashboardPage() {
 
     const { summary, workers, is_employer } = data || {};
 
+    // API возвращает: положительное = работодатель должен работнику
+    // Для отображения: + = тебе должны (хорошо), - = ты должен (плохо)
+    // Поэтому для работодателя инвертируем знак
+    const rawBalance = (summary?.balance || 0);
+    const balanceForDisplay = is_employer ? -rawBalance : rawBalance;
+    // Единая семантика: + = зелёный (хорошо), - = красный (плохо)
+    const balanceColor = balanceForDisplay >= 0 ? '#10b981' : '#ef4444';
+
     return (
         <div className="nursia-container">
             {/* Header */}
@@ -201,15 +209,9 @@ function DashboardPage() {
                     </div>
                 </div>
                 <div className="nursia-summary-card">
-                    <h3>Неоплачено</h3>
-                    <div className="nursia-amount" style={{ color: '#f59e0b' }}>
-                        {formatCurrency(summary?.unpaid || 0)}
-                    </div>
-                </div>
-                <div className="nursia-summary-card">
-                    <h3>Задолженность</h3>
-                    <div className="nursia-amount" style={{ color: '#e2ea3f' }}>
-                        {formatCurrency(summary?.debt || 0)}
+                    <h3>Премии / Подарки</h3>
+                    <div className="nursia-amount" style={{ color: '#2e54fe' }}>
+                        {formatCurrency(summary?.bonuses || 0)}
                     </div>
                 </div>
                 <div className="nursia-summary-card">
@@ -219,15 +221,9 @@ function DashboardPage() {
                     </div>
                 </div>
                 <div className="nursia-summary-card">
-                    <h3>К выплате</h3>
-                    <div className="nursia-amount" style={{ color: '#fe4747' }}>
-                        {formatCurrency(summary?.due || 0)}
-                    </div>
-                </div>
-                <div className="nursia-summary-card">
-                    <h3>Премии / Подарки</h3>
-                    <div className="nursia-amount" style={{ color: '#2e54fe' }}>
-                        {formatCurrency(summary?.bonuses || 0)}
+                    <h3>Неоплачено</h3>
+                    <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+                        {formatCurrency(summary?.unpaid || 0)}
                     </div>
                 </div>
                 <div className="nursia-summary-card">
@@ -236,11 +232,38 @@ function DashboardPage() {
                         {formatCurrency(summary?.paid || 0)}
                     </div>
                 </div>
+                <div className="nursia-summary-card">
+                    <h3>Сальдо</h3>
+                    <div 
+                        className="nursia-amount" 
+                        style={{ color: balanceColor }}
+                    >
+                        {balanceForDisplay >= 0 ? '+' : ''}{formatCurrency(balanceForDisplay)}
+                    </div>
+                </div>
             </div>
 
             {/* Worker Cards */}
             <div className="nursia-workers-grid">
-                {workers?.map(worker => (
+                {workers?.map(worker => {
+                    // API: due > 0 = работодатель должен работнику
+                    // Отображение: + = тебе должны (хорошо), - = ты должен (плохо)
+                    const workerDue = worker.balance.due;
+                    // Для работодателя инвертируем знак (его расход = минус)
+                    const dueForDisplay = is_employer ? -workerDue : workerDue;
+                    // Единая семантика: + = зелёный (хорошо), - = красный (плохо)
+                    const balanceColor = dueForDisplay >= 0 ? '#10b981' : '#ef4444';
+                    const isGreen = dueForDisplay >= 0;
+                    
+                    // Пропускаем карточку, если нет никаких платежей
+                    const hasPayments = worker.balance.accrued > 0 || worker.balance.paid > 0 || 
+                                       worker.balance.expenses > 0 || worker.balance.bonuses > 0 || 
+                                       worker.balance.salary_unpaid > 0 || worker.balance.credits_given > 0 ||
+                                       worker.stats.shifts > 0 || worker.stats.hours > 0;
+                    
+                    if (!hasPayments) return null;
+                    
+                    return (
                     <div key={worker.id} className="nursia-worker-card">
                         <div className="nursia-worker-header">
                             <div className="nursia-worker-name">
@@ -264,29 +287,23 @@ function DashboardPage() {
 
                         <div className="nursia-worker-body">
                             {/* Balance Block */}
-                            <div className={`nursia-balance-main ${worker.balance.is_positive ? 'positive' : 'negative'}`}>
+                            <div className={`nursia-balance-main ${isGreen ? 'positive' : 'negative'}`}>
                                 <div className="nursia-balance-label">Баланс</div>
                                 <div
                                     className="nursia-balance-amount"
-                                    style={{ color: worker.balance.is_positive ? '#10b981' : '#ef4444' }}
+                                    style={{ color: balanceColor }}
                                 >
-                                    {formatCurrency(Math.abs(worker.balance.due))}
+                                    {formatCurrency(Math.abs(dueForDisplay))}
                                 </div>
                                 <div className="nursia-balance-breakdown">
                                     <div className="nursia-breakdown-item">
-                                        <span>Зарплата</span>
-                                        <span>{formatCurrency(worker.balance.salary_unpaid || worker.balance.salary)}</span>
+                                        <span>Начислено</span>
+                                        <span>{formatCurrency(worker.balance.accrued || worker.balance.salary)}</span>
                                     </div>
                                     <div className="nursia-breakdown-item">
                                         <span>Выплачено</span>
                                         <span>{formatCurrency(worker.balance.paid || 0)}</span>
                                     </div>
-                                    {worker.balance.credit !== 0 && (
-                                        <div className="nursia-breakdown-item">
-                                            <span>Кредит</span>
-                                            <span>{worker.balance.credit < 0 ? '-' : ''} {formatCurrency(Math.abs(worker.balance.credit))}</span>
-                                        </div>
-                                    )}
                                     {worker.balance.expenses > 0 && (
                                         <div className="nursia-breakdown-item">
                                             <span>Расходы</span>
@@ -302,10 +319,10 @@ function DashboardPage() {
                                     <div className="nursia-breakdown-divider"></div>
                                     <div
                                         className="nursia-breakdown-item nursia-breakdown-total"
-                                        style={{ color: worker.balance.is_positive ? '#10b981' : '#ef4444' }}
+                                        style={{ color: balanceColor }}
                                     >
-                                        <span>{worker.balance.is_positive ? 'К выплате' : 'К получению'}</span>
-                                        <span>{formatCurrency(Math.abs(worker.balance.due))}</span>
+                                        <span>{isGreen ? 'К получению' : 'К выплате'}</span>
+                                        <span>{formatCurrency(Math.abs(dueForDisplay))}</span>
                                     </div>
                                 </div>
                             </div>
@@ -349,7 +366,8 @@ function DashboardPage() {
                             </div>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Time Modal */}
