@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Учёт работників</title>
+    <title>Nursia</title>
     <style>
         * {
             margin: 0;
@@ -409,60 +409,80 @@
 <body>
     <div class="container">
         <header>
-            <h1>💼 Учёт работников</h1>
+            <h1 style="display: flex; align-items: center; gap: 10px;"><img src="../frontend/public/favicon.svg" alt="Nursia" width="50" height="50">Nursia</h1>
             <div class="header-actions">
-                <button class="btn btn-secondary" onclick="openModal('timeModal')">⏱️ Время</button>
-                <button class="btn btn-secondary" onclick="openModal('expenseModal')">💳 Расход</button>
-                <button class="btn btn-primary" onclick="openModal('paymentModal')">💰 Выплата</button>
+                <button class="btn btn-secondary">⚙️Настройки</button>
+                <button class="btn btn-secondary">👨🏻‍💼Аккаунт</button>
             </div>
         </header>
 
         <div class="summary-cards">
             <div class="summary-card">
-                <h3>К выплате</h3>
-                <div class="amount" style="color: #f59e0b;">14 730 ₴</div>
+                <h3>Смены</h3>
+                <div class="amount" style="color: #3b82f6;">3</div>
             </div>
             <div class="summary-card">
-                <h3>Авансы</h3>
-                <div class="amount" style="color: #ef4444;">20 ₴</div>
+                <h3>Часы</h3>
+                <div class="amount" style="color: #3b82f6;">3.5</div>
             </div>
             <div class="summary-card">
-                <h3>Итого</h3>
-                <div class="amount" style="color: #10b981;">14 710 ₴</div>
+                <h3>Зарплата</h3>
+                <div class="amount" style="color: #2dbfc4;">350 ₴</div>
             </div>
             <div class="summary-card">
-                <h3>Часов</h3>
-                <div class="amount" style="color: #3b82f6;">72.5</div>
+                <h3>Кредиты / Авансы</h3>
+                <div class="amount" style="color: #7469eb;">1 270 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Неоплачено</h3>
+                <div class="amount" style="color: #f59e0b;">100 ₴</div>
+            </div>            
+            <div class="summary-card">
+                <h3>Задолженность</h3>
+                <div class="amount" style="color: #e2ea3f;">980 ₴</div>
             </div>
             <div class="summary-card">
                 <h3>Расходы</h3>
-                <div class="amount" style="color: #f59e0b;">2 850 ₴</div>
+                <div class="amount" style="color: #bc1db4;">0 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>К выплате</h3>
+                <div class="amount" style="color: #fe4747;">80 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Премии / Подарки</h3>
+                <div class="amount" style="color: #2e54fe;">0 ₴</div>
+            </div>
+            <div class="summary-card">
+                <h3>Итого</h3>
+                <div class="amount" style="color: #f9f9f9;">1 270 ₴</div>
             </div>
         </div>
 
         <div class="workers-grid">
             <div class="worker-card">
                 <div class="worker-header">
-                    <div>
-                        <div class="worker-name">👩‍🦰 Евгения</div>
-                        <div class="worker-rate">350 ₴/час</div>
+                    <div class="worker-name">👩🏻 Евгения</div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="openModal('timeModal')">⏱️ Время</button>
+                        <button class="btn btn-secondary" onclick="openModal('expenseModal')">💳 Платеж</button>
                     </div>
                 </div>
                 <div class="worker-body">
                     <div class="balance-main positive">
                         <div class="balance-label">Баланс</div>
-                        <div class="balance-amount">80 ₴</div>
+                        <div class="balance-amount" style="color: #ef4444;">80 ₴</div>
                         <div class="balance-breakdown">
                             <div class="breakdown-item">
                                 <span>Зарплата</span>
                                 <span>100 ₴</span>
                             </div>
-                            <div class="breakdown-item" style="color: #ef4444;">
+                            <div class="breakdown-item" style="color: #e2ea3f;">
                                 <span>Задолженность</span>
                                 <span>-20 ₴</span>
                             </div>
                             <div class="breakdown-divider"></div>
-                            <div class="breakdown-item" style="font-weight: 700;">
+                            <div class="breakdown-item" style="color: #ef4444; font-weight: 700;">
                                 <span>К выплате</span>
                                 <span>80 ₴</span>
                             </div>
@@ -472,15 +492,15 @@
                     <div class="stats-compact">
                         <div class="stat-compact">
                             <div class="stat-compact-label">Часов</div>
-                            <div class="stat-compact-value">4.5</div>
+                            <div class="stat-compact-value">3.5</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Начислено</div>
-                            <div class="stat-compact-value">100 ₴</div>
+                            <div class="stat-compact-value">350 ₴</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Выплачено</div>
-                            <div class="stat-compact-value">370 ₴</div>
+                            <div class="stat-compact-value">270 ₴</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Расходы</div>
@@ -497,28 +517,29 @@
 
             <div class="worker-card">
                 <div class="worker-header">
-                    <div>
-                        <div class="worker-name">👩‍🦰 Татьяна</div>
-                        <div class="worker-rate">350 ₴/час</div>
+                    <div class="worker-name">👩🏻 Татьяна</div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="openModal('timeModal')">⏱️ Время</button>
+                        <button class="btn btn-secondary" onclick="openModal('expenseModal')">💳 Платеж</button>
                     </div>
                 </div>
                 <div class="worker-body">
                     <div class="balance-main positive">
                         <div class="balance-label">Баланс</div>
-                        <div class="balance-amount">14 650 ₴</div>
+                        <div class="balance-amount">1000 ₴</div>
                         <div class="balance-breakdown">
                             <div class="breakdown-item">
                                 <span>Зарплата</span>
-                                <span>11 800 ₴</span>
+                                <span>0 ₴</span>
                             </div>
-                            <div class="breakdown-item">
-                                <span>Расходы</span>
-                                <span>2 850 ₴</span>
+                            <div class="breakdown-item" >
+                                <span>Задолженность</span>
+                                <span>1 000 ₴</span>
                             </div>
                             <div class="breakdown-divider"></div>
                             <div class="breakdown-item" style="font-weight: 700;">
-                                <span>К выплате</span>
-                                <span>14 650 ₴</span>
+                                <span>К получению</span>
+                                <span>1 000 ₴</span>
                             </div>
                         </div>
                     </div>
@@ -526,37 +547,24 @@
                     <div class="stats-compact">
                         <div class="stat-compact">
                             <div class="stat-compact-label">Часов</div>
-                            <div class="stat-compact-value">68</div>
+                            <div class="stat-compact-value">0</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Начислено</div>
-                            <div class="stat-compact-value">23 800 ₴</div>
+                            <div class="stat-compact-value">0 ₴</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Выплачено</div>
-                            <div class="stat-compact-value">12 000 ₴</div>
+                            <div class="stat-compact-value">1 000 ₴</div>
                         </div>
                         <div class="stat-compact">
                             <div class="stat-compact-label">Расходы</div>
-                            <div class="stat-compact-value">2 850 ₴</div>
+                            <div class="stat-compact-value">0 ₴</div>
                         </div>
                     </div>
-
-                    <div class="expenses-compact">
-                        <div class="expenses-title">Расходы</div>
-                        <div class="expense-row">
-                            <span class="expense-cat">🛒 Продукты</span>
-                            <span class="expense-amt">1 450 ₴</span>
-                        </div>
-                        <div class="expense-row">
-                            <span class="expense-cat">🧹 Хоз. товары</span>
-                            <span class="expense-amt">1 400 ₴</span>
-                        </div>
-                    </div>
-
                     <div class="worker-actions">
                         <button class="btn btn-primary btn-small" onclick="showDetails('Татьяна')">📊 Детали</button>
-                        <button class="btn btn-secondary btn-small" onclick="makePayment('Татьяна', 14650)">💸 Выплатить</button>
+                        <!-- <button class="btn btn-secondary btn-small" onclick="makePayment('Татьяна', 1000)">💸 Выплатить</button> -->
                     </div>
                 </div>
             </div>
