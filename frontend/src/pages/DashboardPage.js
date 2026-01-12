@@ -321,7 +321,7 @@ function DashboardPage() {
                                         className="nursia-breakdown-item nursia-breakdown-total"
                                         style={{ color: balanceColor }}
                                     >
-                                        <span>{isGreen ? 'К получению' : 'К выплате'}</span>
+                                        <span>{workerDue < 0 ? 'Переплачено' : 'Недоплачено'}</span>
                                         <span>{formatCurrency(Math.abs(dueForDisplay))}</span>
                                     </div>
                                 </div>
