@@ -6,7 +6,7 @@ import {
 import { Settings, AccountCircle, AccessTime, Payment, Info } from '@mui/icons-material';
 import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { useActiveSession } from '../contexts/ActiveSessionContext';
+import { useActiveSession } from '../context/ActiveSessionContext';
 import './DashboardPage.css';
 
 // Символы валют
