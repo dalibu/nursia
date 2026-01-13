@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { Check, Close, Delete } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 
 function RequestsPage() {
   const { checkRequests } = useNotifications();
@@ -136,6 +137,7 @@ function RequestsPage() {
 
   return (
     <Box>
+      <PageHeader showMainMenu={true} />
       <Typography variant="h4" mb={3}>Заявки на регистрацию ({requests.length})</Typography>
 
       {message && (

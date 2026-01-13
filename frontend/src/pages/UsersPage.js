@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { Edit, Delete, Check, Close, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 
 function UsersPage() {
   const { checkRequests } = useNotifications();
@@ -267,6 +268,7 @@ function UsersPage() {
 
   return (
     <Box>
+      <PageHeader showMainMenu={true} />
       <Typography variant="h4" mb={3}>Управление пользователями</Typography>
 
       {message && (

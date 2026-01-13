@@ -12,6 +12,7 @@ import {
     CheckCircle, Cancel, AdminPanelSettings
 } from '@mui/icons-material';
 import { admin, usersApi } from '../services/api';
+import PageHeader from '../components/PageHeader';
 
 function RolesPage() {
     const [loading, setLoading] = useState(true);
@@ -203,6 +204,7 @@ function RolesPage() {
 
     return (
         <Box>
+            <PageHeader showMainMenu={true} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
                     <AdminPanelSettings sx={{ mr: 1, verticalAlign: 'middle' }} />
