@@ -1,0 +1,86 @@
+/* Global Theme Variables */
+
+:root[data-theme="dark"] {
+  /* Background colors */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-card: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --bg-header: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --bg-balance: rgba(15, 23, 42, 0.5);
+  --bg-stats: rgba(15, 23, 42, 0.5);
+  
+  /* Text colors */
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  /* Border colors */
+  --border-primary: rgba(148, 163, 184, 0.1);
+  --border-secondary: rgba(148, 163, 184, 0.2);
+  
+  /* Accent colors */
+  --accent-gradient: linear-gradient(135deg, #06b6d4, #3b82f6);
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-yellow: #f59e0b;
+  --accent-purple: #8b5cf6;
+  
+  /* Button colors */
+  --btn-primary: linear-gradient(135deg, #3b82f6, #2563eb);
+  --btn-secondary: linear-gradient(135deg, #10b981, #059669);
+  --btn-hover-shadow: rgba(59, 130, 246, 0.4);
+  
+  /* Shadow colors */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="light"] {
+  /* Background colors */
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --bg-card: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  --bg-header: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  --bg-balance: rgba(255, 255, 255, 0.85);
+  --bg-stats: rgba(255, 255, 255, 0.85);
+  
+  /* Text colors */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  
+  /* Border colors */
+  --border-primary: rgba(148, 163, 184, 0.25);
+  --border-secondary: rgba(148, 163, 184, 0.35);
+  
+  /* Accent colors */
+  --accent-gradient: linear-gradient(135deg, #0ea5e9, #3b82f6);
+  --accent-blue: #2563eb;
+  --accent-cyan: #0284c7;
+  --accent-green: #059669;
+  --accent-red: #dc2626;
+  --accent-yellow: #d97706;
+  --accent-purple: #7c3aed;
+  
+  /* Button colors */
+  --btn-primary: linear-gradient(135deg, #3b82f6, #2563eb);
+  --btn-secondary: linear-gradient(135deg, #059669, #047857);
+  --btn-hover-shadow: rgba(59, 130, 246, 0.35);
+  
+  /* Shadow colors */
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+/* Apply theme to body */
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

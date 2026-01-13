@@ -10,7 +10,7 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import { useActiveSession } from '../context/ActiveSessionContext';
 import MainMenu from '../components/MainMenu';
 import AccountMenu from '../components/AccountMenu';
-import './DashboardPage.css';
+import '../styles/pages.css';
 
 // Символы валют
 const currencySymbols = {

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { IconButton, Tooltip } from '@mui/material';
 import { AccountCircle } from '@mui/icons-material';
+import { useTheme } from '../contexts/ThemeContext';
 import '../styles/MainMenu.css';
 
 const AccountMenu = ({ onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -51,6 +53,10 @@ const AccountMenu = ({ onLogout }) => {
                   <span className="menu-icon">👤</span>
                   Профиль
                 </Link>
+                <button className="main-menu-item" onClick={toggleTheme}>
+                  <span className="menu-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
+                  {theme === 'dark' ? 'Светлая тема' : 'Темная тема'}
+                </button>
                 <button className="main-menu-item logout-btn" onClick={handleLogout}>
                   <span className="menu-icon">🚪</span>
                   Выйти
