@@ -207,23 +207,21 @@
 
 /* Header */
 .nursia-header {
-    background: var(--bg-header);
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     padding: 20px 24px;
     border-radius: 12px;
     margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid var(--border-primary);
+    border: none;
 }
 
 .nursia-title {
     font-size: 22px;
     font-weight: 700;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: white;
+    text-transform: uppercase;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -233,6 +231,14 @@
 .nursia-header-actions {
     display: flex;
     gap: 8px;
+}
+
+.nursia-header-actions .MuiIconButton-root {
+    color: white;
+}
+
+.nursia-header-actions .MuiIconButton-root:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Buttons */
@@ -256,7 +262,7 @@
 
 .nursia-btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 8px 20px var(--btn-hover-shadow);
 }
 
 .nursia-btn-secondary {
@@ -265,7 +271,7 @@
 
 .nursia-btn-secondary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 8px 20px var(--btn-hover-shadow);
 }
 
 .nursia-btn-small {
@@ -349,6 +355,14 @@
 .nursia-worker-actions-header {
     display: flex;
     gap: 8px;
+}
+
+.nursia-worker-actions-header .MuiIconButton-root {
+    color: white;
+}
+
+.nursia-worker-actions-header .MuiIconButton-root:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .nursia-worker-body {

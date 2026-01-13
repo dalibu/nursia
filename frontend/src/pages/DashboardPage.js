@@ -171,17 +171,17 @@ function DashboardPage() {
                 </h1>
                 <div className="nursia-header-actions">
                     <Tooltip title="Обозрение">
-                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/">
+                        <IconButton component={Link} to="/" sx={{ color: 'var(--icon-color)' }}>
                             <Home />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Платежи">
-                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/payments">
+                        <IconButton component={Link} to="/payments" sx={{ color: 'var(--icon-color)' }}>
                             <Payment />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Время">
-                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/time-tracker">
+                        <IconButton component={Link} to="/time-tracker" sx={{ color: 'var(--icon-color)' }}>
                             <AccessTime />
                         </IconButton>
                     </Tooltip>
@@ -284,18 +284,27 @@ function DashboardPage() {
                                 {worker.avatar} {worker.name}
                             </div>
                             <div className="nursia-worker-actions-header">
-                                <button
-                                    className="nursia-btn nursia-btn-secondary"
-                                    onClick={() => handleOpenTimeModal(worker)}
-                                >
-                                    <AccessTime fontSize="small" /> Время
-                                </button>
-                                <button
-                                    className="nursia-btn nursia-btn-secondary"
-                                    onClick={() => handleOpenPaymentModal(worker)}
-                                >
-                                    <Payment fontSize="small" /> Платеж
-                                </button>
+                                <Tooltip title="Время">
+                                    <IconButton
+                                        onClick={() => handleOpenTimeModal(worker)}
+                                    >
+                                        <AccessTime />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Платеж">
+                                    <IconButton
+                                        onClick={() => handleOpenPaymentModal(worker)}
+                                    >
+                                        <Payment />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Детали">
+                                    <IconButton
+                                        onClick={() => handleShowDetails(worker)}
+                                    >
+                                        <Info />
+                                    </IconButton>
+                                </Tooltip>
                             </div>
                         </div>
 
@@ -359,24 +368,6 @@ function DashboardPage() {
                                     <div className="nursia-stat-compact-label">Расходы</div>
                                     <div className="nursia-stat-compact-value">{formatCurrency(worker.stats.expenses)}</div>
                                 </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="nursia-worker-actions">
-                                <button
-                                    className="nursia-btn nursia-btn-primary nursia-btn-small"
-                                    onClick={() => handleShowDetails(worker)}
-                                >
-                                    <Info fontSize="small" /> Детали
-                                </button>
-                                {is_employer && worker.balance.due > 0 && (
-                                    <button
-                                        className="nursia-btn nursia-btn-secondary nursia-btn-small"
-                                        onClick={() => handleOpenPaymentModal(worker, worker.balance.due)}
-                                    >
-                                        💸 {formatCurrency(worker.balance.due)}
-                                    </button>
-                                )}
                             </div>
                         </div>
                     </div>

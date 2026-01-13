@@ -27,8 +27,9 @@ const MainMenu = ({ isAdmin, hasRequests, onLogout }) => {
     <div className="main-menu-container">
       <Tooltip title="Настройки">
         <IconButton 
-          className="main-menu-trigger nursia-btn nursia-btn-secondary"
+          className="main-menu-trigger"
           onClick={toggleMenu}
+          sx={{ color: 'var(--icon-color)' }}
         >
           <Settings />
         </IconButton>
