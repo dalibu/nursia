@@ -1185,9 +1185,12 @@ function TimeTrackerPage() {
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-            </Box>
+            <div className="nursia-container">
+                <PageHeader showMainMenu={false} />
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                    <CircularProgress />
+                </Box>
+            </div>
         );
     }
 

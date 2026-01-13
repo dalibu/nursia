@@ -139,18 +139,24 @@ function DashboardPage() {
 
     if (loading) {
         return (
-            <Box className="nursia-loading">
-                <CircularProgress sx={{ color: '#3b82f6' }} />
-            </Box>
+            <div className="nursia-container">
+                <PageHeader showMainMenu={false} />
+                <Box className="nursia-loading">
+                    <CircularProgress sx={{ color: '#3b82f6' }} />
+                </Box>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <Box className="nursia-error">
-                <p>{error}</p>
-                <Button onClick={() => loadData()}>Повторить</Button>
-            </Box>
+            <div className="nursia-container">
+                <PageHeader showMainMenu={false} />
+                <Box className="nursia-error">
+                    <p>{error}</p>
+                    <Button onClick={() => loadData()}>Повторить</Button>
+                </Box>
+            </div>
         );
     }
 
