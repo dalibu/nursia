@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Box, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, MenuItem, Button, IconButton, Tooltip
 } from '@mui/material';
-import { Settings, AccountCircle, AccessTime, Payment, Info } from '@mui/icons-material';
+import { Settings, AccountCircle, AccessTime, Payment, Info, Home } from '@mui/icons-material';
 import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useActiveSession } from '../context/ActiveSessionContext';
+import MainMenu from '../components/MainMenu';
+import AccountMenu from '../components/AccountMenu';
 import './DashboardPage.css';
 
 // Символы валют
@@ -164,21 +167,32 @@ function DashboardPage() {
             <header className="nursia-header">
                 <h1 className="nursia-title">
                     <img src="/favicon.svg" alt="Nursia" width="40" height="40" />
-                    Nursia
+                    NURSIA
                 </h1>
                 <div className="nursia-header-actions">
-                    {is_employer && (
-                        <Tooltip title="Настройки">
-                            <IconButton className="nursia-btn nursia-btn-secondary">
-                                <Settings />
-                            </IconButton>
-                        </Tooltip>
-                    )}
-                    <Tooltip title="Аккаунт">
-                        <IconButton className="nursia-btn nursia-btn-secondary">
-                            <AccountCircle />
+                    <Tooltip title="Обозрение">
+                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/">
+                            <Home />
                         </IconButton>
                     </Tooltip>
+                    <Tooltip title="Платежи">
+                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/payments">
+                            <Payment />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Время">
+                        <IconButton className="nursia-btn nursia-btn-secondary" component={Link} to="/time-tracker">
+                            <AccessTime />
+                        </IconButton>
+                    </Tooltip>
+                    {is_employer && (
+                        <MainMenu 
+                            isAdmin={is_employer} 
+                            hasRequests={false}
+                            onLogout={() => {}}
+                        />
+                    )}
+                    <AccountMenu onLogout={() => {}} />
                 </div>
             </header>
 
