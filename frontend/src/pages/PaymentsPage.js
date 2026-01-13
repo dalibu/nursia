@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
   Typography, Button, TableCell,
@@ -8,10 +8,8 @@ import {
   DialogContentText, Chip, Popover, Tooltip,
   Grid, Card, CardContent, Checkbox, Snackbar, Alert, CircularProgress
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, Home, AccessTime, LightMode, DarkMode } from '@mui/icons-material';
-import MainMenu from '../components/MainMenu';
-import AccountMenu from '../components/AccountMenu';
-import { useTheme } from '../contexts/ThemeContext';
+import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, AccessTime } from '@mui/icons-material';
+import PageHeader from '../components/PageHeader';
 import '../styles/pages.css';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -131,9 +129,6 @@ function PaymentsPage() {
   const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
   const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
   const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
-
-  // Theme
-  const { theme, toggleTheme } = useTheme();
 
   // Loading state
   const [loading, setLoading] = useState(true);
@@ -651,42 +646,7 @@ function PaymentsPage() {
 
   return (
     <div className="nursia-container">
-      {/* Header */}
-      <header className="nursia-header">
-        <h1 className="nursia-title">
-          <img src="/favicon.svg" alt="Nursia" width="40" height="40" />
-          NURSIA
-        </h1>
-        <div className="nursia-header-actions">
-          <Tooltip title="Обозрение">
-            <IconButton component={Link} to="/">
-              <Home />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Платежи">
-            <IconButton component={Link} to="/payments">
-              <Payment />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Время">
-            <IconButton component={Link} to="/time-tracker">
-              <AccessTime />
-            </IconButton>
-          </Tooltip>
-          {isAdmin && (
-            <MainMenu 
-              isAdmin={isAdmin}
-              hasRequests={false}
-            />
-          )}
-          <AccountMenu onLogout={() => {}} />
-          <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}>
-            <IconButton onClick={toggleTheme}>
-              {theme === 'dark' ? <LightMode /> : <DarkMode />}
-            </IconButton>
-          </Tooltip>
-        </div>
-      </header>
+      <PageHeader showMainMenu={isAdmin} />
 
       {/* Add Payment Button */}
       <Box display="flex" justifyContent="flex-end" mb={2}>

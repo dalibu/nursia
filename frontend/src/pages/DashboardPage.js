@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import {
     Box, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, MenuItem, Button, IconButton, Tooltip
 } from '@mui/material';
-import { Settings, AccountCircle, AccessTime, Payment, Info, Home, LightMode, DarkMode } from '@mui/icons-material';
+import { Settings, AccountCircle, AccessTime, Payment, Info } from '@mui/icons-material';
 import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useActiveSession } from '../context/ActiveSessionContext';
-import { useTheme } from '../contexts/ThemeContext';
-import MainMenu from '../components/MainMenu';
-import AccountMenu from '../components/AccountMenu';
+import PageHeader from '../components/PageHeader';
 import '../styles/pages.css';
 
 // Символы валют
@@ -53,7 +50,6 @@ function DashboardPage() {
 
     const { subscribe } = useWebSocket();
     const { activeSession } = useActiveSession();
-    const { theme, toggleTheme } = useTheme();
 
     const formatCurrency = (amount, currency = 'UAH') => {
         const value = Number(amount);
@@ -170,43 +166,7 @@ function DashboardPage() {
 
     return (
         <div className="nursia-container">
-            {/* Header */}
-            <header className="nursia-header">
-                <h1 className="nursia-title">
-                    <img src="/favicon.svg" alt="Nursia" width="40" height="40" />
-                    NURSIA
-                </h1>
-                <div className="nursia-header-actions">
-                    <Tooltip title="Обозрение">
-                        <IconButton component={Link} to="/" sx={{ color: 'var(--icon-color)' }}>
-                            <Home />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Платежи">
-                        <IconButton component={Link} to="/payments" sx={{ color: 'var(--icon-color)' }}>
-                            <Payment />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Время">
-                        <IconButton component={Link} to="/time-tracker" sx={{ color: 'var(--icon-color)' }}>
-                            <AccessTime />
-                        </IconButton>
-                    </Tooltip>
-                    {is_employer && (
-                        <MainMenu 
-                            isAdmin={is_employer} 
-                            hasRequests={false}
-                            onLogout={() => {}}
-                        />
-                    )}
-                    <AccountMenu onLogout={() => {}} />
-                    <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}>
-                        <IconButton onClick={toggleTheme}>
-                            {theme === 'dark' ? <LightMode /> : <DarkMode />}
-                        </IconButton>
-                    </Tooltip>
-                </div>
-            </header>
+            <PageHeader showMainMenu={is_employer} />
 
             {/* Summary Cards */}
             <div className="nursia-summary-cards">

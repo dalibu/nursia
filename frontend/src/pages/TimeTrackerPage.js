@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
+import PageHeader from '../components/PageHeader';
+import '../styles/pages.css';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
@@ -1190,78 +1192,75 @@ function TimeTrackerPage() {
     }
 
     return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    Учёт времени
-                </Typography>
-                <Box display="flex" gap={1}>
-                    {/* Dropdown menu for "Начать смену" */}
-                    <Button
-                        variant="contained"
-                        color="success"
-                        endIcon={<ArrowDropDown />}
-                        onClick={handleStartMenuOpen}
-                        sx={{
-                            '& .MuiButton-endIcon': { ml: 0.5 }
-                        }}
-                    >
-                        Начать смену
-                    </Button>
-                    <Menu
-                        anchorEl={startMenuAnchor}
-                        open={Boolean(startMenuAnchor)}
-                        onClose={handleStartMenuClose}
-                        anchorOrigin={{
-                            vertical: 'bottom',
-                            horizontal: 'left',
-                        }}
-                        transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                        }}
-                    >
-                        <MenuItem
-                            onClick={handleStartTimerClick}
-                            disabled={!isAdmin && !!activeSession}
-                        >
-                            <PlayArrow sx={{ mr: 1, color: 'success.main' }} />
-                            Запустить таймер
-                        </MenuItem>
-                        <MenuItem onClick={handleManualAddClick}>
-                            <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
-                            Создать запись
-                        </MenuItem>
-                    </Menu>
-                    <Button
-                        variant="contained"
-                        color={activeSession?.session_type === 'pause' ? 'success' : 'warning'}
-                        startIcon={activeSession?.session_type === 'pause' ? <PlayArrow /> : <Pause />}
-                        onClick={() => activeSession && togglePause()}
-                        disabled={!activeSession}
-                    >
-                        {activeSession?.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<Stop />}
-                        onClick={() => activeSession && stopSession()}
-                        disabled={!activeSession}
-                    >
-                        Завершить
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={() => setNewTaskOpen(true)}
-                        disabled={!activeSession}
-                    >
-                        Новое задание
-                    </Button>
-                </Box>
-            </Box>
+        <div className="nursia-container">
+            <PageHeader showMainMenu={isAdmin} />
 
+            {/* Action Buttons */}
+            <Box display="flex" justifyContent="flex-end" gap={1} mb={2}>
+                {/* Dropdown menu for "Начать смену" */}
+                <Button
+                    variant="contained"
+                    color="success"
+                    endIcon={<ArrowDropDown />}
+                    onClick={handleStartMenuOpen}
+                    sx={{
+                        '& .MuiButton-endIcon': { ml: 0.5 }
+                    }}
+                >
+                    Начать смену
+                </Button>
+                <Menu
+                    anchorEl={startMenuAnchor}
+                    open={Boolean(startMenuAnchor)}
+                    onClose={handleStartMenuClose}
+                    anchorOrigin={{
+                        vertical: 'bottom',
+                        horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'left',
+                    }}
+                >
+                    <MenuItem
+                        onClick={handleStartTimerClick}
+                        disabled={!isAdmin && !!activeSession}
+                    >
+                        <PlayArrow sx={{ mr: 1, color: 'success.main' }} />
+                        Запустить таймер
+                    </MenuItem>
+                    <MenuItem onClick={handleManualAddClick}>
+                        <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
+                        Создать запись
+                    </MenuItem>
+                </Menu>
+                <Button
+                    variant="contained"
+                    color={activeSession?.session_type === 'pause' ? 'success' : 'warning'}
+                    startIcon={activeSession?.session_type === 'pause' ? <PlayArrow /> : <Pause />}
+                    onClick={() => activeSession && togglePause()}
+                    disabled={!activeSession}
+                >
+                    {activeSession?.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
+                </Button>
+                <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<Stop />}
+                    onClick={() => activeSession && stopSession()}
+                    disabled={!activeSession}
+                >
+                    Завершить
+                </Button>
+                <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setNewTaskOpen(true)}
+                    disabled={!activeSession}
+                >
+                    Новое задание
+                </Button>
+            </Box>
 
             {/* Active session is now shown in FloatingTimer */}
 
@@ -1277,65 +1276,50 @@ function TimeTrackerPage() {
                 const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_status === 'unpaid').length;
 
                 return (
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                        {/* Смены / Задания */}
-                        <Grid item xs={6} sm={3} md={3}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Смены / Задания</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalSessions} / {totalTasks}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-
-                        {/* Часы */}
-                        <Grid item xs={6} sm={3} md={3}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Готово</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{completedSessions}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-
-                        {/* В работе */}
-                        <Grid item xs={6} sm={3} md={3}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">В работе</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{activeSessions}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-
-                        {/* Часы */}
-                        <Grid item xs={6} sm={3} md={3}>
-                            <Card sx={{
-                                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                                color: 'white',
-                                height: '100%'
-                            }}>
-                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                    <Typography variant="caption">Часы</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalHours.toFixed(1)}</Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-
-
-                    </Grid>
+                    <div className="nursia-summary-cards">
+                        <div className="nursia-summary-card">
+                            <h3>Смены</h3>
+                            <div className="nursia-amount" style={{ color: '#7469eb' }}>
+                                {totalSessions}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>Задания</h3>
+                            <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
+                                {totalTasks}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>Готово</h3>
+                            <div className="nursia-amount" style={{ color: '#10b981' }}>
+                                {completedSessions}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>В работе</h3>
+                            <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+                                {activeSessions}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>Часы</h3>
+                            <div className="nursia-amount" style={{ color: '#3b82f6' }}>
+                                {totalHours.toFixed(1)}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>Оплачено</h3>
+                            <div className="nursia-amount" style={{ color: '#10b981' }}>
+                                {paidSessions}
+                            </div>
+                        </div>
+                        <div className="nursia-summary-card">
+                            <h3>Неоплачено</h3>
+                            <div className="nursia-amount" style={{ color: '#bc1db4' }}>
+                                {unpaidSessions}
+                            </div>
+                        </div>
+                    </div>
                 );
             })()}
 
@@ -1877,7 +1861,7 @@ function TimeTrackerPage() {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </Box>
+        </div>
     );
 }
 
