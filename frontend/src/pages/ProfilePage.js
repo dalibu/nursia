@@ -4,6 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText
 } from '@mui/material';
 import PasswordField from '../components/PasswordField';
+import PageHeader from '../components/PageHeader';
 import CryptoJS from 'crypto-js';
 
 function ProfilePage() {
@@ -182,9 +183,7 @@ function ProfilePage() {
 
   return (
     <Box>
-      <Typography variant="h4" mb={3}>Мой профиль</Typography>
-
-
+      <PageHeader showMainMenu={false} />
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>Редактировать профиль</Typography>
