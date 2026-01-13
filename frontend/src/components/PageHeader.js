@@ -33,7 +33,7 @@ function PageHeader({ title = 'NURSIA', showMainMenu = false }) {
                         <AccessTime />
                     </IconButton>
                 </Tooltip>
-                {showMainMenu && <MainMenu />}
+                {showMainMenu && <MainMenu isAdmin={true} />}
                 <AccountMenu />
                 <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
                     <IconButton onClick={toggleTheme}>
