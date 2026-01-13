@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import {
   Typography, Button, TableCell,
@@ -8,7 +8,10 @@ import {
   DialogContentText, Chip, Popover, Tooltip,
   Grid, Card, CardContent, Checkbox, Snackbar, Alert, CircularProgress
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, Home, AccessTime } from '@mui/icons-material';
+import MainMenu from '../components/MainMenu';
+import AccountMenu from '../components/AccountMenu';
+import '../styles/pages.css';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, addMonths } from 'date-fns';
@@ -628,92 +631,119 @@ function PaymentsPage() {
   };
 
 
+  const totalCount = filteredList.length;
+  const paidPayments = filteredList.filter(p => p.payment_status === 'paid');
+  const unpaidPayments = filteredList.filter(p => p.payment_status === 'unpaid' || !p.payment_status);
+  const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalAmount = paidAmount + unpaidAmount;
+
+  const formatAmount = (amount) => (
+    <>
+      {amount.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+      <span style={{ fontWeight: 400 }}> ₴</span>
+    </>
+  );
+
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a237e' }}>Платежи</Typography>
+    <div className="nursia-container">
+      {/* Header */}
+      <header className="nursia-header">
+        <h1 className="nursia-title">
+          <img src="/favicon.svg" alt="Nursia" width="40" height="40" />
+          NURSIA
+        </h1>
+        <div className="nursia-header-actions">
+          <Tooltip title="Обозрение">
+            <IconButton component={Link} to="/">
+              <Home />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Платежи">
+            <IconButton component={Link} to="/payments">
+              <Payment />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Время">
+            <IconButton component={Link} to="/time-tracker">
+              <AccessTime />
+            </IconButton>
+          </Tooltip>
+          {isAdmin && (
+            <MainMenu 
+              isAdmin={isAdmin}
+              hasRequests={false}
+            />
+          )}
+          <AccountMenu onLogout={() => {}} />
+        </div>
+      </header>
+
+      {/* Add Payment Button */}
+      <Box display="flex" justifyContent="flex-end" mb={2}>
         <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => { setRepeatTemplate(null); setEditingPayment(null); setShowForm(true); }}
+          sx={{
+            background: 'var(--btn-primary)',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 20px var(--btn-hover-shadow)'
+            }
+          }}
         >
           Добавить платёж
         </Button>
       </Box>
 
       {/* Summary Cards */}
-      {(() => {
-        const totalCount = filteredList.length;
-        const paidPayments = filteredList.filter(p => p.payment_status === 'paid');
-        const unpaidPayments = filteredList.filter(p => p.payment_status === 'unpaid' || !p.payment_status);
-        const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-        const unpaidAmount = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-        const totalAmount = paidAmount + unpaidAmount;
+      <div className="nursia-summary-cards">
+        <div className="nursia-summary-card">
+          <h3>Всего</h3>
+          <div className="nursia-amount" style={{ color: '#7469eb' }}>
+            {totalCount}
+          </div>
+        </div>
+        <div className="nursia-summary-card">
+          <h3>Оплачено</h3>
+          <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
+            {paidPayments.length}
+          </div>
+        </div>
+        <div className="nursia-summary-card">
+          <h3>Сумма оплачено</h3>
+          <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
+            {formatAmount(paidAmount)}
+          </div>
+        </div>
+        <div className="nursia-summary-card">
+          <h3>Неоплачено</h3>
+          <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+            {unpaidPayments.length}
+          </div>
+        </div>
+        <div className="nursia-summary-card">
+          <h3>Сумма неоплачено</h3>
+          <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+            {formatAmount(unpaidAmount)}
+          </div>
+        </div>
+        <div className="nursia-summary-card">
+          <h3>Итого</h3>
+          <div className="nursia-amount" style={{ color: 'var(--amount-white)' }}>
+            {formatAmount(totalAmount)}
+          </div>
+        </div>
+      </div>
 
-        const formatAmount = (amount) => `₴${amount.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-
-        return (
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* Всего */}
-            <Grid item xs={6} sm={3}>
-              <Card sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                height: '100%'
-              }}>
-                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                  <Typography variant="caption">Всего</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalCount}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Оплачено */}
-            <Grid item xs={6} sm={3}>
-              <Card sx={{
-                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                color: 'white',
-                height: '100%'
-              }}>
-                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                  <Typography variant="caption">Оплачено ({paidPayments.length})</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(paidAmount)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* К оплате */}
-            <Grid item xs={6} sm={3}>
-              <Card sx={{
-                background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
-                color: 'white',
-                height: '100%'
-              }}>
-                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                  <Typography variant="caption">К оплате ({unpaidPayments.length})</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(unpaidAmount)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Итого */}
-            <Grid item xs={6} sm={3}>
-              <Card sx={{
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                color: 'white',
-                height: '100%'
-              }}>
-                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                  <Typography variant="caption">Итого</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatAmount(totalAmount)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        );
-      })()}
-
-      <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+      <Paper sx={{ 
+        p: 2, 
+        mb: 2, 
+        background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+        border: '1px solid var(--border-primary)',
+        borderRadius: '12px'
+      }}>
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
           <TextField
             label="Поиск"
@@ -1001,7 +1031,7 @@ function PaymentsPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </div>
   );
 }
 

@@ -56,7 +56,12 @@ function DashboardPage() {
     const formatCurrency = (amount, currency = 'UAH') => {
         const value = Number(amount);
         const symbol = currencySymbols[currency] || currency;
-        return `${value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${symbol}`;
+        return (
+            <>
+                {value.toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <span style={{ fontWeight: 400 }}> {symbol}</span>
+            </>
+        );
     };
 
     const loadData = useCallback(async (showLoading = true) => {
@@ -242,7 +247,7 @@ function DashboardPage() {
                 </div>
                 <div className="nursia-summary-card">
                     <h3>Выплачено</h3>
-                    <div className="nursia-amount" style={{ color: '#f9f9f9' }}>
+                    <div className="nursia-amount" style={{ color: 'var(--amount-white)' }}>
                         {formatCurrency(summary?.paid || 0)}
                     </div>
                 </div>

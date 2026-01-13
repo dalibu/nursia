@@ -220,7 +220,7 @@
 .nursia-title {
     font-size: 22px;
     font-weight: 700;
-    color: white;
+    color: var(--header-text-color, white);
     text-transform: uppercase;
     display: flex;
     align-items: center;
@@ -234,11 +234,11 @@
 }
 
 .nursia-header-actions .MuiIconButton-root {
-    color: white;
+    color: var(--header-text-color, white);
 }
 
 .nursia-header-actions .MuiIconButton-root:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--header-hover-bg, rgba(255, 255, 255, 0.1));
 }
 
 /* Buttons */
@@ -282,9 +282,10 @@
 /* Summary Cards */
 .nursia-summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 180px));
     gap: 12px;
     margin-bottom: 20px;
+    justify-content: start;
 }
 
 .nursia-summary-card {
@@ -349,7 +350,7 @@
 .nursia-worker-name {
     font-size: 18px;
     font-weight: 700;
-    color: white;
+    color: var(--header-text-color, white);
 }
 
 .nursia-worker-actions-header {
@@ -358,11 +359,11 @@
 }
 
 .nursia-worker-actions-header .MuiIconButton-root {
-    color: white;
+    color: var(--header-text-color, white);
 }
 
 .nursia-worker-actions-header .MuiIconButton-root:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--header-hover-bg, rgba(255, 255, 255, 0.1));
 }
 
 .nursia-worker-body {
