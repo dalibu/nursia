@@ -4,10 +4,11 @@ import {
     Box, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, MenuItem, Button, IconButton, Tooltip
 } from '@mui/material';
-import { Settings, AccountCircle, AccessTime, Payment, Info, Home } from '@mui/icons-material';
+import { Settings, AccountCircle, AccessTime, Payment, Info, Home, LightMode, DarkMode } from '@mui/icons-material';
 import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useActiveSession } from '../context/ActiveSessionContext';
+import { useTheme } from '../contexts/ThemeContext';
 import MainMenu from '../components/MainMenu';
 import AccountMenu from '../components/AccountMenu';
 import '../styles/pages.css';
@@ -52,6 +53,7 @@ function DashboardPage() {
 
     const { subscribe } = useWebSocket();
     const { activeSession } = useActiveSession();
+    const { theme, toggleTheme } = useTheme();
 
     const formatCurrency = (amount, currency = 'UAH') => {
         const value = Number(amount);
@@ -198,6 +200,11 @@ function DashboardPage() {
                         />
                     )}
                     <AccountMenu onLogout={() => {}} />
+                    <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}>
+                        <IconButton onClick={toggleTheme}>
+                            {theme === 'dark' ? <LightMode /> : <DarkMode />}
+                        </IconButton>
+                    </Tooltip>
                 </div>
             </header>
 

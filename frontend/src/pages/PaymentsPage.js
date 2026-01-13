@@ -8,9 +8,10 @@ import {
   DialogContentText, Chip, Popover, Tooltip,
   Grid, Card, CardContent, Checkbox, Snackbar, Alert, CircularProgress
 } from '@mui/material';
-import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, Home, AccessTime } from '@mui/icons-material';
+import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, Home, AccessTime, LightMode, DarkMode } from '@mui/icons-material';
 import MainMenu from '../components/MainMenu';
 import AccountMenu from '../components/AccountMenu';
+import { useTheme } from '../contexts/ThemeContext';
 import '../styles/pages.css';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -130,6 +131,9 @@ function PaymentsPage() {
   const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
   const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
   const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+  // Theme
+  const { theme, toggleTheme } = useTheme();
 
   // Loading state
   const [loading, setLoading] = useState(true);
@@ -676,6 +680,11 @@ function PaymentsPage() {
             />
           )}
           <AccountMenu onLogout={() => {}} />
+          <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}>
+            <IconButton onClick={toggleTheme}>
+              {theme === 'dark' ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
         </div>
       </header>
 

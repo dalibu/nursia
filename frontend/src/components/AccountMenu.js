@@ -49,6 +49,7 @@ const AccountMenu = ({ onLogout }) => {
 
   const handleThemeToggle = () => {
     toggleTheme();
+    closeMenu();
   };
 
   return (
@@ -108,27 +109,6 @@ const AccountMenu = ({ onLogout }) => {
               </ListItemIcon>
               <ListItemText 
                 primary="Профиль"
-                primaryTypographyProps={{
-                  sx: { color: 'var(--text-primary)' }
-                }}
-              />
-            </ListItemButton>
-          </ListItem>
-
-          <ListItem disablePadding>
-            <ListItemButton 
-              onClick={handleThemeToggle}
-              sx={{
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)'
-                }
-              }}
-            >
-              <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
-                {theme === 'dark' ? <LightMode /> : <DarkMode />}
-              </ListItemIcon>
-              <ListItemText 
-                primary={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}
                 primaryTypographyProps={{
                   sx: { color: 'var(--text-primary)' }
                 }}
