@@ -97,7 +97,7 @@ function Layout({ onLogout }) {
   useIdleTimer(handleLogout, 30 * 60 * 1000);
 
   return (
-    <NotificationContext.Provider value={{ checkRequests }}>
+    <NotificationContext.Provider value={{ checkRequests, handleLogout }}>
       <FloatingTimer />
       <Box sx={{ flexGrow: 1 }}>
         <Container maxWidth="lg" sx={{ mt: 4 }}>

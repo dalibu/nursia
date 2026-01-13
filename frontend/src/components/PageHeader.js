@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { IconButton, Tooltip } from '@mui/material';
 import { Home, Payment, AccessTime, LightMode, DarkMode } from '@mui/icons-material';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNotifications } from './Layout';
 import MainMenu from './MainMenu';
 import AccountMenu from './AccountMenu';
 
 function PageHeader({ title = 'NURSIA', showMainMenu = false }) {
     const { theme, toggleTheme } = useTheme();
+    const { handleLogout } = useNotifications();
 
     return (
         <div className="nursia-header">
@@ -34,7 +36,7 @@ function PageHeader({ title = 'NURSIA', showMainMenu = false }) {
                     </IconButton>
                 </Tooltip>
                 {showMainMenu && <MainMenu isAdmin={true} />}
-                <AccountMenu />
+                <AccountMenu onLogout={handleLogout} />
                 <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
                     <IconButton onClick={toggleTheme}>
                         {theme === 'dark' ? <LightMode /> : <DarkMode />}
