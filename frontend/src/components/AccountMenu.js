@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { IconButton, Tooltip } from '@mui/material';
-import { AccountCircle } from '@mui/icons-material';
+import { 
+  IconButton, 
+  Tooltip, 
+  Drawer, 
+  Box, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemButton, 
+  ListItemIcon, 
+  ListItemText,
+  Divider,
+  useMediaQuery,
+  useTheme as useMuiTheme
+} from '@mui/material';
+import { 
+  AccountCircle, 
+  Close,
+  Person,
+  LightMode,
+  DarkMode,
+  Logout
+} from '@mui/icons-material';
 import { useTheme } from '../contexts/ThemeContext';
-import '../styles/MainMenu.css';
 
 const AccountMenu = ({ onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const muiTheme = useMuiTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -25,11 +47,14 @@ const AccountMenu = ({ onLogout }) => {
     setIsMenuOpen(false);
   };
 
+  const handleThemeToggle = () => {
+    toggleTheme();
+  };
+
   return (
-    <div className="main-menu-container">
+    <>
       <Tooltip title="Аккаунт">
         <IconButton 
-          className="main-menu-trigger"
           onClick={toggleMenu}
           sx={{ color: 'var(--icon-color)' }}
         >
@@ -37,37 +62,105 @@ const AccountMenu = ({ onLogout }) => {
         </IconButton>
       </Tooltip>
       
-      {isMenuOpen && (
-        <>
-          <div className="main-menu-overlay" onClick={closeMenu}></div>
-          <div className="main-menu">
-            <div className="main-menu-header">
-              <h3>Аккаунт</h3>
-              <button className="main-menu-close" onClick={closeMenu}>
-                ✕
-              </button>
-            </div>
-            
-            <div className="main-menu-body">
-              <div className="main-menu-section">
-                <Link to="/profile" className="main-menu-item" onClick={closeMenu}>
-                  <span className="menu-icon">👤</span>
-                  Профиль
-                </Link>
-                <button className="main-menu-item" onClick={toggleTheme}>
-                  <span className="menu-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
-                  {theme === 'dark' ? 'Светлая тема' : 'Темная тема'}
-                </button>
-                <button className="main-menu-item logout-btn" onClick={handleLogout}>
-                  <span className="menu-icon">🚪</span>
-                  Выйти
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+      <Drawer
+        anchor={isMobile ? 'bottom' : 'right'}
+        open={isMenuOpen}
+        onClose={closeMenu}
+        PaperProps={{
+          sx: {
+            width: isMobile ? '100%' : 320,
+            maxHeight: isMobile ? '60vh' : '100%',
+            borderRadius: isMobile ? '16px 16px 0 0' : 0,
+            background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+            color: 'var(--text-primary)'
+          }
+        }}
+      >
+        <Box sx={{ 
+          p: 2, 
+          background: 'var(--btn-primary)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
+            Аккаунт
+          </Typography>
+          <IconButton onClick={closeMenu} sx={{ color: 'white' }}>
+            <Close />
+          </IconButton>
+        </Box>
+
+        <List>
+          <ListItem disablePadding>
+            <ListItemButton 
+              component={Link} 
+              to="/profile"
+              onClick={closeMenu}
+              sx={{
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)'
+                }
+              }}
+            >
+              <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
+                <Person />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Профиль"
+                primaryTypographyProps={{
+                  sx: { color: 'var(--text-primary)' }
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton 
+              onClick={handleThemeToggle}
+              sx={{
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)'
+                }
+              }}
+            >
+              <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
+                {theme === 'dark' ? <LightMode /> : <DarkMode />}
+              </ListItemIcon>
+              <ListItemText 
+                primary={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}
+                primaryTypographyProps={{
+                  sx: { color: 'var(--text-primary)' }
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+
+          <Divider sx={{ my: 1, borderColor: 'var(--border-primary)' }} />
+
+          <ListItem disablePadding>
+            <ListItemButton 
+              onClick={handleLogout}
+              sx={{
+                '&:hover': {
+                  background: 'rgba(239, 68, 68, 0.1)'
+                }
+              }}
+            >
+              <ListItemIcon sx={{ color: 'var(--accent-red)', minWidth: 40 }}>
+                <Logout />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Выйти"
+                primaryTypographyProps={{
+                  sx: { color: 'var(--accent-red)' }
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+        </List>
+      </Drawer>
+    </>
   );
 };
 
