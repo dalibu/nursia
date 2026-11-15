@@ -9,7 +9,6 @@ import {
   Grid, Card, CardContent, Checkbox, Snackbar, Alert, CircularProgress
 } from '@mui/material';
 import { Add, Edit, Delete, Payment, Replay, Search, DateRange, DeleteSweep, AccessTime } from '@mui/icons-material';
-import PageHeader from '../components/PageHeader';
 import '../styles/pages.css';
 import { DateRangePicker } from 'react-date-range';
 import { ru } from 'date-fns/locale';
@@ -646,8 +645,6 @@ function PaymentsPage() {
 
   return (
     <div className="nursia-container">
-      <PageHeader showMainMenu={isAdmin} />
-
       {/* Add Payment Button */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <Button

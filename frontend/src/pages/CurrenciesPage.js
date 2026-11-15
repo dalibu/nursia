@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { currencies } from '../services/api';
-import PageHeader from '../components/PageHeader';
 
 function CurrenciesPage() {
   const [currencyList, setCurrencyList] = useState([]);
@@ -84,7 +83,6 @@ function CurrenciesPage() {
 
   return (
     <Box>
-      <PageHeader showMainMenu={true} />
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h6">Валюты</Typography>
         <Button

@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import { Edit, Delete, Check, Close, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
-import PageHeader from '../components/PageHeader';
 
 function UsersPage() {
   const { checkRequests } = useNotifications();
@@ -268,14 +267,11 @@ function UsersPage() {
 
   return (
     <Box>
-      <PageHeader showMainMenu={true} />
-
       {message && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage('')}>
           {message}
         </Alert>
       )}
-
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -289,7 +285,7 @@ function UsersPage() {
               onChange={(e) => setShowDeleted(e.target.checked)}
               style={{ marginRight: 4 }}
             />
-            <Typography variant="body2" color="text.secondary">Показать удалённых</Typography>
+            Показать удалённых
           </label>
         </Box>
         <Button

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import PageHeader from '../components/PageHeader';
 import '../styles/pages.css';
 import {
     Typography, Paper, Box, Button, Card, CardContent, Grid,
@@ -1186,8 +1185,7 @@ function TimeTrackerPage() {
     if (loading) {
         return (
             <div className="nursia-container">
-                <PageHeader showMainMenu={false} />
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+<Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
                     <CircularProgress />
                 </Box>
             </div>
@@ -1196,8 +1194,6 @@ function TimeTrackerPage() {
 
     return (
         <div className="nursia-container">
-            <PageHeader showMainMenu={isAdmin} />
-
             {/* Action Buttons */}
             <Box display="flex" justifyContent="flex-end" gap={1} mb={2}>
                 {/* Dropdown menu for "Начать смену" */}

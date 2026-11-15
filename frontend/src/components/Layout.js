@@ -4,6 +4,7 @@ import { Container, Box } from '@mui/material';
 import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
 import FloatingTimer from './FloatingTimer';
+import PageHeader from './PageHeader';
 
 const NotificationContext = createContext();
 
@@ -20,7 +21,6 @@ function Layout({ onLogout }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
-  // ActiveSession context is still used by FloatingTimer child component
 
   useEffect(() => {
     checkUserRole();
@@ -35,7 +35,7 @@ function Layout({ onLogout }) {
 
   useEffect(() => {
     if (isAdmin && checkInterval) {
-      const intervalMs = checkInterval * 60 * 1000; // Переводим минуты в миллисекунды
+      const intervalMs = checkInterval * 60 * 1000;
       const interval = setInterval(checkRequests, intervalMs);
       return () => clearInterval(interval);
     }
@@ -50,8 +50,6 @@ function Layout({ onLogout }) {
       const roles = response.data.roles || [];
       const isAdminUser = roles.includes('admin');
       setIsAdmin(isAdminUser);
-
-      // Проверяем заявки при логине админа
       if (isAdminUser) {
         checkRequests();
       }
@@ -66,13 +64,11 @@ function Layout({ onLogout }) {
       const response = await axios.get('/api/settings/requests_check_interval', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setCheckInterval(parseInt(response.data.value)); // Значение в минутах
+      setCheckInterval(parseInt(response.data.value));
     } catch (error) {
       console.error('Failed to load check interval:', error);
     }
   };
-
-
 
   const checkRequests = async () => {
     try {
@@ -93,14 +89,14 @@ function Layout({ onLogout }) {
     navigate('/login');
   };
 
-  // Автоматический logout по бездействию (30 минут)
   useIdleTimer(handleLogout, 30 * 60 * 1000);
 
   return (
-    <NotificationContext.Provider value={{ checkRequests, handleLogout }}>
+    <NotificationContext.Provider value={{ checkRequests, handleLogout, isAdmin, hasRequests }}>
       <FloatingTimer />
       <Box sx={{ flexGrow: 1 }}>
         <Container maxWidth="lg" sx={{ mt: 4 }}>
+          <PageHeader isAdmin={isAdmin} hasRequests={hasRequests} />
           <Outlet />
         </Container>
       </Box>

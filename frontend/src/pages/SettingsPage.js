@@ -6,7 +6,6 @@ import {
   Switch, FormControlLabel, Chip
 } from '@mui/material';
 import { Edit, Check, Close } from '@mui/icons-material';
-import PageHeader from '../components/PageHeader';
 
 function SettingsPage() {
   const [settings, setSettings] = useState([]);
@@ -168,7 +167,6 @@ function SettingsPage() {
 
   return (
     <Box>
-      <PageHeader showMainMenu={true} />
       <Typography variant="h6" mb={3}>Системные настройки</Typography>
 
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>

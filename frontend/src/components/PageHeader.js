@@ -7,9 +7,11 @@ import { useNotifications } from './Layout';
 import MainMenu from './MainMenu';
 import AccountMenu from './AccountMenu';
 
-function PageHeader({ title = 'NURSIA', showMainMenu = false }) {
+function PageHeader({ isAdmin, hasRequests }) {
     const { theme, toggleTheme } = useTheme();
-    const { handleLogout } = useNotifications();
+    const { handleLogout, isAdmin: ctxIsAdmin, hasRequests: ctxHasRequests } = useNotifications();
+    const resolvedIsAdmin = typeof isAdmin === 'boolean' ? isAdmin : !!ctxIsAdmin;
+    const resolvedHasRequests = typeof hasRequests === 'boolean' ? hasRequests : !!ctxHasRequests;
 
     return (
         <div className="nursia-header">
@@ -35,7 +37,7 @@ function PageHeader({ title = 'NURSIA', showMainMenu = false }) {
                         <AccessTime />
                     </IconButton>
                 </Tooltip>
-                {showMainMenu && <MainMenu isAdmin={true} />}
+                {resolvedIsAdmin && <MainMenu isAdmin={true} hasRequests={resolvedHasRequests} />}
                 <AccountMenu onLogout={handleLogout} />
                 <Tooltip title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
                     <IconButton onClick={toggleTheme}>

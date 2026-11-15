@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { payments } from '../services/api';
-import PageHeader from '../components/PageHeader';
 
 // Предустановленные цвета
 const PRESET_COLORS = [
@@ -152,7 +151,6 @@ function CategoriesPage() {
 
   return (
     <Box>
-      <PageHeader showMainMenu={true} />
       <Typography variant="h6" gutterBottom>Категории платежей</Typography>
 
       <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 3 }}>

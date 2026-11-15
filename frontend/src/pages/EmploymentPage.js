@@ -9,7 +9,6 @@ import {
     Add, Edit, Delete, Work, Person, AttachMoney
 } from '@mui/icons-material';
 import { employment, users, currencies } from '../services/api';
-import PageHeader from '../components/PageHeader';
 
 // Символы валют
 const currencySymbols = {
@@ -165,7 +164,6 @@ function EmploymentPage() {
 
     return (
         <Box>
-            <PageHeader showMainMenu={true} />
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h6">
                     👔 Трудовые отношения

@@ -7,7 +7,6 @@ import { Settings, AccountCircle, AccessTime, Payment, Info } from '@mui/icons-m
 import { dashboard, payments, employment } from '../services/api';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useActiveSession } from '../context/ActiveSessionContext';
-import PageHeader from '../components/PageHeader';
 import '../styles/pages.css';
 
 // Символы валют
@@ -140,7 +139,6 @@ function DashboardPage() {
     if (loading) {
         return (
             <div className="nursia-container">
-                <PageHeader showMainMenu={false} />
                 <Box className="nursia-loading">
                     <CircularProgress sx={{ color: '#3b82f6' }} />
                 </Box>
@@ -151,7 +149,6 @@ function DashboardPage() {
     if (error) {
         return (
             <div className="nursia-container">
-                <PageHeader showMainMenu={false} />
                 <Box className="nursia-error">
                     <p>{error}</p>
                     <Button onClick={() => loadData()}>Повторить</Button>
@@ -172,8 +169,6 @@ function DashboardPage() {
 
     return (
         <div className="nursia-container">
-            <PageHeader showMainMenu={is_employer} />
-
             {/* Summary Cards */}
             <div className="nursia-summary-cards">
                 <div className="nursia-summary-card">
