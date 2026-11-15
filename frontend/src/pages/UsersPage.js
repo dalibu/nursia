@@ -269,7 +269,6 @@ function UsersPage() {
   return (
     <Box>
       <PageHeader showMainMenu={true} />
-      <Typography variant="h4" mb={3}>Управление пользователями</Typography>
 
       {message && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage('')}>
