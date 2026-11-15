@@ -14,19 +14,37 @@ Payment tracking service for household spending management with multi-currency s
 - **Detailed Reports** with filtering by period and currency
 - **CRUD Operations** for payments (create, read, update, delete)
 
-## Quick Start with Docker
+---
+
+## 🐳 Running with Docker (Development & Production)
+
+### 1. Local Development
+By default, `docker-compose.yml` is configured for local development with direct port access to the React frontend and FastAPI backend:
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# Create admin user
-docker-compose exec api python scripts/create_admin.py
-
-# Access the application
-# React App: http://localhost:3000
-# API Docs: http://localhost:8000/docs
+cp .env.example .env
+docker compose up -d --build
+docker compose exec api python scripts/create_admin.py
 ```
+
+* **Frontend (SPA):** http://localhost:3000
+* **Backend API (Swagger UI):** http://localhost:8000/docs
+
+### 2. Server Deployment with HTTPS (Production)
+For production environments (e.g., Oracle Cloud), the project uses **Caddy** as a reverse proxy. Caddy automatically provisions and renews Let's Encrypt SSL certificates and routes traffic to `/api` (including `wss://` WebSocket connections) and the frontend.
+
+1. Set your domain name in the `.env` file:
+   ```env
+   DOMAIN_NAME=your-domain.duckdns.org
+   ```
+
+2. Start the services using the production override file:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   docker compose exec api python scripts/create_admin.py
+   ```
+
+* **Application URL:** `https://your-domain.duckdns.org`
 
 ## Manual Installation
 

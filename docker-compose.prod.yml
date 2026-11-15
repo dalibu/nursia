@@ -1,0 +1,26 @@
+services:
+  caddy:
+    image: caddy:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - api
+
+  frontend:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+
+volumes:
+  caddy_data:
+  caddy_config:
