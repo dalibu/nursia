@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { 
-  IconButton, 
-  Tooltip, 
-  Drawer, 
-  Box, 
-  Typography, 
-  List, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
+import {
+  IconButton,
+  Tooltip,
+  Drawer,
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   useMediaQuery,
   useTheme
 } from '@mui/material';
-import { 
-  Settings, 
+import {
+  Settings,
   Close,
   People,
   Security,
@@ -24,6 +24,7 @@ import {
   Folder,
   Work,
   AttachMoney,
+  Assessment,
   SettingsApplications
 } from '@mui/icons-material';
 
@@ -48,20 +49,21 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
     { to: '/categories', icon: <Folder />, label: t('nav.categories') },
     { to: '/employment', icon: <Work />, label: t('nav.employment') },
     { to: '/currencies', icon: <AttachMoney />, label: t('nav.currencies') },
+    { to: '/reports', icon: <Assessment />, label: t('nav.reports') },
     { to: '/settings', icon: <SettingsApplications />, label: t('nav.parameters') }
   ];
 
   return (
     <>
       <Tooltip title={t('nav.settings')}>
-        <IconButton 
+        <IconButton
           onClick={toggleMenu}
           sx={{ color: 'var(--icon-color)' }}
         >
           <Settings />
         </IconButton>
       </Tooltip>
-      
+
       <Drawer
         anchor={isMobile ? 'bottom' : 'right'}
         open={isMenuOpen}
@@ -76,8 +78,8 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
           }
         }}
       >
-        <Box sx={{ 
-          p: 2, 
+        <Box sx={{
+          p: 2,
           background: 'var(--btn-primary)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -94,10 +96,10 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
         {isAdmin && (
           <>
             <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: 'var(--text-secondary)', 
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'var(--text-secondary)',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                   fontWeight: 600
@@ -106,12 +108,12 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
                 {t('nav.administration')}
               </Typography>
             </Box>
-            
+
             <List>
               {menuItems.map((item) => (
                 <ListItem key={item.to} disablePadding>
-                  <ListItemButton 
-                    component={Link} 
+                  <ListItemButton
+                    component={Link}
                     to={item.to}
                     onClick={closeMenu}
                     sx={{
@@ -123,7 +125,7 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
                     <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
                       {item.icon}
                     </ListItemIcon>
-                    <ListItemText 
+                    <ListItemText
                       primary={item.label}
                       primaryTypographyProps={{
                         sx: { color: 'var(--text-primary)' }

@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, MenuItem, Box, Chip, Select, InputLabel, FormControl
+  TextField, Button, MenuItem, Box, Chip, Select, InputLabel, FormControl, Alert
 } from '@mui/material';
 import { payments, currencies, users } from '../services/api';
 
-// Группы категорий доступные для worker
 const WORKER_ALLOWED_GROUPS = ['expense', 'repayment', 'other'];
 
 function PaymentForm({ open, payment, initialData, onClose }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     amount: '',
     currency: '',
     category_id: '',
     recipient_id: '',
-    payer_id: '',  // Добавляем payer_id
-    payment_date: new Date().toISOString().split('T')[0],
+    payer_id: '',
+    payment_date: new Date().toISOString().split('T').at(0),
     description: '',
     payment_status: 'unpaid'
   });
   const [originalTime, setOriginalTime] = useState(null);
-  const [allCategories, setAllCategories] = useState([]);
-  const [categories, setCategories] = useState([]);  // Отфильтрованные по роли
+  const [categories, setCategories] = useState([]);
   const [currencyList, setCurrencyList] = useState([]);
   const [userList, setUserList] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -29,23 +29,19 @@ function PaymentForm({ open, payment, initialData, onClose }) {
   const [localError, setLocalError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployer, setIsEmployer] = useState(false);
-  const [isWorker, setIsWorker] = useState(false);
 
-  // Ref to detect when dialog opens (transition from false to true)
   const prevOpenRef = React.useRef(false);
 
   useEffect(() => {
-    // Detect if dialog just opened (false -> true transition)
     const justOpened = open && !prevOpenRef.current;
     prevOpenRef.current = open;
 
     if (justOpened) {
-      // Dialog just opened - initialize form
       loadData();
 
       if (payment) {
         const dateTimeParts = payment.payment_date.split('T');
-        setOriginalTime(dateTimeParts[1] || null);
+        setOriginalTime(dateTimeParts.at(1) || null);
 
         setFormData({
           amount: payment.amount,
@@ -53,7 +49,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           category_id: payment.category_id,
           recipient_id: payment.recipient_id || '',
           payer_id: payment.payer_id || '',
-          payment_date: dateTimeParts[0],
+          payment_date: dateTimeParts.at(0),
           description: payment.description || '',
           payment_status: payment.payment_status || 'unpaid',
           assignment_id: payment.assignment_id || ''
@@ -65,7 +61,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           category_id: initialData.category_id || '',
           recipient_id: initialData.recipient_id || '',
           payer_id: initialData.payer_id || '',
-          payment_date: initialData.payment_date || new Date().toISOString().split('T')[0],
+          payment_date: initialData.payment_date || new Date().toISOString().split('T').at(0),
           description: initialData.description || '',
           payment_status: initialData.payment_status || 'unpaid',
           assignment_id: initialData.assignment_id || ''
@@ -77,7 +73,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           category_id: '',
           recipient_id: '',
           payer_id: '',
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: new Date().toISOString().split('T').at(0),
           description: '',
           payment_status: 'unpaid',
           assignment_id: ''
@@ -85,13 +81,10 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       }
       setLocalError('');
     }
-    // If open is true but justOpened is false - do nothing, keep current formData
-    // If open is false - do nothing
   }, [open, payment, initialData]);
 
   const loadData = async () => {
     try {
-      const token = localStorage.getItem('token');
       const [categoriesRes, currenciesRes, userRes, usersRes] = await Promise.all([
         payments.categories(),
         currencies.list(),
@@ -100,23 +93,18 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       ]);
 
       const allCats = categoriesRes.data;
-      setAllCategories(allCats);
       setCurrencyList(currenciesRes.data.currencies);
-      // Получаем информацию о текущем пользователе
+
       const userData = userRes.data;
       setCurrentUser(userData);
-
       const userId = userData.id;
 
-      // Сразу фильтруем список пользователей, чтобы не показывать себя
       const filteredUsers = (Array.isArray(usersRes) ? usersRes : []).filter(u => {
         const uId = u.id || u.user_id;
         return String(uId) !== String(userId);
       });
-
       setUserList(filteredUsers);
 
-      // Check roles via roles array (RBAC)
       const roles = userData.roles || [];
       const admin = roles.includes('admin');
       const employer = roles.includes('employer');
@@ -124,14 +112,10 @@ function PaymentForm({ open, payment, initialData, onClose }) {
 
       setIsAdmin(admin);
       setIsEmployer(employer);
-      setIsWorker(worker);
 
-      // Фильтруем категории по роли
       if (admin || employer) {
-        // Работодатель/Админ видит все категории
         setCategories(allCats);
       } else if (worker) {
-        // Worker видит только expense, repayment, other
         const filteredCats = allCats.filter(cat =>
           cat.category_group && WORKER_ALLOWED_GROUPS.includes(cat.category_group.code)
         );
@@ -140,21 +124,17 @@ function PaymentForm({ open, payment, initialData, onClose }) {
         setCategories([]);
       }
 
-      // Set default currency
       const defaultCurrency = currenciesRes.data.details.find(c => c.is_default);
       if (defaultCurrency && !payment && !initialData) {
         setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
       }
 
-      // Auto-set payer_id для нового платежа
       if (!payment && !initialData && userData.id) {
-        // Для worker: payer = сам worker
-        // Для employer/admin: payer = сам пользователь (работодатель)
         setFormData(prev => ({ ...prev, payer_id: userData.id }));
       }
     } catch (error) {
       console.error('Failed to load form data:', error);
-      setLocalError('Не удалось загрузить данные для формы. Пожалуйста, попробуйте еще раз.');
+      setLocalError(t('payments.formLoadError'));
     }
   };
 
@@ -184,24 +164,27 @@ function PaymentForm({ open, payment, initialData, onClose }) {
       onClose();
     } catch (error) {
       console.error('Failed to save payment:', error);
-      setLocalError(error.response?.data?.detail || 'Ошибка при сохранении платежа. Проверьте правильность заполнения всех полей.');
+      setLocalError(error.response?.data?.detail || t('payments.formSaveError'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Определяем нужно ли показывать поле Получатель
   const showRecipientField = isAdmin || isEmployer;
 
-  return (
+    return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{payment ? `Редактировать платёж ${payment.tracking_nr || ''}` : 'Новый платёж'}</DialogTitle>
+      <DialogTitle>
+        {payment
+          ? t('payments.editPaymentTitle', { number: payment.tracking_nr || '' })
+          : t('payments.newPaymentTitle')}
+      </DialogTitle>
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
         <DialogContent>
           {localError && <Alert severity="error" sx={{ mb: 2 }}>{localError}</Alert>}
           <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
             <TextField
-              label="Сумма"
+              label={t('payments.colAmount')}
               type="number"
               margin="normal"
               value={formData.amount}
@@ -211,7 +194,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             />
             <TextField
               select
-              label="Валюта"
+              label={t('payments.currency')}
               margin="normal"
               value={formData.currency}
               onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
@@ -225,11 +208,10 @@ function PaymentForm({ open, payment, initialData, onClose }) {
             </TextField>
           </Box>
 
-          {/* Поле Получатель только для employer/admin */}
           {showRecipientField && (
             <TextField
               select
-              label="Получатель"
+              label={t('payments.recipient')}
               margin="normal"
               fullWidth
               value={formData.recipient_id}
@@ -248,7 +230,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
           <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
             <TextField
               select
-              label="Категория"
+              label={t('payments.category')}
               margin="normal"
               value={formData.category_id}
               onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
@@ -263,10 +245,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
                       <Chip
                         label={cat.name}
                         size="small"
-                        sx={{
-                          backgroundColor: '#FFEB3B',
-                          color: '#000',
-                        }}
+                        sx={{ backgroundColor: '#FFEB3B', color: '#000' }}
                       />
                     )
                     : cat.name}
@@ -274,7 +253,7 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               ))}
             </TextField>
             <TextField
-              label="Дата"
+              label={t('payments.date')}
               type="date"
               margin="normal"
               value={formData.payment_date}
@@ -283,37 +262,41 @@ function PaymentForm({ open, payment, initialData, onClose }) {
               sx={{ width: 180 }}
             />
           </Box>
+
           <TextField
             fullWidth
-            label="Описание"
+            label={t('payments.description')}
             margin="normal"
             multiline
             rows={3}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             inputProps={{ maxLength: 1000 }}
-            helperText={`${formData.description.length}/1000 символов`}
+            helperText={t('payments.charsCount', { current: formData.description.length, max: 1000 })}
           />
+
           {isAdmin && (
             <Box mt={2}>
               <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>Статус оплаты</InputLabel>
+                <InputLabel>{t('payments.paymentStatusLabel')}</InputLabel>
                 <Select
                   value={formData.payment_status}
                   onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
-                  label="Статус оплаты"
+                  label={t('payments.paymentStatusLabel')}
                 >
-                  <MenuItem value="unpaid">Не оплачено</MenuItem>
-                  <MenuItem value="paid">Оплачено</MenuItem>
-                  <MenuItem value="offset">Зачтено</MenuItem>
+                  <MenuItem value="unpaid">{t('payments.statusUnpaid')}</MenuItem>
+                  <MenuItem value="paid">{t('payments.statusPaid')}</MenuItem>
+                  <MenuItem value="offset">{t('payments.statusOffset')}</MenuItem>
                 </Select>
               </FormControl>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Отмена</Button>
-          <Button type="submit" variant="contained">Сохранить</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" variant="contained" disabled={loading}>
+            {t('common.save')}
+          </Button>
         </DialogActions>
       </Box>
     </Dialog>

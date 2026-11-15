@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import { useTranslation } from 'react-i18next';
+import {
   Typography, Paper, Box, TextField, MenuItem, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
 import { payments, currencies } from '../services/api';
 
 function ReportsPage() {
+  const { t } = useTranslation();
   const [reports, setReports] = useState([]);
   const [filters, setFilters] = useState({
     start_date: '',
@@ -37,26 +39,26 @@ function ReportsPage() {
   };
 
   const handleFilterChange = (field, value) => {
-    setFilters({...filters, [field]: value});
+    setFilters({ ...filters, [field]: value });
   };
 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Обзор
+        {t('reports.overview')}
       </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" gap={2} alignItems="center">
+        <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
           <TextField
-            label="Дата от"
+            label={t('reports.dateFrom')}
             type="date"
             value={filters.start_date}
             onChange={(e) => handleFilterChange('start_date', e.target.value)}
             InputLabelProps={{ shrink: true }}
           />
           <TextField
-            label="Дата до"
+            label={t('reports.dateTo')}
             type="date"
             value={filters.end_date}
             onChange={(e) => handleFilterChange('end_date', e.target.value)}
@@ -64,7 +66,7 @@ function ReportsPage() {
           />
           <TextField
             select
-            label="Валюта"
+            label={t('payments.currency')}
             value={filters.currency}
             onChange={(e) => handleFilterChange('currency', e.target.value)}
             sx={{ minWidth: 120 }}
@@ -74,7 +76,7 @@ function ReportsPage() {
             ))}
           </TextField>
           <Button variant="contained" onClick={loadReports}>
-            Сформировать
+            {t('reports.generate')}
           </Button>
         </Box>
       </Paper>
@@ -84,9 +86,9 @@ function ReportsPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Категория</TableCell>
-                <TableCell align="right">Сумма</TableCell>
-                <TableCell align="right">Количество</TableCell>
+                <TableCell>{t('payments.category')}</TableCell>
+                <TableCell align="right">{t('payments.colAmount')}</TableCell>
+                <TableCell align="right">{t('reports.count')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
