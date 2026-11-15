@@ -4,7 +4,11 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { useTranslation } from 'react-i18next';
+import 'dayjs/locale/uk';
 import 'dayjs/locale/ru';
+import 'dayjs/locale/de';
+import 'dayjs/locale/en';
 import { ActiveSessionProvider } from './context/ActiveSessionContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { ThemeProvider as CustomThemeProvider, useTheme as useCustomTheme } from './contexts/ThemeContext';
@@ -30,7 +34,8 @@ import RolesPage from './pages/RolesPage';
 // Wrapper component to use custom theme
 function ThemedApp() {
   const { theme: customTheme } = useCustomTheme();
-  
+  const { t } = useTranslation();
+
   const muiTheme = createTheme({
     palette: {
       mode: customTheme === 'dark' ? 'dark' : 'light',
@@ -62,6 +67,12 @@ function ThemedApp() {
           },
         },
       },
+      MuiTablePagination: {
+        defaultProps: {
+          labelRowsPerPage: t('common.rowsPerPage'),
+          labelDisplayedRows: ({ from, to, count }) => `${from}–${to} / ${count}`,
+        },
+      },
     },
   });
 
@@ -73,6 +84,7 @@ function ThemedApp() {
 }
 
 function AppContent() {
+  const { i18n } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -89,7 +101,7 @@ function AppContent() {
   return (
     <>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ru">
+      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18n.language || 'uk'}>
         <Router>
           <Routes>
             <Route path="/login" element={

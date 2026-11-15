@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   IconButton, 
   Tooltip, 
@@ -19,16 +20,13 @@ import {
   AccountCircle, 
   Close,
   Person,
-  LightMode,
-  DarkMode,
   Logout
 } from '@mui/icons-material';
-import { useTheme } from '../contexts/ThemeContext';
 
 const AccountMenu = ({ onLogout }) => {
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
@@ -47,14 +45,9 @@ const AccountMenu = ({ onLogout }) => {
     setIsMenuOpen(false);
   };
 
-  const handleThemeToggle = () => {
-    toggleTheme();
-    closeMenu();
-  };
-
   return (
     <>
-      <Tooltip title="Аккаунт">
+      <Tooltip title={t('nav.account')}>
         <IconButton 
           onClick={toggleMenu}
           sx={{ color: 'var(--icon-color)' }}
@@ -85,7 +78,7 @@ const AccountMenu = ({ onLogout }) => {
           alignItems: 'center'
         }}>
           <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
-            Аккаунт
+            {t('nav.account')}
           </Typography>
           <IconButton onClick={closeMenu} sx={{ color: 'white' }}>
             <Close />
@@ -108,7 +101,7 @@ const AccountMenu = ({ onLogout }) => {
                 <Person />
               </ListItemIcon>
               <ListItemText 
-                primary="Профиль"
+                primary={t('nav.profile')}
                 primaryTypographyProps={{
                   sx: { color: 'var(--text-primary)' }
                 }}
@@ -131,7 +124,7 @@ const AccountMenu = ({ onLogout }) => {
                 <Logout />
               </ListItemIcon>
               <ListItemText 
-                primary="Выйти"
+                primary={t('nav.logout')}
                 primaryTypographyProps={{
                   sx: { color: 'var(--accent-red)' }
                 }}

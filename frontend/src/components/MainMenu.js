@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   IconButton, 
   Tooltip, 
@@ -11,7 +12,6 @@ import {
   ListItemButton, 
   ListItemIcon, 
   ListItemText,
-  Divider,
   useMediaQuery,
   useTheme
 } from '@mui/material';
@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 
 const MainMenu = ({ isAdmin, hasRequests }) => {
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -41,18 +42,18 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
   };
 
   const menuItems = [
-    { to: '/users', icon: <People />, label: 'Пользователи' },
-    { to: '/roles', icon: <Security />, label: 'Роли и права' },
-    { to: '/requests', icon: <Assignment />, label: 'Заявки', badge: hasRequests },
-    { to: '/categories', icon: <Folder />, label: 'Категории' },
-    { to: '/employment', icon: <Work />, label: 'Трудовые отношения' },
-    { to: '/currencies', icon: <AttachMoney />, label: 'Валюты' },
-    { to: '/settings', icon: <SettingsApplications />, label: 'Параметры' }
+    { to: '/users', icon: <People />, label: t('nav.users') },
+    { to: '/roles', icon: <Security />, label: t('nav.roles') },
+    { to: '/requests', icon: <Assignment />, label: t('nav.requests'), badge: hasRequests },
+    { to: '/categories', icon: <Folder />, label: t('nav.categories') },
+    { to: '/employment', icon: <Work />, label: t('nav.employment') },
+    { to: '/currencies', icon: <AttachMoney />, label: t('nav.currencies') },
+    { to: '/settings', icon: <SettingsApplications />, label: t('nav.parameters') }
   ];
 
   return (
     <>
-      <Tooltip title="Настройки">
+      <Tooltip title={t('nav.settings')}>
         <IconButton 
           onClick={toggleMenu}
           sx={{ color: 'var(--icon-color)' }}
@@ -83,7 +84,7 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
           alignItems: 'center'
         }}>
           <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
-            Настройки
+            {t('nav.settings')}
           </Typography>
           <IconButton onClick={closeMenu} sx={{ color: 'white' }}>
             <Close />
@@ -102,7 +103,7 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
                   fontWeight: 600
                 }}
               >
-                Администрирование
+                {t('nav.administration')}
               </Typography>
             </Box>
             

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { Container, Paper, TextField, Button, Typography, Box, Alert, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { auth } from '../services/api';
 
 // Простое хеширование на клиенте
@@ -13,10 +14,17 @@ const hashPassword = async (password) => {
 };
 
 function LoginPage({ onLogin }) {
+  const { t, i18n } = useTranslation();
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleLanguageChange = (event, newLang) => {
+    if (newLang) {
+      i18n.changeLanguage(newLang);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,18 +55,18 @@ function LoginPage({ onLogin }) {
     } catch (error) {
       console.error('Login failed:', error);
       const detail = error.response?.data?.detail || '';
-      const [msg, delay] = detail.split('|');
+      const [, delay] = detail.split('|');
 
       if (error.response?.status === 401) {
-        let errorMsg = 'Неверный логин или пароль.';
+        let errorMsg = t('auth.invalidCredentials');
         if (delay && parseFloat(delay) > 1) {
-          errorMsg += `\nВключена защита от перебора: задержка составила ${parseFloat(delay).toFixed(1)} сек.`;
+          errorMsg += `\n${t('auth.bruteForceDelay', { seconds: parseFloat(delay).toFixed(1) })}`;
         }
         setError(errorMsg);
       } else if (error.response?.status === 403) {
-        setError('Ваш аккаунт еще не активирован администратором.');
+        setError(t('auth.accountNotActivated'));
       } else {
-        setError('Ошибка подключения к серверу');
+        setError(t('auth.serverError'));
       }
     } finally {
       setLoading(false);
@@ -68,21 +76,37 @@ function LoginPage({ onLogin }) {
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+          <ToggleButtonGroup
+            size="small"
+            value={i18n.language || 'uk'}
+            exclusive
+            onChange={handleLanguageChange}
+          >
+            <ToggleButton value="uk">UA</ToggleButton>
+            <ToggleButton value="ru">RU</ToggleButton>
+            <ToggleButton value="de">DE</ToggleButton>
+            <ToggleButton value="en">EN</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
           <img src="/favicon.svg" alt="NURSIA" style={{ width: 40, height: 40 }} />
           <Typography variant="h4">
             NURSIA
           </Typography>
         </Box>
+
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
             {error}
           </Alert>
         )}
+
         <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            label="Логин"
+            label={t('auth.username')}
             margin="normal"
             value={credentials.username}
             onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
@@ -90,7 +114,7 @@ function LoginPage({ onLogin }) {
           />
           <TextField
             fullWidth
-            label="Пароль"
+            label={t('auth.password')}
             type="password"
             margin="normal"
             value={credentials.password}
@@ -104,7 +128,7 @@ function LoginPage({ onLogin }) {
             disabled={loading}
             sx={{ mt: 3 }}
           >
-            {loading ? 'Вход...' : 'Войти'}
+            {loading ? t('auth.loggingIn') : t('auth.login')}
           </Button>
           <Button
             component={Link}
@@ -113,7 +137,7 @@ function LoginPage({ onLogin }) {
             variant="text"
             sx={{ mt: 1 }}
           >
-            Нет аккаунта? Зарегистрироваться
+            {t('auth.noAccountRegister')}
           </Button>
         </Box>
       </Paper>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
@@ -7,8 +8,10 @@ import {
 } from '@mui/material';
 import { Edit, Delete, Check, Close, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
+import CustomTablePagination from '../components/CustomTablePagination';
 
 function UsersPage() {
+  const { t } = useTranslation();
   const { checkRequests } = useNotifications();
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -276,7 +279,7 @@ function UsersPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography variant="h6">
-            Пользователи ({users.length})
+            {t('users.title')} ({users.length})
           </Typography>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
             <input
@@ -285,7 +288,7 @@ function UsersPage() {
               onChange={(e) => setShowDeleted(e.target.checked)}
               style={{ marginRight: 4 }}
             />
-            Показать удалённых
+            {t('users.showDeleted')}
           </label>
         </Box>
         <Button
@@ -293,21 +296,21 @@ function UsersPage() {
           startIcon={<PersonAdd />}
           onClick={() => setShowCreateDialog(true)}
         >
-          Добавить пользователя
+          {t('users.addUser')}
         </Button>
       </Box>
 
       <Box sx={{ mb: 2 }}>
         <TextField
           fullWidth
-          label="Поиск по всем полям"
+          label={t('common.search')}
           variant="outlined"
           value={searchFilter}
           onChange={(e) => {
             setSearchFilter(e.target.value);
             setPage(0);
           }}
-          placeholder="Введите текст для поиска..."
+          placeholder={t('users.searchPlaceholder')}
         />
       </Box>
 
@@ -315,15 +318,15 @@ function UsersPage() {
         <Table size="small" stickyHeader>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Логин</TableCell>
-              <TableCell>Полное имя</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Роль</TableCell>
-              <TableCell>Статус</TableCell>
-              <TableCell>Зарегистрирован</TableCell>
-              <TableCell>Редактирован</TableCell>
-              <TableCell sx={{ width: 120 }}>Действия</TableCell>
+              <TableCell>{t('users.id')}</TableCell>
+              <TableCell>{t('users.username')}</TableCell>
+              <TableCell>{t('users.fullName')}</TableCell>
+              <TableCell>{t('users.email')}</TableCell>
+              <TableCell>{t('users.role')}</TableCell>
+              <TableCell>{t('common.status')}</TableCell>
+              <TableCell>{t('users.registeredAt')}</TableCell>
+              <TableCell>{t('users.updatedAt')}</TableCell>
+              <TableCell sx={{ width: 120 }}>{t('common.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -369,8 +372,7 @@ function UsersPage() {
         </Table>
       </TableContainer>
 
-      <TablePagination
-        component="div"
+      <CustomTablePagination
         count={filteredUsers.length}
         page={page}
         onPageChange={(event, newPage) => setPage(newPage)}
@@ -380,8 +382,8 @@ function UsersPage() {
           setPage(0);
         }}
         rowsPerPageOptions={[10, 25, 50]}
-        labelRowsPerPage="Строк на странице:"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}${searchFilter ? ` (отфильтровано из ${users.length})` : ''}`}
+        isFiltered={Boolean(searchFilter)}
+        totalCount={users.length}
       />
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>

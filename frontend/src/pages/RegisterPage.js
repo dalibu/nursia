@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { Container, Paper, TextField, Button, Typography, Box, Alert, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { auth } from '../services/api';
 
 // Простое хеширование на клиенте
@@ -13,6 +14,7 @@ const hashPassword = async (password) => {
 };
 
 function RegisterPage() {
+  const { t, i18n } = useTranslation();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -29,6 +31,12 @@ function RegisterPage() {
     loadPasswordRules();
   }, []);
 
+  const handleLanguageChange = (event, newLang) => {
+    if (newLang) {
+      i18n.changeLanguage(newLang);
+    }
+  };
+
   const loadPasswordRules = async () => {
     try {
       const response = await fetch('/api/users/password-rules');
@@ -41,13 +49,13 @@ function RegisterPage() {
 
   const validatePassword = (password) => {
     if (password.length < 6) {
-      return 'Пароль должен содержать минимум 6 символов';
+      return t('auth.passwordMinLength');
     }
     if (!/[0-9]/.test(password)) {
-      return 'Пароль должен содержать минимум 1 цифру';
+      return t('auth.passwordRequireDigit');
     }
-    if (!/[a-zA-Zа-яА-Я]/.test(password)) {
-      return 'Пароль должен содержать буквы (латиница или кириллица)';
+    if (!/[a-zA-Zа-яА-ЯіІїЇєЄґҐäöüÄÖÜß]/.test(password)) {
+      return t('auth.passwordRequireLetter');
     }
     return '';
   };
@@ -83,25 +91,41 @@ function RegisterPage() {
     } catch (error) {
       console.error('Registration failed:', error);
       if (error.response?.status === 400) {
-        setError(error.response.data.detail || 'Пользователь уже существует');
+        setError(error.response.data.detail || t('auth.userAlreadyExists'));
       } else {
-        setError('Ошибка регистрации');
+        setError(t('auth.registrationError'));
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const languageSwitcher = (
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+      <ToggleButtonGroup
+        size="small"
+        value={i18n.language || 'uk'}
+        exclusive
+        onChange={handleLanguageChange}
+      >
+        <ToggleButton value="uk">UA</ToggleButton>
+        <ToggleButton value="ru">RU</ToggleButton>
+        <ToggleButton value="de">DE</ToggleButton>
+        <ToggleButton value="en">EN</ToggleButton>
+      </ToggleButtonGroup>
+    </Box>
+  );
+
   if (success) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
+          {languageSwitcher}
           <Typography variant="h6" align="center" gutterBottom>
-            Заявка отправлена
+            {t('auth.requestSentTitle')}
           </Typography>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Ваша заявка на регистрацию отправлена администратору.
-            Ожидайте подтверждения.
+            {t('auth.requestSentMessage')}
           </Alert>
           <Button
             component={Link}
@@ -110,7 +134,7 @@ function RegisterPage() {
             variant="contained"
             sx={{ mt: 2 }}
           >
-            Вернуться к входу
+            {t('auth.backToLogin')}
           </Button>
         </Paper>
       </Container>
@@ -120,8 +144,9 @@ function RegisterPage() {
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
+        {languageSwitcher}
         <Typography variant="h6" align="center" gutterBottom>
-          Регистрация
+          {t('auth.registerTitle')}
         </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -131,7 +156,7 @@ function RegisterPage() {
         <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            label="Логин"
+            label={t('auth.username')}
             margin="normal"
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -139,18 +164,18 @@ function RegisterPage() {
           />
           <TextField
             fullWidth
-            label="Пароль"
+            label={t('auth.password')}
             type="password"
             margin="normal"
             value={formData.password}
             onChange={handlePasswordChange}
             error={!!passwordError}
-            helperText={passwordError || (formData.password ? '' : passwordRules)}
+            helperText={passwordError || (formData.password ? '' : t('auth.passwordRulesHint'))}
             required
           />
           <TextField
             fullWidth
-            label="Email (необязательно)"
+            label={t('auth.emailOptional')}
             type="email"
             margin="normal"
             value={formData.email}
@@ -158,7 +183,7 @@ function RegisterPage() {
           />
           <TextField
             fullWidth
-            label="Полное имя"
+            label={t('auth.fullName')}
             margin="normal"
             value={formData.full_name}
             onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
@@ -171,7 +196,7 @@ function RegisterPage() {
             disabled={loading}
             sx={{ mt: 3 }}
           >
-            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+            {loading ? t('auth.registering') : t('auth.registerButton')}
           </Button>
           <Button
             component={Link}
@@ -180,7 +205,7 @@ function RegisterPage() {
             variant="text"
             sx={{ mt: 1 }}
           >
-            Уже есть аккаунт? Войти
+            {t('auth.alreadyHaveAccount')}
           </Button>
         </Box>
       </Paper>
