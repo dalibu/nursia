@@ -53,6 +53,15 @@ function ThemedApp() {
           },
         },
       },
+      MuiTableCell: {
+        styleOverrides: {
+          head: {
+            backgroundColor: customTheme === 'dark' ? '#334155' : '#e2e8f0',
+            color: customTheme === 'dark' ? '#f8fafc' : '#0f172a',
+            fontWeight: 700,
+          },
+        },
+      },
     },
   });
 
