@@ -42,7 +42,7 @@ function ReportsPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h6" gutterBottom>
         Обзор
       </Typography>
 

@@ -169,7 +169,7 @@ function SettingsPage() {
   return (
     <Box>
       <PageHeader showMainMenu={true} />
-      <Typography variant="h4" mb={3}>Системные настройки</Typography>
+      <Typography variant="h6" mb={3}>Системные настройки</Typography>
 
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>

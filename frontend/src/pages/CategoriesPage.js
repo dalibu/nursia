@@ -153,7 +153,7 @@ function CategoriesPage() {
   return (
     <Box>
       <PageHeader showMainMenu={true} />
-      <Typography variant="h4" gutterBottom>Категории платежей</Typography>
+      <Typography variant="h6" gutterBottom>Категории платежей</Typography>
 
       <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 3 }}>
         <Tab label="Категории" />

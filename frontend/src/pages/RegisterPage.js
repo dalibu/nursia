@@ -96,7 +96,7 @@ function RegisterPage() {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" align="center" gutterBottom>
+          <Typography variant="h6" align="center" gutterBottom>
             Заявка отправлена
           </Typography>
           <Alert severity="success" sx={{ mb: 2 }}>
@@ -120,7 +120,7 @@ function RegisterPage() {
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
+        <Typography variant="h6" align="center" gutterBottom>
           Регистрация
         </Typography>
         {error && (

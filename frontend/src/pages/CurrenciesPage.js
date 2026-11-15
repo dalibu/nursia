@@ -86,7 +86,7 @@ function CurrenciesPage() {
     <Box>
       <PageHeader showMainMenu={true} />
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Валюты</Typography>
+        <Typography variant="h6">Валюты</Typography>
         <Button
           variant="contained"
           startIcon={<Add />}

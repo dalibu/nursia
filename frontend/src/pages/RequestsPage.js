@@ -138,7 +138,7 @@ function RequestsPage() {
   return (
     <Box>
       <PageHeader showMainMenu={true} />
-      <Typography variant="h4" mb={3}>Заявки на регистрацию ({requests.length})</Typography>
+      <Typography variant="h6" mb={3}>Заявки на регистрацию ({requests.length})</Typography>
 
       {message && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage('')}>
