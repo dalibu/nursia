@@ -35,7 +35,7 @@ async def init_roles(session):
     created = 0
     for r_data in roles_data:
         result = await session.execute(select(Role).where(Role.name == r_data["name"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(Role(**r_data))
             created += 1
     if created > 0:
@@ -57,7 +57,7 @@ async def init_permissions(session):
     created = 0
     for p_data in permissions_data:
         result = await session.execute(select(Permission).where(Permission.name == p_data["name"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(Permission(**p_data))
             created += 1
     if created > 0:
@@ -122,7 +122,7 @@ async def init_settings(session):
     created = 0
     for s_data in settings:
         result = await session.execute(select(SystemSetting).where(SystemSetting.key == s_data["key"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(SystemSetting(**s_data))
             created += 1
     if created > 0:
@@ -143,7 +143,7 @@ async def init_category_groups(session):
     created = 0
     for g_data in groups_data:
         result = await session.execute(select(PaymentCategoryGroup).where(PaymentCategoryGroup.code == g_data["code"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(PaymentCategoryGroup(**g_data))
             created += 1
     if created > 0:
@@ -220,7 +220,7 @@ async def init_categories(session):
     created = 0
     for c_data in categories:
         result = await session.execute(select(PaymentCategory).where(PaymentCategory.name == c_data["name"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(PaymentCategory(**c_data))
             created += 1
     if created > 0:
@@ -236,7 +236,7 @@ async def init_currencies(session):
     created = 0
     for curr_data in currencies:
         result = await session.execute(select(Currency).where(Currency.code == curr_data["code"]))
-        if not result.scalar_one_or_none():
+        if not result.scalars().first():
             session.add(Currency(**curr_data))
             created += 1
     if created > 0:
@@ -301,7 +301,7 @@ async def init_admin(session):
     result = await session.execute(
         select(EmploymentRelation).where(EmploymentRelation.user_id == admin.id)
     )
-    if not result.scalar_one_or_none():
+    if not result.scalars().first():
         admin_employment = EmploymentRelation(
             user_id=admin.id,
             hourly_rate=Decimal("100.00"),
@@ -343,7 +343,7 @@ async def init_employment_relations(session):
                 EmploymentRelation.is_active == True
             )
         )
-        if result.scalar_one_or_none():
+        if result.scalars().first():
             continue
         
         # Создаём EmploymentRelation

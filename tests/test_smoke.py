@@ -99,7 +99,7 @@ def test_api_routers_registered():
     from api.main import app
     
     # Получаем все зарегистрированные пути
-    routes = [route.path for route in app.routes]
+    routes = list(app.openapi().get("paths", {}).keys())
     
     # Проверяем что основные эндпоинты зарегистрированы
     expected_prefixes = [

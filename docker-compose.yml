@@ -1,21 +1,34 @@
 services:
+  caddy:
+    image: caddy:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - api
+
   frontend:
     image: node:18-alpine
+    restart: unless-stopped
     working_dir: /app
     volumes:
       - ./frontend:/app
-    ports:
-      - "3000:3000"
     command: sh -c "npm install && npm start"
     environment:
       - CHOKIDAR_USEPOLLING=true
       - NODE_OPTIONS=--no-deprecation
+      - DANGEROUSLY_DISABLE_HOST_CHECK=true
 
   api:
     build: .
+    restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"
-    ports:
-      - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./database/migrations:/app/database/migrations
@@ -24,7 +37,10 @@ services:
       - DB_URL=sqlite+aiosqlite:///./data/nursia.db
       - PYTHONPATH=/app
       - PYTHONWARNINGS=ignore::DeprecationWarning
-
     command: ./scripts/startup.sh
     depends_on:
       - frontend
+
+volumes:
+  caddy_data:
+  caddy_config:
