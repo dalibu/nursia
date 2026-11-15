@@ -19,3 +19,4 @@ anyio>=4.12.0
 pytz>=2023.3
 backports.zoneinfo>=0.2.1;python_version<"3.9"
 tzdata>=2023.3
+greenlet

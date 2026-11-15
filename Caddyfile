@@ -1,0 +1,22 @@
+dalibude.duckdns.org {
+    # Если фронтенд стучится на /api или /auth, проксируем в FastAPI
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+    handle /docs* {
+        reverse_proxy api:8000
+    }
+    handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    # Всё остальное отправляем в React (фронтенд)
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
+
+# Отдельный поддомен напрямую для API (удобно, если фронтенд ждет полный URL)
+api.dalibude.duckdns.org {
+    reverse_proxy api:8000
+}
