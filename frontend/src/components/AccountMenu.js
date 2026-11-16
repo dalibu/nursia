@@ -13,6 +13,8 @@ import {
   ListItemIcon, 
   ListItemText,
   Divider,
+  Menu,
+  MenuItem,
   useMediaQuery,
   useTheme as useMuiTheme
 } from '@mui/material';
@@ -20,15 +22,29 @@ import {
   AccountCircle, 
   Close,
   Person,
-  Logout
+  Logout,
+  Language,
+  LightMode,
+  DarkMode
 } from '@mui/icons-material';
+import { useTheme } from '../contexts/ThemeContext';
+
+const LANGUAGES = [
+  { code: 'uk', short: 'UA', label: 'Українська' },
+  { code: 'ru', short: 'RU', label: 'Русский' },
+  { code: 'de', short: 'DE', label: 'Deutsch' },
+  { code: 'en', short: 'EN', label: 'English' },
+];
 
 const AccountMenu = ({ onLogout }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [langAnchorEl, setLangAnchorEl] = useState(null);
   const navigate = useNavigate();
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const currentLang = LANGUAGES.find((language) => language.code === i18n.language) || LANGUAGES[0];
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -43,6 +59,11 @@ const AccountMenu = ({ onLogout }) => {
 
   const closeMenu = () => {
     setIsMenuOpen(false);
+  };
+
+  const handleSelectLanguage = (langCode) => {
+    i18n.changeLanguage(langCode);
+    setLangAnchorEl(null);
   };
 
   return (
@@ -102,6 +123,58 @@ const AccountMenu = ({ onLogout }) => {
               </ListItemIcon>
               <ListItemText 
                 primary={t('nav.profile')}
+                primaryTypographyProps={{
+                  sx: { color: 'var(--text-primary)' }
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+
+          <Divider sx={{ my: 1, borderColor: 'var(--border-primary)' }} />
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={(event) => setLangAnchorEl(event.currentTarget)}>
+              <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
+                <Language />
+              </ListItemIcon>
+              <ListItemText
+                primary={t('nav.language')}
+                secondary={currentLang.label}
+                primaryTypographyProps={{
+                  sx: { color: 'var(--text-primary)' }
+                }}
+                secondaryTypographyProps={{
+                  sx: { color: 'var(--text-secondary)' }
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+
+          <Menu
+            anchorEl={langAnchorEl}
+            open={Boolean(langAnchorEl)}
+            onClose={() => setLangAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            {LANGUAGES.map((language) => (
+              <MenuItem
+                key={language.code}
+                selected={language.code === currentLang.code}
+                onClick={() => handleSelectLanguage(language.code)}
+              >
+                <strong>{language.short}</strong>&nbsp;— {language.label}
+              </MenuItem>
+            ))}
+          </Menu>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={toggleTheme}>
+              <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
+                {theme === 'dark' ? <LightMode /> : <DarkMode />}
+              </ListItemIcon>
+              <ListItemText
+                primary={theme === 'dark' ? t('nav.lightTheme') : t('nav.darkTheme')}
                 primaryTypographyProps={{
                   sx: { color: 'var(--text-primary)' }
                 }}
