@@ -248,5 +248,22 @@
         "dateTo": "Дата до",
         "generate": "Сформировать",
         "count": "Количество"
+    },
+    "requests": {
+        "pageTitle": "Заявки на регистрацию ({{count}})",
+        "noRequests": "Нет заявок на регистрацию",
+        "submittedAt": "Дата подачи",
+        "statusApproved": "Одобрено",
+        "approve": "Одобрить",
+        "reject": "Отклонить",
+        "approveDialogTitle": "Одобрение регистрации",
+        "selectRoleForUser": "Выберите роль для пользователя <b>{{username}}</b>:",
+        "confirmDeleteMessage": "Вы уверены, что хотите удалить заявку пользователя \"{{username}}\"?",
+        "approvedMessage": "Пользователь {{username}} одобрен с ролью {{role}}",
+        "approveError": "Ошибка при одобрении",
+        "rejectedMessage": "Заявка отклонена и удалена",
+        "rejectError": "Ошибка при отклонении",
+        "deletedMessage": "Заявка удалена",
+        "deleteError": "Ошибка при удалении"
     }
 }

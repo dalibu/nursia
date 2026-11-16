@@ -248,5 +248,22 @@
         "dateTo": "Date to",
         "generate": "Generate",
         "count": "Count"
+    },
+    "requests": {
+        "pageTitle": "Registration requests ({{count}})",
+        "noRequests": "No registration requests",
+        "submittedAt": "Submitted at",
+        "statusApproved": "Approved",
+        "approve": "Approve",
+        "reject": "Reject",
+        "approveDialogTitle": "Approve registration",
+        "selectRoleForUser": "Select a role for user <b>{{username}}</b>:",
+        "confirmDeleteMessage": "Are you sure you want to delete the request from user \"{{username}}\"?",
+        "approvedMessage": "User {{username}} approved with role {{role}}",
+        "approveError": "Error approving request",
+        "rejectedMessage": "Request rejected and deleted",
+        "rejectError": "Error rejecting request",
+        "deletedMessage": "Request deleted",
+        "deleteError": "Error deleting request"
     }
 }

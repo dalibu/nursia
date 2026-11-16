@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Button, Box, Chip, Alert, IconButton,
@@ -9,6 +10,7 @@ import { Check, Close, Delete } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
 
 function RequestsPage() {
+  const { t, i18n } = useTranslation();
   const { checkRequests } = useNotifications();
   const [requests, setRequests] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -76,12 +78,12 @@ function RequestsPage() {
         throw new Error('Approval failed');
       }
 
-      setMessage(`Пользователь ${approveDialog.username} одобрен с ролью ${selectedRole}`);
+      setMessage(t('requests.approvedMessage', { username: approveDialog.username, role: selectedRole }));
       setApproveDialog({ open: false, requestId: null, username: '' });
       loadRequests();
       checkRequests();
     } catch (error) {
-      setMessage('Ошибка при одобрении');
+      setMessage(t('requests.approveError'));
     } finally {
       setLoading(false);
     }
@@ -96,11 +98,11 @@ function RequestsPage() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      setMessage('Заявка отклонена и удалена');
+      setMessage(t('requests.rejectedMessage'));
       loadRequests();
       checkRequests();
     } catch (error) {
-      setMessage('Ошибка при отклонении');
+      setMessage(t('requests.rejectError'));
     } finally {
       setLoading(false);
     }
@@ -123,20 +125,24 @@ function RequestsPage() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      setMessage('Заявка удалена');
+      setMessage(t('requests.deletedMessage'));
       loadRequests();
       checkRequests();
       setDeleteDialog({ open: false, requestId: null, requestName: '' });
     } catch (error) {
-      setMessage('Ошибка при удалении');
+      setMessage(t('requests.deleteError'));
     } finally {
       setLoading(false);
     }
   };
 
+  const currentLocale = i18n.language === 'uk' ? 'uk-UA' : i18n.language || 'uk-UA';
+
   return (
     <Box>
-      <Typography variant="h6" mb={3}>Заявки на регистрацию ({requests.length})</Typography>
+      <Typography variant="h6" mb={3}>
+        {t('requests.pageTitle', { count: requests.length })}
+      </Typography>
 
       {message && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage('')}>
@@ -147,20 +153,20 @@ function RequestsPage() {
       {requests.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
-            Нет заявок на регистрацию
+            {t('requests.noRequests')}
           </Typography>
         </Paper>
       ) : (
         <TableContainer component={Paper}>
           <Table>
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+            <TableHead>
               <TableRow>
-                <TableCell>Логин</TableCell>
-                <TableCell>Полное имя</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Дата подачи</TableCell>
-                <TableCell>Статус</TableCell>
-                <TableCell>Действия</TableCell>
+                <TableCell>{t('users.username')}</TableCell>
+                <TableCell>{t('users.fullName')}</TableCell>
+                <TableCell>{t('users.email')}</TableCell>
+                <TableCell>{t('requests.submittedAt')}</TableCell>
+                <TableCell>{t('common.status')}</TableCell>
+                <TableCell>{t('common.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -170,11 +176,15 @@ function RequestsPage() {
                   <TableCell>{request.full_name}</TableCell>
                   <TableCell>{request.email}</TableCell>
                   <TableCell>
-                    {new Date(request.created_at).toLocaleDateString()}
+                    {new Date(request.created_at).toLocaleDateString(currentLocale)}
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={request.status}
+                      label={
+                        request.status === 'pending' ? t('profile.statusPending') :
+                          request.status === 'approved' ? t('requests.statusApproved') :
+                            request.status
+                      }
                       color={request.status === 'pending' ? 'warning' : request.status === 'approved' ? 'success' : 'default'}
                       size="small"
                     />
@@ -191,7 +201,7 @@ function RequestsPage() {
                             disabled={loading}
                             onClick={() => handleApproveClick(request)}
                           >
-                            Одобрить
+                            {t('requests.approve')}
                           </Button>
                           <Button
                             size="small"
@@ -201,7 +211,7 @@ function RequestsPage() {
                             disabled={loading}
                             onClick={() => handleReject(request.id)}
                           >
-                            Отклонить
+                            {t('requests.reject')}
                           </Button>
                         </>
                       )}
@@ -223,15 +233,19 @@ function RequestsPage() {
       )}
 
       <Dialog open={approveDialog.open} onClose={() => setApproveDialog({ open: false, requestId: null, username: '' })} maxWidth="xs" fullWidth>
-        <DialogTitle>Одобрение регистрации</DialogTitle>
+        <DialogTitle>{t('requests.approveDialogTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText mb={2}>
-            Выберите роль для пользователя <b>{approveDialog.username}</b>:
+            <Trans
+              i18nKey="requests.selectRoleForUser"
+              values={{ username: approveDialog.username }}
+              components={{ b: <b /> }}
+            />
           </DialogContentText>
           <TextField
             select
             fullWidth
-            label="Роль"
+            label={t('users.role')}
             value={selectedRole}
             onChange={(e) => setSelectedRole(e.target.value)}
           >
@@ -244,29 +258,29 @@ function RequestsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveDialog({ open: false, requestId: null, username: '' })}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleApproveConfirm} color="success" variant="contained" disabled={loading}>
-            Одобрить
+            {t('requests.approve')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, requestId: null, requestName: '' })}>
-        <DialogTitle>Подтвердите удаление</DialogTitle>
+        <DialogTitle>{t('payments.confirmDeleteTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите удалить заявку пользователя "{deleteDialog.requestName}"?
+            {t('requests.confirmDeleteMessage', { username: deleteDialog.requestName })}
             <br /><br />
-            Это действие нельзя отменить.
+            {t('payments.irreversibleAction')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialog({ open: false, requestId: null, requestName: '' })}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Удалить
+            {t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -246,5 +246,22 @@
         "dateTo": "Дата до",
         "generate": "Сформувати",
         "count": "Кількість"
+    },
+    "requests": {
+        "pageTitle": "Заявки на реєстрацію ({{count}})",
+        "noRequests": "Немає заявок на реєстрацію",
+        "submittedAt": "Дата подання",
+        "statusApproved": "Схвалено",
+        "approve": "Схвалити",
+        "reject": "Відхилити",
+        "approveDialogTitle": "Схвалення реєстрації",
+        "selectRoleForUser": "Оберіть роль для користувача <b>{{username}}</b>:",
+        "confirmDeleteMessage": "Ви впевнені, що хочете видалити заявку користувача \"{{username}}\"?",
+        "approvedMessage": "Користувача {{username}} схвалено з роллю {{role}}",
+        "approveError": "Помилка при схваленні",
+        "rejectedMessage": "Заявку відхилено та видалено",
+        "rejectError": "Помилка при відхиленні",
+        "deletedMessage": "Заявку видалено",
+        "deleteError": "Помилка при видаленні"
     }
 }

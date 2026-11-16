@@ -248,5 +248,22 @@
         "dateTo": "Datum bis",
         "generate": "Erstellen",
         "count": "Anzahl"
+    },
+    "requests": {
+        "pageTitle": "Registrierungsanfragen ({{count}})",
+        "noRequests": "Keine Registrierungsanfragen",
+        "submittedAt": "Eingereicht am",
+        "statusApproved": "Genehmigt",
+        "approve": "Genehmigen",
+        "reject": "Ablehnen",
+        "approveDialogTitle": "Registrierung genehmigen",
+        "selectRoleForUser": "Wählen Sie eine Rolle für den Benutzer <b>{{username}}</b>:",
+        "confirmDeleteMessage": "Möchten Sie die Anfrage des Benutzers \"{{username}}\" wirklich löschen?",
+        "approvedMessage": "Benutzer {{username}} wurde mit der Rolle {{role}} genehmigt",
+        "approveError": "Fehler beim Genehmigen",
+        "rejectedMessage": "Anfrage abgelehnt und gelöscht",
+        "rejectError": "Fehler beim Ablehnen",
+        "deletedMessage": "Anfrage gelöscht",
+        "deleteError": "Fehler beim Löschen"
     }
 }
