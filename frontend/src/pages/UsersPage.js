@@ -317,7 +317,7 @@ function UsersPage() {
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow>
+            <TableRow hover>
               <TableCell>{t('users.id')}</TableCell>
               <TableCell>{t('users.username')}</TableCell>
               <TableCell>{t('users.fullName')}</TableCell>
@@ -333,7 +333,7 @@ function UsersPage() {
             {filteredUsers
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((user) => (
-                <TableRow key={user.id} sx={{ opacity: user.status === 'deleted' ? 0.5 : 1, bgcolor: user.status === 'deleted' ? 'action.hover' : 'inherit' }}>
+                <TableRow key={user.id} sx={{ opacity: user.status === 'deleted' ? 0.5 : 1, bgcolor: user.status === 'deleted' ? 'action.hover' : 'inherit' }} hover>
                   <TableCell>{user.id}</TableCell>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.full_name}</TableCell>

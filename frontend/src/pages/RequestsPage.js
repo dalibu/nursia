@@ -171,7 +171,7 @@ function RequestsPage() {
             </TableHead>
             <TableBody>
               {requests.map((request) => (
-                <TableRow key={request.id}>
+                <TableRow key={request.id} hover>
                   <TableCell>{request.username}</TableCell>
                   <TableCell>{request.full_name}</TableCell>
                   <TableCell>{request.email}</TableCell>

@@ -93,7 +93,7 @@ function ReportsPage() {
             </TableHead>
             <TableBody>
               {reports.map((report, index) => (
-                <TableRow key={index}>
+                <TableRow key={index} hover>
                   <TableCell>{report.category}</TableCell>
                   <TableCell align="right">{report.total_amount} {filters.currency}</TableCell>
                   <TableCell align="right">{report.count}</TableCell>

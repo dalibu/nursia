@@ -97,7 +97,7 @@ function CurrenciesPage() {
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow>
+            <TableRow hover>
               <TableCell>ID</TableCell>
               <TableCell>{t('currencies.code')}</TableCell>
               <TableCell>{t('categories.name')}</TableCell>
@@ -112,7 +112,7 @@ function CurrenciesPage() {
             {currencyList
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((currency) => (
-                <TableRow key={currency.id}>
+                <TableRow key={currency.id} hover>
                   <TableCell>{currency.id}</TableCell>
                   <TableCell>{currency.code}</TableCell>
                   <TableCell>{currency.name}</TableCell>

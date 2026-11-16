@@ -171,7 +171,7 @@ function SettingsPage() {
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow>
+            <TableRow hover>
               <TableCell>{t('settings.key')}</TableCell>
               <TableCell>{t('settings.value')}</TableCell>
               <TableCell>{t('settings.type')}</TableCell>
@@ -183,7 +183,7 @@ function SettingsPage() {
             {settings
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((setting) => (
-                <TableRow key={setting.key}>
+                <TableRow key={setting.key} hover>
                   <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{setting.key}</TableCell>
                   <TableCell>{renderValue(setting)}</TableCell>
                   <TableCell>

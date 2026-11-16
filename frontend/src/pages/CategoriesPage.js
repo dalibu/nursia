@@ -162,7 +162,7 @@ function CategoriesPage() {
           <TableContainer component={Paper} sx={{ maxHeight: '60vh' }}>
             <Table size="small" stickyHeader>
               <TableHead>
-                <TableRow>
+                <TableRow hover>
                   <TableCell>ID</TableCell>
                   <TableCell>{t('categories.name')}</TableCell>
                   <TableCell>{t('categories.group')}</TableCell>
@@ -174,7 +174,7 @@ function CategoriesPage() {
                 {categories.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((cat) => {
                   const group = cat.category_group || getGroupById(cat.group_id);
                   return (
-                    <TableRow key={cat.id}>
+                    <TableRow key={cat.id} hover>
                       <TableCell>{cat.id}</TableCell>
                       <TableCell>{cat.name}</TableCell>
                       <TableCell>
@@ -221,7 +221,7 @@ function CategoriesPage() {
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow hover>
                   <TableCell>ID</TableCell>
                   <TableCell>{t('categories.name')}</TableCell>
                   <TableCell>{t('common.status')}</TableCell>
@@ -230,7 +230,7 @@ function CategoriesPage() {
               </TableHead>
               <TableBody>
                 {groups.map((group) => (
-                  <TableRow key={group.id}>
+                  <TableRow key={group.id} hover>
                     <TableCell>{group.id}</TableCell>
                     <TableCell>
                       <Chip
