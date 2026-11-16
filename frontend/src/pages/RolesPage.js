@@ -1,45 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    Typography, Paper, Box, Button, Card, CardContent,
+    Typography, Paper, Box, Button,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TextField, Dialog, DialogTitle, DialogContent, DialogActions,
     CircularProgress, Chip, IconButton, Alert, Snackbar,
-    MenuItem, Tabs, Tab, Checkbox, FormControlLabel, Tooltip,
-    List, ListItem, ListItemText, ListItemSecondaryAction
+    MenuItem, Tabs, Tab, Checkbox, Tooltip,
+    List, ListItem, ListItemText
 } from '@mui/material';
 import {
-    Add, Edit, Delete, Security, VpnKey, Person, Refresh,
-    CheckCircle, Cancel, AdminPanelSettings
+    Add, Edit, Delete, Security, VpnKey, Person, Refresh, AdminPanelSettings
 } from '@mui/icons-material';
 import { admin, usersApi } from '../services/api';
 
 function RolesPage() {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [roles, setRoles] = useState([]);
     const [permissions, setPermissions] = useState([]);
     const [users, setUsers] = useState([]);
     const [tabIndex, setTabIndex] = useState(0);
 
-    // Snackbar
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const showMessage = (message, severity = 'success') => setSnackbar({ open: true, message, severity });
 
-    // Role dialog
     const [roleDialog, setRoleDialog] = useState(false);
     const [editingRole, setEditingRole] = useState(null);
     const [roleForm, setRoleForm] = useState({ name: '', type: 'business', description: '' });
 
-    // Permission dialog
     const [permDialog, setPermDialog] = useState(false);
     const [editingPerm, setEditingPerm] = useState(null);
     const [permForm, setPermForm] = useState({ name: '', description: '' });
 
-    // Role permissions dialog
     const [rolePermDialog, setRolePermDialog] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
     const [selectedPermissions, setSelectedPermissions] = useState([]);
 
-    // User roles dialog
     const [userRolesDialog, setUserRolesDialog] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [selectedRoles, setSelectedRoles] = useState([]);
@@ -57,11 +53,11 @@ function RolesPage() {
             setUsers(usersRes.data || []);
         } catch (error) {
             console.error('Failed to load data:', error);
-            showMessage('Ошибка загрузки данных', 'error');
+            showMessage(t('dashboard.loadError'), 'error');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         loadData();
@@ -78,26 +74,26 @@ function RolesPage() {
         try {
             if (editingRole) {
                 await admin.updateRole(editingRole.id, roleForm);
-                showMessage('Роль обновлена');
+                showMessage(t('roles.roleUpdated'));
             } else {
                 await admin.createRole(roleForm);
-                showMessage('Роль создана');
+                showMessage(t('roles.roleCreated'));
             }
             setRoleDialog(false);
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка сохранения', 'error');
+            showMessage(error.response?.data?.detail || t('roles.saveError'), 'error');
         }
     };
 
     const deleteRole = async (role) => {
-        if (!window.confirm(`Удалить роль "${role.name}"?`)) return;
+        if (!window.confirm(t('roles.confirmDeleteRole', { name: role.name }))) return;
         try {
             await admin.deleteRole(role.id);
-            showMessage('Роль удалена');
+            showMessage(t('roles.roleDeleted'));
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка удаления', 'error');
+            showMessage(error.response?.data?.detail || t('roles.deleteError'), 'error');
         }
     };
 
@@ -112,26 +108,26 @@ function RolesPage() {
         try {
             if (editingPerm) {
                 await admin.updatePermission(editingPerm.id, permForm);
-                showMessage('Разрешение обновлено');
+                showMessage(t('roles.permUpdated'));
             } else {
                 await admin.createPermission(permForm);
-                showMessage('Разрешение создано');
+                showMessage(t('roles.permCreated'));
             }
             setPermDialog(false);
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка сохранения', 'error');
+            showMessage(error.response?.data?.detail || t('roles.saveError'), 'error');
         }
     };
 
     const deletePerm = async (perm) => {
-        if (!window.confirm(`Удалить разрешение "${perm.name}"?`)) return;
+        if (!window.confirm(t('roles.confirmDeletePerm', { name: perm.name }))) return;
         try {
             await admin.deletePermission(perm.id);
-            showMessage('Разрешение удалено');
+            showMessage(t('roles.permDeleted'));
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка удаления', 'error');
+            showMessage(error.response?.data?.detail || t('roles.deleteError'), 'error');
         }
     };
 
@@ -146,11 +142,11 @@ function RolesPage() {
     const saveRolePermissions = async () => {
         try {
             await admin.setRolePermissions(selectedRole.id, selectedPermissions);
-            showMessage('Разрешения роли обновлены');
+            showMessage(t('roles.rolePermsUpdated'));
             setRolePermDialog(false);
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка сохранения', 'error');
+            showMessage(error.response?.data?.detail || t('roles.saveError'), 'error');
         }
     };
 
@@ -168,22 +164,22 @@ function RolesPage() {
             setSelectedRoles(res.data.roles.map(r => r.id));
             setUserRolesDialog(true);
         } catch (error) {
-            showMessage('Ошибка загрузки ролей пользователя', 'error');
+            showMessage(t('roles.userRolesLoadError'), 'error');
         }
     };
 
     const saveUserRoles = async () => {
         if (selectedRoles.length === 0) {
-            showMessage('Необходимо выбрать хотя бы одну роль', 'error');
+            showMessage(t('roles.selectAtLeastOneRole'), 'error');
             return;
         }
         try {
             await admin.setUserRoles(selectedUser.id, selectedRoles);
-            showMessage('Роли пользователя обновлены');
+            showMessage(t('roles.userRolesUpdated'));
             setUserRolesDialog(false);
             loadData();
         } catch (error) {
-            showMessage(error.response?.data?.detail || 'Ошибка сохранения', 'error');
+            showMessage(error.response?.data?.detail || t('roles.saveError'), 'error');
         }
     };
 
@@ -206,7 +202,7 @@ function RolesPage() {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">
                     <AdminPanelSettings sx={{ mr: 1, verticalAlign: 'middle' }} />
-                    Управление ролями и правами
+                    {t('roles.pageTitle')}
                 </Typography>
                 <IconButton onClick={loadData} color="primary">
                     <Refresh />
@@ -214,29 +210,29 @@ function RolesPage() {
             </Box>
 
             <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} sx={{ mb: 3 }}>
-                <Tab icon={<Security />} label="Роли" />
-                <Tab icon={<VpnKey />} label="Разрешения" />
-                <Tab icon={<Person />} label="Пользователи" />
+                <Tab icon={<Security />} label={t('roles.tabRoles')} />
+                <Tab icon={<VpnKey />} label={t('roles.tabPermissions')} />
+                <Tab icon={<Person />} label={t('nav.users')} />
             </Tabs>
 
             {/* ========== TAB: ROLES ========== */}
             {tabIndex === 0 && (
                 <Paper sx={{ p: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="h6">Роли системы</Typography>
+                        <Typography variant="h6">{t('roles.systemRoles')}</Typography>
                         <Button variant="contained" startIcon={<Add />} onClick={() => openRoleDialog()}>
-                            Добавить роль
+                            {t('roles.addRole')}
                         </Button>
                     </Box>
                     <TableContainer>
                         <Table>
                             <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                    <TableCell><strong>Название</strong></TableCell>
-                                    <TableCell><strong>Тип</strong></TableCell>
-                                    <TableCell><strong>Описание</strong></TableCell>
-                                    <TableCell><strong>Разрешения</strong></TableCell>
-                                    <TableCell align="right"><strong>Действия</strong></TableCell>
+                                <TableRow>
+                                    <TableCell><strong>{t('categories.name')}</strong></TableCell>
+                                    <TableCell><strong>{t('settings.type')}</strong></TableCell>
+                                    <TableCell><strong>{t('payments.description')}</strong></TableCell>
+                                    <TableCell><strong>{t('roles.tabPermissions')}</strong></TableCell>
+                                    <TableCell align="right"><strong>{t('common.actions')}</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -268,18 +264,18 @@ function RolesPage() {
                                             </Box>
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Tooltip title="Настроить разрешения">
+                                            <Tooltip title={t('roles.configurePermissions')}>
                                                 <IconButton size="small" onClick={() => openRolePermDialog(role)}>
                                                     <VpnKey />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title="Редактировать">
+                                            <Tooltip title={t('common.edit')}>
                                                 <IconButton size="small" onClick={() => openRoleDialog(role)}>
                                                     <Edit />
                                                 </IconButton>
                                             </Tooltip>
                                             {!['admin', 'worker', 'employer'].includes(role.name) && (
-                                                <Tooltip title="Удалить">
+                                                <Tooltip title={t('common.delete')}>
                                                     <IconButton size="small" color="error" onClick={() => deleteRole(role)}>
                                                         <Delete />
                                                     </IconButton>
@@ -298,18 +294,18 @@ function RolesPage() {
             {tabIndex === 1 && (
                 <Paper sx={{ p: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="h6">Разрешения</Typography>
+                        <Typography variant="h6">{t('roles.tabPermissions')}</Typography>
                         <Button variant="contained" startIcon={<Add />} onClick={() => openPermDialog()}>
-                            Добавить разрешение
+                            {t('roles.addPermission')}
                         </Button>
                     </Box>
                     <TableContainer>
                         <Table>
                             <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                    <TableCell><strong>Название</strong></TableCell>
-                                    <TableCell><strong>Описание</strong></TableCell>
-                                    <TableCell align="right"><strong>Действия</strong></TableCell>
+                                <TableRow>
+                                    <TableCell><strong>{t('categories.name')}</strong></TableCell>
+                                    <TableCell><strong>{t('payments.description')}</strong></TableCell>
+                                    <TableCell align="right"><strong>{t('common.actions')}</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -320,12 +316,12 @@ function RolesPage() {
                                         </TableCell>
                                         <TableCell>{perm.description || '—'}</TableCell>
                                         <TableCell align="right">
-                                            <Tooltip title="Редактировать">
+                                            <Tooltip title={t('common.edit')}>
                                                 <IconButton size="small" onClick={() => openPermDialog(perm)}>
                                                     <Edit />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title="Удалить">
+                                            <Tooltip title={t('common.delete')}>
                                                 <IconButton size="small" color="error" onClick={() => deletePerm(perm)}>
                                                     <Delete />
                                                 </IconButton>
@@ -336,7 +332,7 @@ function RolesPage() {
                                 {permissions.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={3} align="center">
-                                            <Typography color="text.secondary">Нет разрешений</Typography>
+                                            <Typography color="text.secondary">{t('roles.noPermissions')}</Typography>
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -349,16 +345,16 @@ function RolesPage() {
             {/* ========== TAB: USERS ========== */}
             {tabIndex === 2 && (
                 <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" sx={{ mb: 2 }}>Роли пользователей</Typography>
+                    <Typography variant="h6" sx={{ mb: 2 }}>{t('roles.userRolesTitle')}</Typography>
                     <TableContainer>
                         <Table>
                             <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                    <TableCell><strong>Пользователь</strong></TableCell>
-                                    <TableCell><strong>Логин</strong></TableCell>
-                                    <TableCell><strong>Email</strong></TableCell>
-                                    <TableCell><strong>Роли</strong></TableCell>
-                                    <TableCell align="right"><strong>Действия</strong></TableCell>
+                                <TableRow>
+                                    <TableCell><strong>{t('dashboard.worker')}</strong></TableCell>
+                                    <TableCell><strong>{t('users.username')}</strong></TableCell>
+                                    <TableCell><strong>{t('users.email')}</strong></TableCell>
+                                    <TableCell><strong>{t('roles.tabRoles')}</strong></TableCell>
+                                    <TableCell align="right"><strong>{t('common.actions')}</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -380,7 +376,7 @@ function RolesPage() {
                                             </Box>
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Tooltip title="Настроить роли">
+                                            <Tooltip title={t('roles.configureRoles')}>
                                                 <IconButton size="small" color="primary" onClick={() => openUserRolesDialog(user)}>
                                                     <Security />
                                                 </IconButton>
@@ -394,15 +390,13 @@ function RolesPage() {
                 </Paper>
             )}
 
-            {/* ========== DIALOGS ========== */}
-
             {/* Role Create/Edit Dialog */}
             <Dialog open={roleDialog} onClose={() => setRoleDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>{editingRole ? 'Редактировать роль' : 'Новая роль'}</DialogTitle>
+                <DialogTitle>{editingRole ? t('roles.editRole') : t('roles.newRole')}</DialogTitle>
                 <DialogContent>
                     <TextField
                         fullWidth
-                        label="Название"
+                        label={t('categories.name')}
                         value={roleForm.name}
                         onChange={e => setRoleForm({ ...roleForm, name: e.target.value })}
                         sx={{ mt: 2 }}
@@ -411,17 +405,17 @@ function RolesPage() {
                     <TextField
                         select
                         fullWidth
-                        label="Тип"
+                        label={t('settings.type')}
                         value={roleForm.type}
                         onChange={e => setRoleForm({ ...roleForm, type: e.target.value })}
                         sx={{ mt: 2 }}
                     >
-                        <MenuItem value="auth">Авторизация (auth)</MenuItem>
-                        <MenuItem value="business">Бизнес (business)</MenuItem>
+                        <MenuItem value="auth">{t('roles.typeAuth')}</MenuItem>
+                        <MenuItem value="business">{t('roles.typeBusiness')}</MenuItem>
                     </TextField>
                     <TextField
                         fullWidth
-                        label="Описание"
+                        label={t('payments.description')}
                         value={roleForm.description}
                         onChange={e => setRoleForm({ ...roleForm, description: e.target.value })}
                         sx={{ mt: 2 }}
@@ -430,18 +424,18 @@ function RolesPage() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setRoleDialog(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={saveRole}>Сохранить</Button>
+                    <Button onClick={() => setRoleDialog(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={saveRole}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
 
             {/* Permission Create/Edit Dialog */}
             <Dialog open={permDialog} onClose={() => setPermDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>{editingPerm ? 'Редактировать разрешение' : 'Новое разрешение'}</DialogTitle>
+                <DialogTitle>{editingPerm ? t('roles.editPermission') : t('roles.newPermission')}</DialogTitle>
                 <DialogContent>
                     <TextField
                         fullWidth
-                        label="Название (код)"
+                        label={t('roles.permCodeName')}
                         value={permForm.name}
                         onChange={e => setPermForm({ ...permForm, name: e.target.value })}
                         sx={{ mt: 2 }}
@@ -449,7 +443,7 @@ function RolesPage() {
                     />
                     <TextField
                         fullWidth
-                        label="Описание"
+                        label={t('payments.description')}
                         value={permForm.description}
                         onChange={e => setPermForm({ ...permForm, description: e.target.value })}
                         sx={{ mt: 2 }}
@@ -458,20 +452,20 @@ function RolesPage() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setPermDialog(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={savePerm}>Сохранить</Button>
+                    <Button onClick={() => setPermDialog(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={savePerm}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
 
             {/* Role Permissions Dialog */}
             <Dialog open={rolePermDialog} onClose={() => setRolePermDialog(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    Разрешения роли: {selectedRole?.name}
+                    {t('roles.rolePermissionsFor', { name: selectedRole?.name })}
                 </DialogTitle>
                 <DialogContent>
                     {permissions.length === 0 ? (
                         <Alert severity="info" sx={{ mt: 2 }}>
-                            Нет доступных разрешений. Создайте разрешения на вкладке "Разрешения".
+                            {t('roles.noAvailablePermissions')}
                         </Alert>
                     ) : (
                         <List>
@@ -493,15 +487,15 @@ function RolesPage() {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setRolePermDialog(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={saveRolePermissions}>Сохранить</Button>
+                    <Button onClick={() => setRolePermDialog(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={saveRolePermissions}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
 
             {/* User Roles Dialog */}
             <Dialog open={userRolesDialog} onClose={() => setUserRolesDialog(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    Роли пользователя: {selectedUser?.full_name}
+                    {t('roles.userRolesFor', { name: selectedUser?.full_name })}
                 </DialogTitle>
                 <DialogContent>
                     <List>
@@ -521,12 +515,12 @@ function RolesPage() {
                         ))}
                     </List>
                     <Alert severity="warning" sx={{ mt: 2 }}>
-                        У пользователя должна быть хотя бы одна роль
+                        {t('roles.selectAtLeastOneRole')}
                     </Alert>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setUserRolesDialog(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={saveUserRoles}>Сохранить</Button>
+                    <Button onClick={() => setUserRolesDialog(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={saveUserRoles}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
 
