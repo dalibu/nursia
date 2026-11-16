@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dialog,
     DialogTitle,
@@ -31,20 +32,23 @@ import {
 } from '@mui/icons-material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { ru } from 'date-fns/locale';
+import { uk, ru, de, enUS } from 'date-fns/locale';
 import api from '../services/api';
 import { toLocalDateString } from '../utils/dateFormat';
+import { alpha } from '@mui/material/styles';
 
 const DEFAULT_START_TIME = '08:00';
 const DEFAULT_END_TIME = '17:00';
 
+const dateFnsLocales = { uk, ru, de, en: enUS };
+
 // Assignment types configuration
 const ASSIGNMENT_TYPES = [
-    { value: 'work', label: 'Рабочая смена', icon: WorkIcon, color: '#4caf50', category: 'work' },
-    { value: 'sick_leave', label: 'Больничный', icon: SickIcon, color: '#f44336', category: 'time_off' },
-    { value: 'vacation', label: 'Отпуск', icon: VacationIcon, color: '#2196f3', category: 'time_off' },
-    { value: 'day_off', label: 'Отгул', icon: DayOffIcon, color: '#ff9800', category: 'time_off' },
-    { value: 'unpaid_leave', label: 'Отпуск за свой счёт', icon: UnpaidIcon, color: '#9e9e9e', category: 'time_off' }
+    { value: 'work', labelKey: 'timetracker.typeWorkShift', icon: WorkIcon, color: '#4caf50', category: 'work' },
+    { value: 'sick_leave', labelKey: 'timetracker.typeSickLeave', icon: SickIcon, color: '#f44336', category: 'time_off' },
+    { value: 'vacation', labelKey: 'timetracker.typeVacation', icon: VacationIcon, color: '#2196f3', category: 'time_off' },
+    { value: 'day_off', labelKey: 'timetracker.typeDayOff', icon: DayOffIcon, color: '#ff9800', category: 'time_off' },
+    { value: 'unpaid_leave', labelKey: 'timetracker.typeUnpaidLeave', icon: UnpaidIcon, color: '#9e9e9e', category: 'time_off' }
 ];
 
 // Helper to format time input for display
@@ -77,6 +81,7 @@ function CreateAssignmentDialog({
     isAdmin,
     initialData = null  // Optional data for cloning
 }) {
+    const { t, i18n } = useTranslation();
     // Form state
     const [selectedEmployment, setSelectedEmployment] = useState('');
     const [assignmentType, setAssignmentType] = useState('work');
@@ -225,12 +230,12 @@ function CreateAssignmentDialog({
         for (let i = 0; i < tasks.length; i++) {
             const task = tasks[i];
             if (!task.start_time || !task.end_time) {
-                return `Задание #${i + 1}: укажите время начала и окончания`;
+                return t('timetracker.taskTimeRequired', { number: i + 1 });
             }
             const start = timeToMinutes(task.start_time);
             const end = timeToMinutes(task.end_time);
             if (end <= start) {
-                return `Задание #${i + 1}: время окончания должно быть позже времени начала`;
+                return t('timetracker.taskEndTimeBeforeStart', { number: i + 1 });
             }
         }
 
@@ -243,7 +248,7 @@ function CreateAssignmentDialog({
                 const t2End = timeToMinutes(tasks[j].end_time);
 
                 if (t1Start < t2End && t1End > t2Start) {
-                    return `Задания #${i + 1} и #${j + 1} пересекаются по времени`;
+                    return t('timetracker.tasksOverlap', { first: i + 1, second: j + 1 });
                 }
             }
         }
@@ -289,11 +294,11 @@ function CreateAssignmentDialog({
 
         // Validate
         if (!selectedEmployment) {
-            setError('Выберите работника');
+            setError(t('timetracker.selectWorker'));
             return;
         }
         if (!assignmentDate) {
-            setError('Укажите дату');
+            setError(t('timetracker.selectDate'));
             return;
         }
 
@@ -303,7 +308,7 @@ function CreateAssignmentDialog({
         if (isWorkType) {
             // Work type validation and submission
             if (tasks.length === 0) {
-                setError('Добавьте хотя бы одно задание');
+                setError(t('timetracker.addAtLeastOneTask'));
                 return;
             }
 
@@ -360,7 +365,7 @@ function CreateAssignmentDialog({
                 console.error('Server error details:', err.response?.data);
 
                 const detail = err.response?.data?.detail;
-                const errorMsg = typeof detail === 'object' ? JSON.stringify(detail) : (detail || 'Ошибка при создании смены');
+                const errorMsg = typeof detail === 'object' ? JSON.stringify(detail) : (detail || t('timetracker.shiftCreateError'));
                 setError(errorMsg);
             } finally {
                 setLoading(false);
@@ -368,12 +373,12 @@ function CreateAssignmentDialog({
         } else {
             // Time-off type validation and submission
             if (endDate < assignmentDate) {
-                setError('Дата окончания должна быть не раньше даты начала');
+                setError(t('timetracker.endDateBeforeStart'));
                 return;
             }
 
             if (daysCount > 365) {
-                setError('Максимальный период: 365 дней');
+                setError(t('timetracker.maxPeriodDays'));
                 return;
             }
 
@@ -410,7 +415,7 @@ function CreateAssignmentDialog({
                 } else if (Array.isArray(detail)) {
                     setError(detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', '));
                 } else {
-                    setError('Ошибка при создании записей');
+                    setError(t('timetracker.recordsCreateError'));
                 }
             } finally {
                 setLoading(false);
@@ -449,7 +454,7 @@ function CreateAssignmentDialog({
                 gap: 1
             }}>
                 {TypeIcon && <TypeIcon />}
-                Создать запись
+                {t('timetracker.createRecord')}
             </DialogTitle>
 
             <DialogContent sx={{ pt: 4 }}>
@@ -461,10 +466,10 @@ function CreateAssignmentDialog({
 
                 {result && (
                     <Alert severity="success" sx={{ mb: 2 }}>
-                        Создано записей: {result.created_count}
+                        {t('timetracker.recordsCreated', { count: result.created_count })}
                         {result.skipped_dates?.length > 0 && (
                             <Typography variant="caption" display="block">
-                                Пропущено (уже существует): {result.skipped_dates.join(', ')}
+                                {t('timetracker.skippedDates', { dates: result.skipped_dates.join(', ') })}
                             </Typography>
                         )}
                     </Alert>
@@ -475,7 +480,7 @@ function CreateAssignmentDialog({
                     {/* Employment selector */}
                     <TextField
                         select
-                        label={isAdmin ? "Работник" : "Трудовые отношения"}
+                        label={isAdmin ? t('timetracker.worker') : t('timetracker.employmentRelations')}
                         value={selectedEmployment}
                         onChange={(e) => setSelectedEmployment(e.target.value)}
                         sx={{ minWidth: 200, flex: 1 }}
@@ -491,7 +496,7 @@ function CreateAssignmentDialog({
                     {/* Assignment type selector */}
                     <TextField
                         select
-                        label="Тип записи"
+                        label={t('timetracker.recordType')}
                         value={assignmentType}
                         onChange={(e) => setAssignmentType(e.target.value)}
                         sx={{ minWidth: 200 }}
@@ -503,7 +508,7 @@ function CreateAssignmentDialog({
                                 <MenuItem key={type.value} value={type.value}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <Icon sx={{ color: type.color, fontSize: 20 }} />
-                                        {type.label}
+                                        {t(type.labelKey)}
                                     </Box>
                                 </MenuItem>
                             );
@@ -512,10 +517,10 @@ function CreateAssignmentDialog({
                 </Box>
 
                 {/* Date picker(s) */}
-                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
+                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={dateFnsLocales[i18n.language] || uk}>
                     <Box display="flex" gap={2} mb={3}>
                         <DatePicker
-                            label={isTimeOffType ? "С даты" : "Дата смены"}
+                            label={isTimeOffType ? t('timetracker.fromDate') : t('timetracker.shiftDate')}
                             value={assignmentDate}
                             onChange={(date) => {
                                 setAssignmentDate(date);
@@ -533,7 +538,7 @@ function CreateAssignmentDialog({
                         />
                         {isTimeOffType && (
                             <DatePicker
-                                label="По дату"
+                                label={t('timetracker.toDate')}
                                 value={endDate}
                                 onChange={(date) => setEndDate(date)}
                                 minDate={assignmentDate}
@@ -551,10 +556,10 @@ function CreateAssignmentDialog({
                     <Box mb={3}>
                         <Box display="flex" gap={2} alignItems="center" mb={2}>
                             <Typography variant="body2" color="text.secondary">
-                                Количество дней: <strong>{daysCount}</strong>
+                                {t('timetracker.daysCountLabel')} <strong>{daysCount}</strong>
                             </Typography>
                             <TextField
-                                label="Часов в день"
+                                label={t('timetracker.hoursPerDay')}
                                 type="number"
                                 value={hoursPerDay}
                                 onChange={(e) => setHoursPerDay(e.target.value)}
@@ -574,7 +579,7 @@ function CreateAssignmentDialog({
                                         color="primary"
                                     />
                                 }
-                                label={isPaid ? "Оплачиваемый" : "Неоплачиваемый"}
+                                label={isPaid ? t('dashboard.paid') : t('dashboard.unpaid')}
                             />
                         )}
                     </Box>
@@ -583,12 +588,12 @@ function CreateAssignmentDialog({
                 {/* Description */}
                 <TextField
                     fullWidth
-                    label="Комментарий"
+                    label={t('timetracker.comment')}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     multiline
                     rows={2}
-                    placeholder={isWorkType ? "Опишите смену..." : "Причина отсутствия..."}
+                    placeholder={isWorkType ? t('timetracker.shiftCommentPlaceholder') : t('timetracker.absenceReasonPlaceholder')}
                     sx={{ mb: 3 }}
                 />
 
@@ -600,7 +605,7 @@ function CreateAssignmentDialog({
                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                 <TimeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                                Задания
+                                {t('timetracker.tasks')}
                             </Typography>
                             <Button
                                 startIcon={<AddIcon />}
@@ -608,7 +613,7 @@ function CreateAssignmentDialog({
                                 variant="outlined"
                                 size="small"
                             >
-                                Добавить задание
+                                {t('timetracker.addTask')}
                             </Button>
                         </Box>
 
@@ -621,7 +626,12 @@ function CreateAssignmentDialog({
                                     sx={{
                                         p: 2,
                                         mb: 1,
-                                        backgroundColor: task.task_type === 'pause' ? '#fff3e0' : '#e8f5e9',
+                                        backgroundColor: (theme) => {
+                                            const isDark = theme.palette.mode === 'dark';
+                                            return task.task_type === 'pause'
+                                                ? alpha(theme.palette.warning.main, isDark ? 0.18 : 0.12)
+                                                : alpha(theme.palette.success.main, isDark ? 0.18 : 0.12);
+                                        },
                                         borderLeft: `4px solid ${task.task_type === 'pause' ? '#ff9800' : '#4caf50'}`
                                     }}
                                 >
@@ -644,13 +654,13 @@ function CreateAssignmentDialog({
                                             <MenuItem value="work">
                                                 <Box display="flex" alignItems="center" gap={1}>
                                                     <WorkIcon fontSize="small" color="success" />
-                                                    Работа
+                                                    {t('timetracker.work')}
                                                 </Box>
                                             </MenuItem>
                                             <MenuItem value="pause">
                                                 <Box display="flex" alignItems="center" gap={1}>
                                                     <CoffeeIcon fontSize="small" color="warning" />
-                                                    Пауза
+                                                    {t('timetracker.pause')}
                                                 </Box>
                                             </MenuItem>
                                         </TextField>
@@ -658,7 +668,7 @@ function CreateAssignmentDialog({
                                         {/* Start time */}
                                         <TextField
                                             type="time"
-                                            label="Начало"
+                                            label={t('timetracker.startTime')}
                                             value={task.start_time}
                                             onChange={(e) => handleTaskChange(index, 'start_time', e.target.value)}
                                             size="small"
@@ -669,7 +679,7 @@ function CreateAssignmentDialog({
                                         {/* End time */}
                                         <TextField
                                             type="time"
-                                            label="Конец"
+                                            label={t('timetracker.endTime')}
                                             value={task.end_time}
                                             onChange={(e) => handleTaskChange(index, 'end_time', e.target.value)}
                                             size="small"
@@ -679,16 +689,16 @@ function CreateAssignmentDialog({
 
                                         {/* Description */}
                                         <TextField
-                                            label="Описание"
+                                            label={t('timetracker.description')}
                                             value={task.description}
                                             onChange={(e) => handleTaskChange(index, 'description', e.target.value)}
                                             size="small"
                                             sx={{ flex: 1, minWidth: 150 }}
-                                            placeholder="Что делали..."
+                                            placeholder={t('timetracker.whatDidYouDo')}
                                         />
 
                                         {/* Delete button */}
-                                        <Tooltip title="Удалить задание">
+                                        <Tooltip title={t('timetracker.deleteTask')}>
                                             <span>
                                                 <IconButton
                                                     size="small"
@@ -713,22 +723,25 @@ function CreateAssignmentDialog({
                                 elevation={2}
                                 sx={{
                                     p: 2,
-                                    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                                    background: (theme) =>
+                                        theme.palette.mode === 'dark'
+                                            ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
+                                            : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
                                     borderRadius: 2
                                 }}
                             >
                                 <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                    📊 Итого:
+                                    {t('timetracker.totalLabel')}
                                 </Typography>
                                 <Box display="flex" gap={3} flexWrap="wrap">
                                     <Box>
-                                        <Typography variant="body2" color="text.secondary">Рабочее время</Typography>
+                                        <Typography variant="body2" color="text.secondary">{t('timetracker.workTime')}</Typography>
                                         <Typography variant="h6" color="success.main">
-                                            {totals.workTime} ({totals.workHours} ч)
+                                            {totals.workTime} ({totals.workHours} {t('timetracker.hoursShort')})
                                         </Typography>
                                     </Box>
                                     <Box>
-                                        <Typography variant="body2" color="text.secondary">Пауза</Typography>
+                                        <Typography variant="body2" color="text.secondary">{t('timetracker.pause')}</Typography>
                                         <Typography variant="h6" color="warning.main">
                                             {totals.pauseTime}
                                         </Typography>
@@ -739,7 +752,7 @@ function CreateAssignmentDialog({
 
                         {/* Payment note */}
                         <Alert severity="info" sx={{ mt: 2 }}>
-                            Платёж будет создан автоматически. После сохранения вы сможете его отредактировать.
+                            {t('timetracker.paymentAutoNote')}
                         </Alert>
                     </>
                 )}
@@ -748,14 +761,14 @@ function CreateAssignmentDialog({
                 {isTimeOffType && isPaid && (
                     <Box sx={{
                         p: 2,
-                        bgcolor: 'grey.100',
+                        bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'grey.100'),
                         borderRadius: 1,
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
                     }}>
                         <Typography variant="body2">
-                            Всего часов: <strong>{(daysCount * (parseFloat(hoursPerDay) || 0)).toFixed(1)}</strong>
+                            {t('timetracker.totalHoursLabel')} <strong>{(daysCount * (parseFloat(hoursPerDay) || 0)).toFixed(1)}</strong>
                         </Typography>
                     </Box>
                 )}
@@ -763,7 +776,7 @@ function CreateAssignmentDialog({
 
             <DialogActions sx={{ p: 2 }}>
                 <Button onClick={handleClose} disabled={loading}>
-                    {result ? 'Закрыть' : 'Отмена'}
+                    {result ? t('common.close') : t('common.cancel')}
                 </Button>
                 {!result && isWorkType && (
                     <Button
@@ -779,7 +792,7 @@ function CreateAssignmentDialog({
                             }
                         }}
                     >
-                        {loading ? 'Сохранение...' : 'Сохранить и создать ещё'}
+                        {loading ? t('timetracker.saving') : t('timetracker.saveAndCreateAnother')}
                     </Button>
                 )}
                 {!result && (
@@ -794,7 +807,7 @@ function CreateAssignmentDialog({
                             }
                         }}
                     >
-                        {loading ? (isWorkType ? 'Сохранение...' : 'Создание...') : (isWorkType ? 'Сохранить' : 'Создать')}
+                        {loading ? (isWorkType ? t('timetracker.saving') : t('timetracker.creating')) : (isWorkType ? t('common.save') : t('common.create'))}
                     </Button>
                 )}
             </DialogActions>
