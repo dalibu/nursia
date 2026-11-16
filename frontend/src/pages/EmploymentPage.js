@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Typography, Paper, Box, Button,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
     IconButton, Chip, CircularProgress, Alert, Snackbar
 } from '@mui/material';
-import {
-    Add, Edit, Delete, Work, Person, AttachMoney
-} from '@mui/icons-material';
+import { Add, Edit, Delete, Work, Person, AttachMoney } from '@mui/icons-material';
 import { employment, users, currencies } from '../services/api';
 
-// Символы валют
 const currencySymbols = {
     'UAH': '₴',
     'EUR': '€',
@@ -18,12 +16,12 @@ const currencySymbols = {
 };
 
 function EmploymentPage() {
+    const { t, i18n } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [relations, setRelations] = useState([]);
     const [usersList, setUsersList] = useState([]);
     const [currencyList, setCurrencyList] = useState(['UAH', 'EUR', 'USD']);
 
-    // Dialog state
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
@@ -34,7 +32,6 @@ function EmploymentPage() {
     });
     const [error, setError] = useState('');
 
-    // Snackbar for notifications
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const showError = (message) => setSnackbar({ open: true, message, severity: 'error' });
     const showSuccess = (message) => setSnackbar({ open: true, message, severity: 'success' });
@@ -48,7 +45,7 @@ function EmploymentPage() {
         setLoading(true);
         try {
             const [relRes, usersRes, currRes] = await Promise.all([
-                employment.list({ is_active: null }), // Все отношения
+                employment.list({ is_active: null }),
                 users.listAll(),
                 currencies.list().catch(() => ({ data: { currencies: ['UAH', 'EUR', 'USD'] } }))
             ]);
@@ -93,9 +90,8 @@ function EmploymentPage() {
     };
 
     const handleSave = async () => {
-        // Validation
         if (!formData.user_id || !formData.hourly_rate) {
-            setError('Заполните все обязательные поля');
+            setError(t('employment.fillRequiredFields'));
             return;
         }
 
@@ -106,51 +102,49 @@ function EmploymentPage() {
                     currency: formData.currency,
                     is_active: formData.is_active
                 });
-                showSuccess('Трудовые отношения обновлены');
+                showSuccess(t('employment.updatedMessage'));
             } else {
                 await employment.create({
-                    user_id: parseInt(formData.user_id),
+                    user_id: parseInt(formData.user_id, 10),
                     hourly_rate: parseFloat(formData.hourly_rate),
                     currency: formData.currency
                 });
-                showSuccess('Трудовые отношения созданы');
+                showSuccess(t('employment.createdMessage'));
             }
             handleCloseDialog();
             loadData();
         } catch (error) {
-            setError(error.response?.data?.detail || 'Ошибка сохранения');
+            setError(error.response?.data?.detail || t('roles.saveError'));
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Деактивировать трудовые отношения?')) return;
+        if (!window.confirm(t('employment.confirmDeactivate'))) return;
 
         try {
             await employment.delete(id);
-            showSuccess('Трудовые отношения деактивированы');
+            showSuccess(t('employment.deactivatedMessage'));
             loadData();
         } catch (error) {
-            showError(error.response?.data?.detail || 'Ошибка удаления');
+            showError(error.response?.data?.detail || t('roles.deleteError'));
         }
     };
 
+    const currentLocale = i18n.language === 'uk' ? 'uk-UA' : i18n.language || 'uk-UA';
+
     const formatCurrency = (amount, currency = 'UAH') => {
         const symbol = currencySymbols[currency] || currency;
-        return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        return `${symbol}${Number(amount).toLocaleString(currentLocale, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
 
-    // Get users that are workers (not admins) and don't have active employment
     const availableUsers = usersList.filter(user => {
-        // Exclude admins - only workers can have employment relations
         const isAdmin = user.roles?.includes('admin') || user.role === 'admin';
         if (isAdmin) return false;
 
-        // If editing, include current user
         if (editingId) {
             const currentRelation = relations.find(r => r.id === editingId);
             if (currentRelation && currentRelation.user_id === user.id) return true;
         }
-        // Exclude users that already have active employment
         return !relations.some(r => r.user_id === user.id && r.is_active);
     });
 
@@ -166,14 +160,14 @@ function EmploymentPage() {
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h6">
-                    👔 Трудовые отношения
+                    👔 {t('employment.pageTitle')}
                 </Typography>
                 <Button
                     variant="contained"
                     startIcon={<Add />}
                     onClick={() => handleOpenDialog()}
                 >
-                    Добавить
+                    {t('employment.add')}
                 </Button>
             </Box>
 
@@ -181,34 +175,32 @@ function EmploymentPage() {
                 <Paper sx={{ p: 4, textAlign: 'center' }}>
                     <Work sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                     <Typography variant="h6" color="text.secondary">
-                        Нет трудовых отношений
+                        {t('employment.noRelations')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Создайте трудовые отношения для учёта рабочего времени
+                        {t('employment.noRelationsHint')}
                     </Typography>
                     <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()}>
-                        Создать первое
+                        {t('employment.createFirst')}
                     </Button>
                 </Paper>
             ) : (
                 <TableContainer component={Paper}>
                     <Table>
                         <TableHead>
-                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell><strong>Работник</strong></TableCell>
-                                <TableCell align="right"><strong>Ставка/час</strong></TableCell>
-                                <TableCell align="center"><strong>Статус</strong></TableCell>
-                                <TableCell align="center"><strong>Действия</strong></TableCell>
+                            <TableRow>
+                                <TableCell><strong>{t('dashboard.worker')}</strong></TableCell>
+                                <TableCell align="right"><strong>{t('employment.ratePerHour')}</strong></TableCell>
+                                <TableCell align="center"><strong>{t('common.status')}</strong></TableCell>
+                                <TableCell align="center"><strong>{t('common.actions')}</strong></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {relations.map((rel) => (
                                 <TableRow
                                     key={rel.id}
-                                    sx={{
-                                        '&:hover': { backgroundColor: '#f9f9f9' },
-                                        opacity: rel.is_active ? 1 : 0.5
-                                    }}
+                                    hover
+                                    sx={{ opacity: rel.is_active ? 1 : 0.5 }}
                                 >
                                     <TableCell>
                                         <Box display="flex" alignItems="center" gap={1}>
@@ -219,16 +211,16 @@ function EmploymentPage() {
                                     <TableCell align="right">
                                         <Chip
                                             icon={<AttachMoney />}
-                                            label={`${formatCurrency(rel.hourly_rate, rel.currency)}/ч`}
+                                            label={`${formatCurrency(rel.hourly_rate, rel.currency)}/${t('employment.hourShort')}`}
                                             color="success"
                                             variant="outlined"
                                         />
                                     </TableCell>
                                     <TableCell align="center">
                                         {rel.is_active ? (
-                                            <Chip label="Активно" color="success" size="small" />
+                                            <Chip label={t('employment.active')} color="success" size="small" />
                                         ) : (
-                                            <Chip label="Неактивно" color="default" size="small" />
+                                            <Chip label={t('employment.inactive')} color="default" size="small" />
                                         )}
                                     </TableCell>
                                     <TableCell align="center">
@@ -259,7 +251,7 @@ function EmploymentPage() {
             {/* Create/Edit Dialog */}
             <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {editingId ? 'Редактировать отношения' : 'Новые трудовые отношения'}
+                    {editingId ? t('employment.editRelation') : t('employment.newRelation')}
                 </DialogTitle>
                 <DialogContent>
                     {error && (
@@ -269,7 +261,7 @@ function EmploymentPage() {
                     <TextField
                         select
                         fullWidth
-                        label="Работник"
+                        label={t('dashboard.worker')}
                         value={formData.user_id}
                         onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
                         sx={{ mt: 2 }}
@@ -285,7 +277,7 @@ function EmploymentPage() {
                     <Box display="flex" gap={2} sx={{ mt: 2 }}>
                         <TextField
                             fullWidth
-                            label="Ставка за час"
+                            label={t('employment.hourlyRate')}
                             type="number"
                             value={formData.hourly_rate}
                             onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
@@ -293,7 +285,7 @@ function EmploymentPage() {
                         />
                         <TextField
                             select
-                            label="Валюта"
+                            label={t('payments.currency')}
                             value={formData.currency}
                             onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                             sx={{ minWidth: 100 }}
@@ -310,25 +302,25 @@ function EmploymentPage() {
                         <TextField
                             select
                             fullWidth
-                            label="Статус"
+                            label={t('common.status')}
                             value={formData.is_active}
                             onChange={(e) => setFormData({ ...formData, is_active: e.target.value })}
                             sx={{ mt: 2 }}
                         >
-                            <MenuItem value={true}>Активно</MenuItem>
-                            <MenuItem value={false}>Неактивно</MenuItem>
+                            <MenuItem value={true}>{t('employment.active')}</MenuItem>
+                            <MenuItem value={false}>{t('employment.inactive')}</MenuItem>
                         </TextField>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCloseDialog}>Отмена</Button>
+                    <Button onClick={handleCloseDialog}>{t('common.cancel')}</Button>
                     <Button variant="contained" onClick={handleSave}>
-                        {editingId ? 'Сохранить' : 'Создать'}
+                        {editingId ? t('common.save') : t('common.create')}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar for notifications */}
+            {/* Snackbar */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}

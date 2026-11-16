@@ -313,5 +313,24 @@
         "userRolesUpdated": "Benutzerrollen aktualisiert",
         "saveError": "Fehler beim Speichern",
         "deleteError": "Fehler beim Löschen"
+    },
+    "employment": {
+        "pageTitle": "Arbeitsverhältnisse",
+        "add": "Hinzufügen",
+        "noRelations": "Keine Arbeitsverhältnisse",
+        "noRelationsHint": "Erstellen Sie Arbeitsverhältnisse zur Zeiterfassung",
+        "createFirst": "Erstes erstellen",
+        "ratePerHour": "Stundensatz",
+        "hourShort": "Std.",
+        "active": "Aktiv",
+        "inactive": "Inaktiv",
+        "editRelation": "Arbeitsverhältnis bearbeiten",
+        "newRelation": "Neues Arbeitsverhältnis",
+        "hourlyRate": "Stundensatz",
+        "fillRequiredFields": "Bitte füllen Sie alle Pflichtfelder aus",
+        "updatedMessage": "Arbeitsverhältnis aktualisiert",
+        "createdMessage": "Arbeitsverhältnis erstellt",
+        "confirmDeactivate": "Arbeitsverhältnis deaktivieren?",
+        "deactivatedMessage": "Arbeitsverhältnis deaktiviert"
     }
 }

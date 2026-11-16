@@ -313,5 +313,24 @@
         "userRolesUpdated": "Роли пользователя обновлены",
         "saveError": "Ошибка сохранения",
         "deleteError": "Ошибка удаления"
+    },
+    "employment": {
+        "pageTitle": "Трудовые отношения",
+        "add": "Добавить",
+        "noRelations": "Нет трудовых отношений",
+        "noRelationsHint": "Создайте трудовые отношения для учёта рабочего времени",
+        "createFirst": "Создать первое",
+        "ratePerHour": "Ставка/час",
+        "hourShort": "ч",
+        "active": "Активно",
+        "inactive": "Неактивно",
+        "editRelation": "Редактировать отношения",
+        "newRelation": "Новые трудовые отношения",
+        "hourlyRate": "Ставка за час",
+        "fillRequiredFields": "Заполните все обязательные поля",
+        "updatedMessage": "Трудовые отношения обновлены",
+        "createdMessage": "Трудовые отношения созданы",
+        "confirmDeactivate": "Деактивировать трудовые отношения?",
+        "deactivatedMessage": "Трудовые отношения деактивированы"
     }
 }

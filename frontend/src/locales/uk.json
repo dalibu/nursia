@@ -311,5 +311,24 @@
         "userRolesUpdated": "Ролі користувача оновлено",
         "saveError": "Помилка збереження",
         "deleteError": "Помилка видалення"
-    }
+    },
+      "employment": {
+    "pageTitle": "Трудові відносини",
+    "add": "Додати",
+    "noRelations": "Немає трудових відносин",
+    "noRelationsHint": "Створіть трудові відносини для обліку робочого часу",
+    "createFirst": "Створити перше",
+    "ratePerHour": "Ставка/год",
+    "hourShort": "год",
+    "active": "Активно",
+    "inactive": "Неактивно",
+    "editRelation": "Редагувати відносини",
+    "newRelation": "Нові трудові відносини",
+    "hourlyRate": "Ставка за годину",
+    "fillRequiredFields": "Заповніть усі обов'язкові поля",
+    "updatedMessage": "Трудові відносини оновлено",
+    "createdMessage": "Трудові відносини створено",
+    "confirmDeactivate": "Деактивувати трудові відносини?",
+    "deactivatedMessage": "Трудові відносини деактивовано"
+  }
 }

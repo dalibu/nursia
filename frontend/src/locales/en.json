@@ -313,5 +313,24 @@
         "userRolesUpdated": "User roles updated",
         "saveError": "Failed to save",
         "deleteError": "Failed to delete"
+    },
+    "employment": {
+        "pageTitle": "Employment relations",
+        "add": "Add",
+        "noRelations": "No employment relations",
+        "noRelationsHint": "Create employment relations for time tracking",
+        "createFirst": "Create first",
+        "ratePerHour": "Rate/hour",
+        "hourShort": "hr",
+        "active": "Active",
+        "inactive": "Inactive",
+        "editRelation": "Edit relation",
+        "newRelation": "New employment relation",
+        "hourlyRate": "Hourly rate",
+        "fillRequiredFields": "Please fill in all required fields",
+        "updatedMessage": "Employment relation updated",
+        "createdMessage": "Employment relation created",
+        "confirmDeactivate": "Deactivate employment relation?",
+        "deactivatedMessage": "Employment relation deactivated"
     }
 }
