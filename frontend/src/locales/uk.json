@@ -44,6 +44,7 @@
         "lightTheme": "Світла",
         "darkTheme": "Темна",
         "monochromeTheme": "Чорно-біла",
+        "highContrastTheme": "Контрастна",
         "language": "Мова інтерфейсу",
         "parameters": "Параметри",
         "administration": "Адміністрування"

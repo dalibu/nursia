@@ -44,6 +44,7 @@
         "lightTheme": "Light",
         "darkTheme": "Dark",
         "monochromeTheme": "Monochrome",
+        "highContrastTheme": "High contrast",
         "language": "Language",
         "parameters": "Parameters",
         "administration": "Administration"

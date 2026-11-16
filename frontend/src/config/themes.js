@@ -1,5 +1,5 @@
 import React from 'react';
-import { LightMode, DarkMode, Contrast } from '@mui/icons-material';
+import { LightMode, DarkMode, Contrast, InvertColors } from '@mui/icons-material';
 
 export const THEMES = {
   light: {
@@ -149,6 +149,56 @@ export const THEMES = {
       '--btn-primary': 'linear-gradient(135deg, #3f3f46, #18181b)',
       '--btn-secondary': 'linear-gradient(135deg, #52525b, #27272a)',
       '--btn-hover-shadow': 'rgba(24, 24, 27, 0.25)',
+    },
+  },
+
+  highContrast: {
+    id: 'highContrast',
+    labelKey: 'nav.highContrastTheme',
+    mode: 'dark',
+    icon: <InvertColors fontSize="small" sx={{ color: '#ffffff' }} />,
+    palette: {
+      primary: '#e4e4e7',
+      secondary: '#a1a1aa',
+      success: '#ffffff',
+      warning: '#d4d4d8',
+      error: '#f4f4f5',
+      info: '#e4e4e7',
+      bgDefault: '#000000',
+      bgPaper: '#09090b',
+      textPrimary: '#ffffff',
+      textSecondary: '#d4d4d8',
+      iconColor: '#ffffff',
+      tableHeaderBg: '#18181b',
+      tableHeaderText: '#ffffff',
+    },
+    cssVars: {
+      '--bg-primary': '#000000',
+      '--bg-secondary': '#09090b',
+      '--bg-tertiary': '#18181b',
+      '--bg-card': 'linear-gradient(135deg, #09090b 0%, #18181b 100%)',
+      '--bg-header': 'linear-gradient(135deg, #18181b 0%, #09090b 100%)',
+      '--bg-balance': '#000000',
+      '--bg-stats': '#000000',
+      '--text-primary': '#ffffff',
+      '--text-secondary': '#d4d4d8',
+      '--text-muted': '#a1a1aa',
+      '--icon-color': '#ffffff',
+      '--header-text-color': '#ffffff',
+      '--header-hover-bg': 'rgba(255, 255, 255, 0.16)',
+      '--amount-white': '#ffffff',
+      '--border-primary': 'rgba(255, 255, 255, 0.28)',
+      '--border-secondary': 'rgba(255, 255, 255, 0.45)',
+      '--accent-gradient': 'linear-gradient(135deg, #ffffff, #d4d4d8)',
+      '--accent-blue': '#ffffff',
+      '--accent-cyan': '#ffffff',
+      '--accent-green': '#ffffff',
+      '--accent-red': '#e4e4e7',
+      '--accent-yellow': '#d4d4d8',
+      '--accent-purple': '#ffffff',
+      '--btn-primary': 'linear-gradient(135deg, #27272a, #18181b)',
+      '--btn-secondary': 'linear-gradient(135deg, #3f3f46, #27272a)',
+      '--btn-hover-shadow': 'rgba(255, 255, 255, 0.2)',
     },
   },
 };
