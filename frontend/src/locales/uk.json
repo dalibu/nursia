@@ -435,6 +435,7 @@
         "totalHoursLabel": "Всього годин:",
         "saving": "Збереження...",
         "saveAndCreateAnother": "Зберегти і створити ще",
-        "creating": "Створення..."
+        "creating": "Створення...",
+        "activeSessions": "Активні сесії ({{count}})"
     }
 }

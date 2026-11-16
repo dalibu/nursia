@@ -437,6 +437,7 @@
         "totalHoursLabel": "Всего часов:",
         "saving": "Сохранение...",
         "saveAndCreateAnother": "Сохранить и создать ещё",
-        "creating": "Создание..."
+        "creating": "Создание...",
+        "activeSessions": "Активные сессии ({{count}})"
     }
 }

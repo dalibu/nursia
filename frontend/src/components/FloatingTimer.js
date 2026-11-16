@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Paper, Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Tooltip, Divider } from '@mui/material';
 import { Pause, PlayArrow, Stop, AccessTime, Coffee, DragIndicator, Add, Person } from '@mui/icons-material';
 import { useActiveSession } from '../context/ActiveSessionContext';
@@ -6,6 +7,7 @@ import { assignments as assignmentsService } from '../services/api';
 
 // Single session row component
 function SessionRow({ session, onPause, onStop, onNewTask, isCompact = false }) {
+    const { t } = useTranslation();
     // Format elapsed time - data is already updated via WebSocket
     const getSessionTime = () => {
         const workSeconds = session.total_work_seconds || 0;
@@ -84,7 +86,7 @@ function SessionRow({ session, onPause, onStop, onNewTask, isCompact = false }) 
                 {times.pause}
             </Typography>
 
-            <Tooltip title={isPaused ? 'Продолжить' : 'Пауза'}>
+            <Tooltip title={isPaused ? t('timetracker.resume') : t('timetracker.pause')}>
                 <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); onPause(session); }}
@@ -93,7 +95,7 @@ function SessionRow({ session, onPause, onStop, onNewTask, isCompact = false }) 
                     {isPaused ? <PlayArrow sx={{ fontSize: 18 }} /> : <Pause sx={{ fontSize: 18 }} />}
                 </IconButton>
             </Tooltip>
-            <Tooltip title="Завершить">
+            <Tooltip title={t('timetracker.finish')}>
                 <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); onStop(session); }}
@@ -102,7 +104,7 @@ function SessionRow({ session, onPause, onStop, onNewTask, isCompact = false }) 
                     <Stop sx={{ fontSize: 18 }} />
                 </IconButton>
             </Tooltip>
-            <Tooltip title="Новое задание">
+            <Tooltip title={t('timetracker.newTask')}>
                 <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); onNewTask(session); }}
@@ -116,6 +118,7 @@ function SessionRow({ session, onPause, onStop, onNewTask, isCompact = false }) 
 }
 
 function FloatingTimer() {
+    const { t } = useTranslation();
     const { activeSessions, fetchActiveSession, notifySessionChange } = useActiveSession();
     // Initial position: right of logo
     const [position, setPosition] = useState({ x: 230, y: 12 });
@@ -229,7 +232,7 @@ function FloatingTimer() {
             >
                 <DragIndicator sx={{ fontSize: 14, opacity: 0.7 }} />
                 <Typography sx={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                    Активные сессии ({activeSessions.length})
+                    {t('timetracker.activeSessions', { count: activeSessions.length })}
                 </Typography>
             </Box>
 
@@ -249,7 +252,7 @@ function FloatingTimer() {
             {/* New Task Dialog */}
             <Dialog open={newTaskOpen} onClose={() => setNewTaskOpen(false)}>
                 <DialogTitle>
-                    Новое задание
+                    {t('timetracker.newTask')}
                     {selectedSession?.worker_name && (
                         <Typography variant="body2" color="text.secondary">
                             {selectedSession.worker_name}
@@ -259,10 +262,10 @@ function FloatingTimer() {
                 <DialogContent sx={{ minWidth: 350 }}>
                     <TextField
                         fullWidth
-                        label="Описание задания"
+                        label={t('timetracker.taskDescription')}
                         value={newTaskDescription}
                         onChange={(e) => setNewTaskDescription(e.target.value)}
-                        placeholder="Что будет делать?"
+                        placeholder={t('timetracker.whatWillYouDo')}
                         multiline
                         rows={2}
                         sx={{ mt: 2 }}
@@ -270,8 +273,8 @@ function FloatingTimer() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setNewTaskOpen(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={handleNewTask}>Начать</Button>
+                    <Button onClick={() => setNewTaskOpen(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={handleNewTask}>{t('timetracker.start')}</Button>
                 </DialogActions>
             </Dialog>
         </Paper>

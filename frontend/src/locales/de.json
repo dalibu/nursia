@@ -437,6 +437,7 @@
         "totalHoursLabel": "Gesamtstunden:",
         "saving": "Speichern...",
         "saveAndCreateAnother": "Speichern und weitere erstellen",
-        "creating": "Erstellen..."
+        "creating": "Erstellen...",
+        "activeSessions": "Aktive Sitzungen ({{count}})"
     }
 }

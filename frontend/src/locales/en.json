@@ -437,6 +437,7 @@
         "totalHoursLabel": "Total hours:",
         "saving": "Saving...",
         "saveAndCreateAnother": "Save and create another",
-        "creating": "Creating..."
+        "creating": "Creating...",
+        "activeSessions": "Active sessions ({{count}})"
     }
 }
