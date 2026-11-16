@@ -4,9 +4,9 @@ import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Button, MenuItem,
-  DialogContentText, TablePagination, Chip, Alert, Tooltip
+  DialogContentText, Chip, Alert, Tooltip
 } from '@mui/material';
-import { Edit, Delete, Check, Close, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
+import { Edit, Delete, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
 import CustomTablePagination from '../components/CustomTablePagination';
 
@@ -94,7 +94,7 @@ function UsersPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        setMessage(`Ошибка: ${error.detail}`);
+        setMessage(t('users.errorPrefix', { detail: error.detail }));
         return;
       }
 
@@ -110,7 +110,7 @@ function UsersPage() {
       loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
-      setMessage('Ошибка при создании пользователя');
+      setMessage(t('users.createError'));
     }
   };
 
@@ -138,10 +138,10 @@ function UsersPage() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      setMessage('Пользователь одобрен и создан');
+      setMessage(t('users.approvedMessage'));
       loadUsers();
     } catch (error) {
-      setMessage('Ошибка при одобрении');
+      setMessage(t('users.approveError'));
     } finally {
       setRequestsLoading(false);
     }
@@ -156,10 +156,10 @@ function UsersPage() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      setMessage('Заявка отклонена');
+      setMessage(t('users.rejectedMessage'));
 
     } catch (error) {
-      setMessage('Ошибка при отклонении');
+      setMessage(t('users.rejectError'));
     } finally {
       setRequestsLoading(false);
     }
@@ -238,15 +238,15 @@ function UsersPage() {
         }
       });
       if (response.ok) {
-        setMessage('Пользователь восстановлен');
+        setMessage(t('users.restoredMessage'));
         loadUsers();
       } else {
         const error = await response.json();
-        setMessage(`Ошибка: ${error.detail}`);
+        setMessage(t('users.errorPrefix', { detail: error.detail }));
       }
     } catch (error) {
       console.error('Failed to restore user:', error);
-      setMessage('Ошибка при восстановлении пользователя');
+      setMessage(t('users.restoreError'));
     }
   };
 
@@ -316,7 +316,7 @@ function UsersPage() {
 
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <TableHead>
             <TableRow>
               <TableCell>{t('users.id')}</TableCell>
               <TableCell>{t('users.username')}</TableCell>
@@ -341,7 +341,12 @@ function UsersPage() {
                   <TableCell>{user.roles ? user.roles.join(', ') : '-'}</TableCell>
                   <TableCell>
                     <Chip
-                      label={user.status === 'deleted' ? 'удалён' : user.status}
+                      label={
+                        user.status === 'active' ? t('profile.statusActive') :
+                          user.status === 'pending' ? t('profile.statusPending') :
+                            user.status === 'blocked' ? t('profile.statusBlocked') :
+                              user.status === 'deleted' ? t('users.deleted') : user.status
+                      }
                       color={user.status === 'active' ? 'success' : user.status === 'pending' ? 'warning' : user.status === 'deleted' ? 'default' : 'error'}
                       size="small"
                     />
@@ -350,7 +355,7 @@ function UsersPage() {
                   <TableCell>{user.updated_at ? new Date(user.updated_at).toLocaleDateString() : '-'}</TableCell>
                   <TableCell>
                     {user.status === 'deleted' ? (
-                      <Tooltip title="Восстановить">
+                      <Tooltip title={t('users.restore')}>
                         <IconButton onClick={() => handleRestoreUser(user.id)} color="primary">
                           <Restore />
                         </IconButton>
@@ -387,12 +392,12 @@ function UsersPage() {
       />
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Редактировать пользователя</DialogTitle>
+        <DialogTitle>{t('users.editTitle')}</DialogTitle>
         <Box component="form" onSubmit={handleSubmit}>
           <DialogContent>
             <TextField
               fullWidth
-              label="Логин"
+              label={t('users.username')}
               margin="normal"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -400,7 +405,7 @@ function UsersPage() {
             />
             <TextField
               fullWidth
-              label="Полное имя"
+              label={t('users.fullName')}
               margin="normal"
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
@@ -408,7 +413,7 @@ function UsersPage() {
             />
             <TextField
               fullWidth
-              label="Email"
+              label={t('users.email')}
               type="email"
               margin="normal"
               value={formData.email}
@@ -417,7 +422,7 @@ function UsersPage() {
             <TextField
               fullWidth
               select
-              label="Роль"
+              label={t('users.role')}
               margin="normal"
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -431,66 +436,66 @@ function UsersPage() {
             <TextField
               fullWidth
               select
-              label="Статус"
+              label={t('common.status')}
               margin="normal"
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             >
-              <MenuItem value="active">Активный</MenuItem>
-              <MenuItem value="pending">Ожидает</MenuItem>
-              <MenuItem value="blocked">Заблокирован</MenuItem>
+              <MenuItem value="active">{t('profile.statusActive')}</MenuItem>
+              <MenuItem value="pending">{t('profile.statusPending')}</MenuItem>
+              <MenuItem value="blocked">{t('profile.statusBlocked')}</MenuItem>
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleFormClose}>Отмена</Button>
-            <Button type="submit" variant="contained">Сохранить</Button>
+            <Button onClick={handleFormClose}>{t('common.cancel')}</Button>
+            <Button type="submit" variant="contained">{t('common.save')}</Button>
           </DialogActions>
         </Box>
       </Dialog>
 
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, userId: null, userName: '' })}>
-        <DialogTitle>Подтвердите удаление</DialogTitle>
+        <DialogTitle>{t('users.confirmDeleteTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите удалить пользователя "{deleteDialog.userName}"?
+            {t('users.confirmDeleteMessage', { name: deleteDialog.userName })}
             <br /><br />
-            Пользователь будет деактивирован. Вы сможете восстановить его позже.
+            {t('users.deactivateHint')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialog({ open: false, userId: null, userName: '' })}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Удалить
+            {t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={confirmDialog} onClose={() => setConfirmDialog(false)}>
-        <DialogTitle>Подтвердите сохранение</DialogTitle>
+        <DialogTitle>{t('users.confirmSaveTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Вы уверены, что хотите сохранить изменения пользователя?
+            {t('users.confirmSaveMessage')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog(false)}>Отмена</Button>
-          <Button onClick={handleConfirmSave} variant="contained">Сохранить</Button>
+          <Button onClick={() => setConfirmDialog(false)}>{t('common.cancel')}</Button>
+          <Button onClick={handleConfirmSave} variant="contained">{t('common.save')}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Диалог создания нового пользователя */}
       <Dialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Добавить нового пользователя</DialogTitle>
+        <DialogTitle>{t('users.addUserTitle')}</DialogTitle>
         <Box component="form" onSubmit={handleCreateUser}>
           <DialogContent>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Пароль будет сгенерирован автоматически. При первом входе пользователь должен будет его сменить.
+              {t('users.passwordGeneratedHint')}
             </Alert>
             <TextField
               fullWidth
-              label="Логин"
+              label={t('users.username')}
               margin="normal"
               value={createFormData.username}
               onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
@@ -499,7 +504,7 @@ function UsersPage() {
             />
             <TextField
               fullWidth
-              label="Полное имя"
+              label={t('users.fullName')}
               margin="normal"
               value={createFormData.full_name}
               onChange={(e) => setCreateFormData({ ...createFormData, full_name: e.target.value })}
@@ -507,7 +512,7 @@ function UsersPage() {
             />
             <TextField
               fullWidth
-              label="Email"
+              label={t('users.email')}
               type="email"
               margin="normal"
               value={createFormData.email}
@@ -516,7 +521,7 @@ function UsersPage() {
             <TextField
               fullWidth
               select
-              label="Роль"
+              label={t('users.role')}
               margin="normal"
               value={createFormData.role}
               onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value })}
@@ -529,36 +534,36 @@ function UsersPage() {
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setShowCreateDialog(false)}>Отмена</Button>
-            <Button type="submit" variant="contained">Создать</Button>
+            <Button onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</Button>
+            <Button type="submit" variant="contained">{t('common.create')}</Button>
           </DialogActions>
         </Box>
       </Dialog>
 
       {/* Диалог показа сгенерированного пароля */}
       <Dialog open={showPasswordDialog} onClose={handleClosePasswordDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ color: 'success.main' }}>✓ Пользователь создан</DialogTitle>
+        <DialogTitle sx={{ color: 'success.main' }}>✓ {t('users.createdTitle')}</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Скопируйте и передайте пароль пользователю. После закрытия этого окна пароль нельзя будет посмотреть!
+            {t('users.copyPasswordWarning')}
           </Alert>
-          <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1, mb: 2 }}>
+          <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1, mb: 2 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Пользователь:
+              {t('users.userLabel')}
             </Typography>
             <Typography variant="body1" fontWeight="bold">
               {createdUserInfo?.full_name} ({createdUserInfo?.username})
             </Typography>
           </Box>
-          <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '2px dashed', borderColor: 'primary.main' }}>
+          <Box sx={{ p: 2, bgcolor: 'action.selected', borderRadius: 1, border: '2px dashed', borderColor: 'primary.main' }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Временный пароль:
+              {t('users.tempPasswordLabel')}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="h6" fontFamily="monospace" sx={{ letterSpacing: 1 }}>
                 {createdUserInfo?.password}
               </Typography>
-              <Tooltip title={passwordCopied ? "Скопировано!" : "Копировать"}>
+              <Tooltip title={passwordCopied ? t('common.copied') : t('common.copy')}>
                 <IconButton onClick={handleCopyPassword} color={passwordCopied ? "success" : "primary"}>
                   <ContentCopy />
                 </IconButton>
@@ -568,7 +573,7 @@ function UsersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClosePasswordDialog} variant="contained">
-            Закрыть
+            {t('common.close')}
           </Button>
         </DialogActions>
       </Dialog>
