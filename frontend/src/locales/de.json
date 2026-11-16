@@ -265,5 +265,17 @@
         "rejectError": "Fehler beim Ablehnen",
         "deletedMessage": "Anfrage gelöscht",
         "deleteError": "Fehler beim Löschen"
+    },
+    "settings": {
+        "pageTitle": "Systemeinstellungen",
+        "key": "Schlüssel",
+        "value": "Wert",
+        "type": "Typ",
+        "on": "Ein",
+        "off": "Aus",
+        "enabled": "Aktiviert",
+        "disabled": "Deaktiviert",
+        "editSetting": "Einstellung bearbeiten",
+        "invalidNumber": "Bitte geben Sie eine gültige Zahl ein"
     }
 }

@@ -265,5 +265,17 @@
         "rejectError": "Error rejecting request",
         "deletedMessage": "Request deleted",
         "deleteError": "Error deleting request"
+    },
+    "settings": {
+        "pageTitle": "System settings",
+        "key": "Key",
+        "value": "Value",
+        "type": "Type",
+        "on": "On",
+        "off": "Off",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "editSetting": "Edit setting",
+        "invalidNumber": "Please enter a valid number"
     }
 }

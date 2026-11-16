@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, IconButton, Box, Dialog, DialogTitle,
@@ -8,6 +9,7 @@ import {
 import { Edit, Check, Close } from '@mui/icons-material';
 
 function SettingsPage() {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingSetting, setEditingSetting] = useState(null);
@@ -46,7 +48,6 @@ function SettingsPage() {
     setShowForm(true);
   };
 
-  // Quick toggle for boolean settings
   const handleBooleanToggle = async (setting) => {
     const newValue = setting.value === 'true' ? 'false' : 'true';
     try {
@@ -70,7 +71,7 @@ function SettingsPage() {
   const validateValue = (value, type) => {
     if (type === 'number') {
       if (value === '' || isNaN(Number(value))) {
-        return 'Введите корректное число';
+        return t('settings.invalidNumber');
       }
     }
     return '';
@@ -111,13 +112,12 @@ function SettingsPage() {
     setError('');
   };
 
-  // Render value cell based on type
   const renderValue = (setting) => {
     if (setting.value_type === 'boolean') {
       return (
         <Chip
           icon={setting.value === 'true' ? <Check /> : <Close />}
-          label={setting.value === 'true' ? 'Вкл' : 'Выкл'}
+          label={setting.value === 'true' ? t('settings.on') : t('settings.off')}
           color={setting.value === 'true' ? 'success' : 'default'}
           size="small"
           onClick={() => handleBooleanToggle(setting)}
@@ -128,7 +128,6 @@ function SettingsPage() {
     return setting.value;
   };
 
-  // Render form input based on type
   const renderFormInput = () => {
     if (formData.value_type === 'boolean') {
       return (
@@ -139,7 +138,7 @@ function SettingsPage() {
               onChange={(e) => setFormData({ ...formData, value: e.target.checked ? 'true' : 'false' })}
             />
           }
-          label={formData.value === 'true' ? 'Включено' : 'Выключено'}
+          label={formData.value === 'true' ? t('settings.enabled') : t('settings.disabled')}
           sx={{ mt: 2 }}
         />
       );
@@ -148,7 +147,7 @@ function SettingsPage() {
     return (
       <TextField
         fullWidth
-        label="Значение"
+        label={t('settings.value')}
         margin="normal"
         multiline={formData.value_type === 'string'}
         rows={formData.value_type === 'string' ? 3 : 1}
@@ -167,17 +166,17 @@ function SettingsPage() {
 
   return (
     <Box>
-      <Typography variant="h6" mb={3}>Системные настройки</Typography>
+      <Typography variant="h6" mb={3}>{t('settings.pageTitle')}</Typography>
 
       <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
         <Table size="small" stickyHeader>
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <TableHead>
             <TableRow>
-              <TableCell>Ключ</TableCell>
-              <TableCell>Значение</TableCell>
-              <TableCell>Тип</TableCell>
-              <TableCell>Описание</TableCell>
-              <TableCell sx={{ width: 80 }}>Действия</TableCell>
+              <TableCell>{t('settings.key')}</TableCell>
+              <TableCell>{t('settings.value')}</TableCell>
+              <TableCell>{t('settings.type')}</TableCell>
+              <TableCell>{t('payments.description')}</TableCell>
+              <TableCell sx={{ width: 80 }}>{t('common.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -217,18 +216,16 @@ function SettingsPage() {
           setRowsPerPage(parseInt(event.target.value, 10));
           setPage(0);
         }}
-        rowsPerPageOptions={[10, 25, 50]}
-        labelRowsPerPage="Строк на странице:"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+        rowsPerPageOptions={Array.of(10, 25, 50)}
       />
 
       <Dialog open={showForm} onClose={handleFormClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Редактировать настройку</DialogTitle>
+        <DialogTitle>{t('settings.editSetting')}</DialogTitle>
         <Box component="form" onSubmit={handleSubmit}>
           <DialogContent>
             <TextField
               fullWidth
-              label="Ключ"
+              label={t('settings.key')}
               margin="normal"
               value={formData.key}
               disabled
@@ -236,7 +233,7 @@ function SettingsPage() {
             {renderFormInput()}
             <TextField
               fullWidth
-              label="Описание"
+              label={t('payments.description')}
               margin="normal"
               multiline
               rows={2}
@@ -245,8 +242,8 @@ function SettingsPage() {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleFormClose}>Отмена</Button>
-            <Button type="submit" variant="contained">Сохранить</Button>
+            <Button onClick={handleFormClose}>{t('common.cancel')}</Button>
+            <Button type="submit" variant="contained">{t('common.save')}</Button>
           </DialogActions>
         </Box>
       </Dialog>
