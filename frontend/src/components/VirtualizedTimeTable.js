@@ -291,7 +291,7 @@ const AssignmentRow = memo(({
             {/* Expandable segments */}
             {hasSegments && (
                 <TableRow>
-                    <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                    <TableCell colSpan={isAdmin ? 11 : 10} sx={{ p: 0, border: 0 }}>
                         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                             <Box sx={{ m: 1, ml: 6, bgcolor: 'background.default', borderRadius: 1, p: 1 }}>
                                 <Table size="small">
@@ -320,7 +320,7 @@ const AssignmentRow = memo(({
                                                 </TableCell>
 
                                                 {/* Date column (for multi-day assignments) */}
-                                                <TableCell width={100} sx={{ color: '#555', fontWeight: 500 }}>
+                                                <TableCell width={100} sx={{ color: 'text.secondary', fontWeight: 500 }}>
                                                     {(() => {
                                                         if (assignment.start_time && assignment.end_time) {
                                                             const assignStart = new Date(assignment.start_time);
@@ -348,7 +348,7 @@ const AssignmentRow = memo(({
                                                         })()
                                                     ) : '—'}
                                                 </TableCell>
-                                                <TableCell sx={{ fontStyle: 'italic', color: '#666' }}>
+                                                <TableCell sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
                                                     {seg.description || ''}
                                                 </TableCell>
                                                 <TableCell align="right">
@@ -419,12 +419,11 @@ function VirtualizedContent({
     if (assignments.length === 0) {
         return (
             <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 4, borderBottom: 'none' }}>
                     <Typography color="text.secondary">{t('timetracker.noRecords')}</Typography>
                 </TableCell>
             </TableRow>
         );
-
     }
 
     const totalSize = virtualizer.getTotalSize();
@@ -530,7 +529,7 @@ function VirtualizedTimeTable({
                 overflowX: 'auto'
             }}
         >
-            <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1000 }}>
+            <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 1000 }}>
                 <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: headerBgColor }}>
                     <TableRow sx={{ backgroundColor: headerBgColor }}>
                         {isAdmin && (
