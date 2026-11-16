@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Container, Paper, TextField, Button, Typography, Box, Alert, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { auth } from '../services/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import ThemeSwitcher from '../components/ThemeSwitcher';
 
 // Простое хеширование на клиенте
 const hashPassword = async (password) => {
@@ -102,17 +104,8 @@ function RegisterPage() {
 
   const languageSwitcher = (
     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-      <ToggleButtonGroup
-        size="small"
-        value={i18n.language || 'uk'}
-        exclusive
-        onChange={handleLanguageChange}
-      >
-        <ToggleButton value="uk">UA</ToggleButton>
-        <ToggleButton value="ru">RU</ToggleButton>
-        <ToggleButton value="de">DE</ToggleButton>
-        <ToggleButton value="en">EN</ToggleButton>
-      </ToggleButtonGroup>
+      <LanguageSwitcher />
+      <ThemeSwitcher />
     </Box>
   );
 
@@ -146,7 +139,12 @@ function RegisterPage() {
       <Paper elevation={3} sx={{ p: 4 }}>
         {languageSwitcher}
         <Typography variant="h6" align="center" gutterBottom>
-          {t('auth.registerTitle')}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+            <img src="/favicon.svg" alt="NURSIA" style={{ width: 40, height: 40 }} />
+            <Typography variant="h4">
+              NURSIA
+            </Typography>
+          </Box>
         </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>

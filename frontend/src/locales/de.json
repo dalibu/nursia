@@ -9,7 +9,6 @@
         "bruteForceDelay": "Brute-Force-Schutz aktiv: Verzögerung von {{seconds}} Sek.",
         "accountNotActivated": "Ihr Konto wurde noch nicht vom Administrator aktiviert.",
         "serverError": "Fehler bei der Verbindung zum Server",
-        "registerTitle": "Registrierung",
         "emailOptional": "E-Mail (optional)",
         "fullName": "Vollständiger Name",
         "registerButton": "Registrieren",

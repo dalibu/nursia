@@ -9,7 +9,6 @@
         "bruteForceDelay": "Включена защита от перебора: задержка составила {{seconds}} сек.",
         "accountNotActivated": "Ваш аккаунт еще не активирован администратором.",
         "serverError": "Ошибка подключения к серверу",
-        "registerTitle": "Регистрация",
         "emailOptional": "Email (необязательно)",
         "fullName": "Полное имя",
         "registerButton": "Зарегистрироваться",

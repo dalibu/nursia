@@ -9,7 +9,6 @@
         "bruteForceDelay": "Увімкнено захист від підбору: затримка склала {{seconds}} сек.",
         "accountNotActivated": "Ваш акаунт ще не активовано адміністратором.",
         "serverError": "Помилка підключення до сервера",
-        "registerTitle": "Реєстрація",
         "emailOptional": "Email (необов'язково)",
         "fullName": "Повне ім'я",
         "registerButton": "Зареєструватися",
