@@ -186,7 +186,7 @@ function PaymentsPage() {
     }
   }, []);
 
-    const applyFiltersAndSort = useCallback(() => {
+  const applyFiltersAndSort = useCallback(() => {
     let filtered = [...paymentList];
 
     if (filters.search) {
@@ -276,7 +276,7 @@ function PaymentsPage() {
     setTotals({ all: newTotals, paid: paidTotals, unpaid: unpaidTotals });
   }, [paymentList, filters, dateRange, sortField, sortDirection, t]);
 
-    useEffect(() => { loadPayments(); }, [loadPayments]);
+  useEffect(() => { loadPayments(); }, [loadPayments]);
 
   useEffect(() => {
     const unsubscribe = subscribe(['payment_created', 'payment_updated', 'payment_deleted'], () => {
@@ -438,7 +438,7 @@ function PaymentsPage() {
     </>
   );
 
-    const activeRange = dateRange.at(0);
+  const activeRange = dateRange.at(0);
 
   return (
     <div className="nursia-container">
@@ -459,23 +459,23 @@ function PaymentsPage() {
       <div className="nursia-summary-cards">
         <div className="nursia-summary-card">
           <h3>{t('payments.totalCount')}</h3>
-          <div className="nursia-amount" style={{ color: '#7469eb' }}>{totalCount}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-purple)' }}>{totalCount}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('payments.paidCount')}</h3>
-          <div className="nursia-amount" style={{ color: '#2dbfc4' }}>{paidPayments.length}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-cyan)' }}>{paidPayments.length}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('payments.paidAmount')}</h3>
-          <div className="nursia-amount" style={{ color: '#2dbfc4' }}>{formatAmount(paidAmount)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-cyan)' }}>{formatAmount(paidAmount)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('payments.unpaidCount')}</h3>
-          <div className="nursia-amount" style={{ color: '#f59e0b' }}>{unpaidPayments.length}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-yellow)' }}>{unpaidPayments.length}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('payments.unpaidAmount')}</h3>
-          <div className="nursia-amount" style={{ color: '#f59e0b' }}>{formatAmount(unpaidAmount)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-yellow)' }}>{formatAmount(unpaidAmount)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('payments.grandTotal')}</h3>
@@ -617,7 +617,7 @@ function PaymentsPage() {
                 position: 'relative',
                 borderBottom: 1,
                 borderColor: 'divider',
-                backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0',
+                backgroundColor: 'var(--bg-tertiary)',
                 ...extraSx,
                 '&:hover .resizer': { opacity: 1 }
               }}

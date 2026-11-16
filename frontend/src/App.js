@@ -33,36 +33,41 @@ import RolesPage from './pages/RolesPage';
 
 // Wrapper component to use custom theme
 function ThemedApp() {
-  const { theme: customTheme } = useCustomTheme();
+  const { themeConfig } = useCustomTheme();
   const { t } = useTranslation();
+  const p = themeConfig.palette;
 
   const muiTheme = createTheme({
     palette: {
-      mode: customTheme === 'dark' ? 'dark' : 'light',
-      primary: { main: customTheme === 'dark' ? '#3b82f6' : '#2563eb' },
-      secondary: { main: customTheme === 'dark' ? '#10b981' : '#059669' },
+      mode: themeConfig.mode,
+      primary: { main: p.primary },
+      secondary: { main: p.secondary },
+      success: { main: p.success },
+      warning: { main: p.warning },
+      error: { main: p.error },
+      info: { main: p.info },
       background: {
-        default: customTheme === 'dark' ? '#0f172a' : '#f1f5f9',
-        paper: customTheme === 'dark' ? '#1e293b' : '#ffffff',
+        default: p.bgDefault,
+        paper: p.bgPaper,
       },
       text: {
-        primary: customTheme === 'dark' ? '#e2e8f0' : '#1e293b',
-        secondary: customTheme === 'dark' ? '#94a3b8' : '#64748b',
+        primary: p.textPrimary,
+        secondary: p.textSecondary,
       },
     },
     components: {
       MuiIconButton: {
         styleOverrides: {
           root: {
-            color: customTheme === 'dark' ? '#e2e8f0' : '#475569',
+            color: p.iconColor,
           },
         },
       },
       MuiTableCell: {
         styleOverrides: {
           head: {
-            backgroundColor: customTheme === 'dark' ? '#334155' : '#e2e8f0',
-            color: customTheme === 'dark' ? '#f8fafc' : '#0f172a',
+            backgroundColor: p.tableHeaderBg,
+            color: p.tableHeaderText,
             fontWeight: 700,
           },
         },
@@ -95,7 +100,7 @@ function AppContent() {
   }, []);
 
   if (isLoading) {
-    return null; // или компонент загрузки
+    return null;
   }
 
   return (

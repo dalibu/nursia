@@ -86,6 +86,49 @@
   --shadow-lg: 0 16px 32px rgba(15, 23, 42, 0.16);
 }
 
+:root[data-theme="monochrome"] {
+  /* Background colors */
+  --bg-primary: #f4f4f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e4e4e7;
+  --bg-card: linear-gradient(135deg, #ffffff 0%, #f4f4f5 100%);
+  --bg-header: linear-gradient(135deg, #27272a 0%, #18181b 100%);
+  --bg-balance: rgba(255, 255, 255, 0.9);
+  --bg-stats: rgba(255, 255, 255, 0.9);
+  
+  /* Text colors */
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --icon-color: #27272a;
+  --header-text-color: #ffffff;
+  --header-hover-bg: rgba(255, 255, 255, 0.12);
+  --amount-white: #18181b;
+  
+  /* Border colors */
+  --border-primary: rgba(24, 24, 27, 0.14);
+  --border-secondary: rgba(24, 24, 27, 0.24);
+  
+  /* Accent colors */
+  --accent-gradient: linear-gradient(135deg, #3f3f46, #18181b);
+  --accent-blue: #27272a;
+  --accent-cyan: #3f3f46;
+  --accent-green: #27272a;
+  --accent-red: #18181b;
+  --accent-yellow: #52525b;
+  --accent-purple: #3f3f46;
+  
+  /* Button colors */
+  --btn-primary: linear-gradient(135deg, #3f3f46, #18181b);
+  --btn-secondary: linear-gradient(135deg, #52525b, #27272a);
+  --btn-hover-shadow: rgba(24, 24, 27, 0.25);
+  
+  /* Shadow colors */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.09);
+  --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.12);
+}
+
 /* Apply theme to body */
 body {
   background: var(--bg-primary) !important;

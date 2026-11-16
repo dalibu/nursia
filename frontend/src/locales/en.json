@@ -40,8 +40,10 @@
         "settings": "Settings",
         "profile": "Profile",
         "logout": "Logout",
-        "lightTheme": "Light theme",
-        "darkTheme": "Dark theme",
+        "theme": "Theme",
+        "lightTheme": "Light",
+        "darkTheme": "Dark",
+        "monochromeTheme": "Monochrome",
         "language": "Language",
         "parameters": "Parameters",
         "administration": "Administration"

@@ -307,12 +307,12 @@ function TimeTrackerPage() {
                     width: columnWidths[id],
                     minWidth: columnWidths[id],
                     position: 'relative',
-                    backgroundColor: (theme) => (theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0'),
+                    backgroundColor: 'var(--bg-tertiary)',
                     ...extraSx,
                     '&:hover .resizer': { opacity: 1 }
                 }}
-
             >
+
                 {sortKey ? (
                     <TableSortLabel
                         active={sortField === sortKey}
@@ -1281,46 +1281,46 @@ function TimeTrackerPage() {
                 const unpaidSessions = filteredAssignments.filter(a => a.payment_tracking_nr && a.payment_status === 'unpaid').length;
 
                 return (
-                    <div className="nursia-summary-cards">
+                                        <div className="nursia-summary-cards">
                         <div className="nursia-summary-card">
                             <h3>{t('dashboard.shifts')}</h3>
-                            <div className="nursia-amount" style={{ color: '#7469eb' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-purple)' }}>
                                 {totalSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('timetracker.tasks')}</h3>
-                            <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-cyan)' }}>
                                 {totalTasks}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('timetracker.done')}</h3>
-                            <div className="nursia-amount" style={{ color: '#10b981' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-green)' }}>
                                 {completedSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('timetracker.inProgress')}</h3>
-                            <div className="nursia-amount" style={{ color: '#f59e0b' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-yellow)' }}>
                                 {activeSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('dashboard.hours')}</h3>
-                            <div className="nursia-amount" style={{ color: '#3b82f6' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-blue)' }}>
                                 {totalHours.toFixed(1)}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('dashboard.paid')}</h3>
-                            <div className="nursia-amount" style={{ color: '#10b981' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-green)' }}>
                                 {paidSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
                             <h3>{t('dashboard.unpaid')}</h3>
-                            <div className="nursia-amount" style={{ color: '#bc1db4' }}>
+                            <div className="nursia-amount" style={{ color: 'var(--accent-purple)' }}>
                                 {unpaidSessions}
                             </div>
                         </div>

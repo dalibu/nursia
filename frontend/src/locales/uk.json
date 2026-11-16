@@ -40,8 +40,10 @@
         "settings": "Налаштування",
         "profile": "Профіль",
         "logout": "Вийти",
-        "lightTheme": "Світла тема",
-        "darkTheme": "Темна тема",
+        "theme": "Тема",
+        "lightTheme": "Світла",
+        "darkTheme": "Темна",
+        "monochromeTheme": "Чорно-біла",
         "language": "Мова інтерфейсу",
         "parameters": "Параметри",
         "administration": "Адміністрування"

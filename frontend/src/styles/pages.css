@@ -205,9 +205,8 @@
     gap: 16px;
 }
 
-/* Header */
 .nursia-header {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: var(--bg-header);
     padding: 20px 24px;
     border-radius: 12px;
     margin-bottom: 20px;
@@ -339,7 +338,7 @@
 
 .nursia-worker-header {
     padding: 16px 20px;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: var(--bg-header);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -392,13 +391,13 @@
 }
 
 .nursia-balance-main.positive {
-    border-color: rgba(16, 185, 129, 0.3);
-    color: #10b981;
+    border-color: var(--border-secondary);
+    color: var(--accent-green);
 }
 
 .nursia-balance-main.negative {
-    border-color: rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    border-color: var(--border-secondary);
+    color: var(--accent-red);
 }
 
 .nursia-balance-label {
@@ -418,9 +417,9 @@
 
 .nursia-balance-breakdown {
     font-size: 13px;
-    opacity: 0.8;
+    opacity: 0.9;
     line-height: 1.6;
-    color: #cbd5e1;
+    color: var(--text-secondary);
 }
 
 .nursia-breakdown-item {
@@ -492,7 +491,7 @@
 
 .nursia-modal-content .MuiInputBase-root {
     color: var(--text-primary);
-    background: rgba(15, 23, 42, 0.5);
+    background: var(--bg-balance);
 }
 
 .nursia-modal-content .MuiInputLabel-root {
@@ -500,7 +499,7 @@
 }
 
 .nursia-modal-content .MuiOutlinedInput-notchedOutline {
-    border-color: rgba(148, 163, 184, 0.3);
+    border-color: var(--border-secondary);
 }
 
 .nursia-modal-content .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
@@ -508,7 +507,7 @@
 }
 
 .nursia-modal-content .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-    border-color: #3b82f6;
+    border-color: var(--accent-blue);
 }
 
 .nursia-modal-content .MuiMenuItem-root {

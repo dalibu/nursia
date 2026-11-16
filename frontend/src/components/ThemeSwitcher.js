@@ -1,38 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, MenuItem, Box } from '@mui/material';
-import { LightMode, DarkMode } from '@mui/icons-material';
 import { useTheme } from '../contexts/ThemeContext';
-
-const THEMES = [
-  { id: 'light', labelKey: 'nav.lightTheme', icon: <LightMode fontSize="small" sx={{ color: '#f59e0b' }} /> },
-  { id: 'dark', labelKey: 'nav.darkTheme', icon: <DarkMode fontSize="small" sx={{ color: '#60a5fa' }} /> }
-  // В будущем новые темы достаточно добавить одной строкой сюда:
-  // { id: 'emerald', labelKey: 'nav.emeraldTheme', icon: <Palette fontSize="small" sx={{ color: '#10b981' }} /> }
-];
+import { THEME_LIST } from '../config/themes';
 
 function ThemeSwitcher() {
   const { t } = useTranslation();
-  const { theme, toggleTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
-  const currentTheme = THEMES.some((item) => item.id === theme) ? theme : 'light';
-
-  const handleChange = (e) => {
-    const nextTheme = e.target.value;
-    if (setTheme) {
-      setTheme(nextTheme);
-    } else if (nextTheme !== theme && toggleTheme) {
-      toggleTheme();
-    }
-  };
+  const currentTheme = THEME_LIST.some((item) => item.id === theme) ? theme : 'light';
 
   return (
     <Select
       size="small"
       value={currentTheme}
-      onChange={handleChange}
+      onChange={(e) => setTheme(e.target.value)}
       renderValue={(selected) => {
-        const item = THEMES.find((i) => i.id === selected) || THEMES.at(0);
+        const item = THEME_LIST.find((i) => i.id === selected) || THEME_LIST.at(0);
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {item.icon}
@@ -51,7 +35,7 @@ function ThemeSwitcher() {
         }
       }}
     >
-      {THEMES.map((item) => (
+      {THEME_LIST.map((item) => (
         <MenuItem key={item.id} value={item.id}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
             {item.icon}

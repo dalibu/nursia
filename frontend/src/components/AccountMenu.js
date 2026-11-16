@@ -23,11 +23,10 @@ import {
   Close,
   Person,
   Logout,
-  Language,
-  LightMode,
-  DarkMode
+  Language
 } from '@mui/icons-material';
 import { useTheme } from '../contexts/ThemeContext';
+import { THEME_LIST } from '../config/themes';
 
 const LANGUAGES = [
   { code: 'uk', short: 'UA', label: 'Українська' },
@@ -38,13 +37,15 @@ const LANGUAGES = [
 
 const AccountMenu = ({ onLogout }) => {
   const { t, i18n } = useTranslation();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [langAnchorEl, setLangAnchorEl] = useState(null);
+  const [themeAnchorEl, setThemeAnchorEl] = useState(null);
   const navigate = useNavigate();
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
-  const currentLang = LANGUAGES.find((language) => language.code === i18n.language) || LANGUAGES[0];
+  const currentLang = LANGUAGES.find((language) => language.code === i18n.language) || LANGUAGES.at(0);
+  const currentTheme = THEME_LIST.find((item) => item.id === theme) || THEME_LIST.at(0);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -64,6 +65,11 @@ const AccountMenu = ({ onLogout }) => {
   const handleSelectLanguage = (langCode) => {
     i18n.changeLanguage(langCode);
     setLangAnchorEl(null);
+  };
+
+  const handleSelectTheme = (themeId) => {
+    setTheme(themeId);
+    setThemeAnchorEl(null);
   };
 
   return (
@@ -169,18 +175,43 @@ const AccountMenu = ({ onLogout }) => {
           </Menu>
 
           <ListItem disablePadding>
-            <ListItemButton onClick={toggleTheme}>
+            <ListItemButton onClick={(event) => setThemeAnchorEl(event.currentTarget)}>
               <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
-                {theme === 'dark' ? <LightMode /> : <DarkMode />}
+                {currentTheme.icon}
               </ListItemIcon>
               <ListItemText
-                primary={theme === 'dark' ? t('nav.lightTheme') : t('nav.darkTheme')}
+                primary={t('nav.theme')}
+                secondary={t(currentTheme.labelKey)}
                 primaryTypographyProps={{
                   sx: { color: 'var(--text-primary)' }
+                }}
+                secondaryTypographyProps={{
+                  sx: { color: 'var(--text-secondary)' }
                 }}
               />
             </ListItemButton>
           </ListItem>
+
+          <Menu
+            anchorEl={themeAnchorEl}
+            open={Boolean(themeAnchorEl)}
+            onClose={() => setThemeAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            {THEME_LIST.map((item) => (
+              <MenuItem
+                key={item.id}
+                selected={item.id === currentTheme.id}
+                onClick={() => handleSelectTheme(item.id)}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                  {item.icon}
+                  <span>{t(item.labelKey)}</span>
+                </Box>
+              </MenuItem>
+            ))}
+          </Menu>
 
           <Divider sx={{ my: 1, borderColor: 'var(--border-primary)' }} />
 

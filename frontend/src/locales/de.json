@@ -40,8 +40,10 @@
         "settings": "Einstellungen",
         "profile": "Profil",
         "logout": "Abmelden",
-        "lightTheme": "Helles Design",
-        "darkTheme": "Dunkles Design",
+        "theme": "Design",
+        "lightTheme": "Hell",
+        "darkTheme": "Dunkеl",
+        "monochromeTheme": "Schwarz-Weiß",
         "language": "Sprache",
         "parameters": "Parameter",
         "administration": "Administration"

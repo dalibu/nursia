@@ -130,7 +130,7 @@ function DashboardPage() {
     return (
       <div className="nursia-container">
         <Box className="nursia-loading">
-          <CircularProgress sx={{ color: '#3b82f6' }} />
+          <CircularProgress sx={{ color: 'var(--accent-blue)' }} />
         </Box>
       </div>
     );
@@ -150,39 +150,39 @@ function DashboardPage() {
   const { summary, workers, is_employer } = data || {};
   const rawBalance = (summary?.balance || 0);
   const balanceForDisplay = is_employer ? -rawBalance : rawBalance;
-  const balanceColor = balanceForDisplay >= 0 ? '#10b981' : '#ef4444';
+  const balanceColor = balanceForDisplay >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
-    return (
+  return (
     <div className="nursia-container">
       {/* Summary Cards */}
       <div className="nursia-summary-cards">
         <div className="nursia-summary-card">
           <h3>{t('dashboard.shifts')}</h3>
-          <div className="nursia-amount" style={{ color: '#3b82f6' }}>{summary?.shifts || 0}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-blue)' }}>{summary?.shifts || 0}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.hours')}</h3>
-          <div className="nursia-amount" style={{ color: '#3b82f6' }}>{summary?.hours?.toFixed(2) || 0}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-blue)' }}>{summary?.hours?.toFixed(2) || 0}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.salary')}</h3>
-          <div className="nursia-amount" style={{ color: '#2dbfc4' }}>{formatCurrency(summary?.salary || 0)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-cyan)' }}>{formatCurrency(summary?.salary || 0)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.creditsAdvances')}</h3>
-          <div className="nursia-amount" style={{ color: '#7469eb' }}>{formatCurrency(summary?.credits || 0)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-purple)' }}>{formatCurrency(summary?.credits || 0)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.bonusesGifts')}</h3>
-          <div className="nursia-amount" style={{ color: '#2e54fe' }}>{formatCurrency(summary?.bonuses || 0)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-blue)' }}>{formatCurrency(summary?.bonuses || 0)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.expenses')}</h3>
-          <div className="nursia-amount" style={{ color: '#bc1db4' }}>{formatCurrency(summary?.expenses || 0)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-purple)' }}>{formatCurrency(summary?.expenses || 0)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.unpaid')}</h3>
-          <div className="nursia-amount" style={{ color: '#f59e0b' }}>{formatCurrency(summary?.unpaid || 0)}</div>
+          <div className="nursia-amount" style={{ color: 'var(--accent-yellow)' }}>{formatCurrency(summary?.unpaid || 0)}</div>
         </div>
         <div className="nursia-summary-card">
           <h3>{t('dashboard.paid')}</h3>
@@ -201,7 +201,7 @@ function DashboardPage() {
         {workers?.map(worker => {
           const workerDue = worker.balance.due;
           const dueForDisplay = is_employer ? -workerDue : workerDue;
-          const cardBalanceColor = dueForDisplay >= 0 ? '#10b981' : '#ef4444';
+          const cardBalanceColor = dueForDisplay >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
           const isGreen = dueForDisplay >= 0;
 
           const hasPayments = worker.balance.accrued > 0 || worker.balance.paid > 0 ||
