@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { alpha } from '@mui/material/styles';
 import {
   Table, TableBody, TableCell, TableHead, TableRow,
-  Box, IconButton, Chip, Tooltip, Typography, Checkbox
+  Box, IconButton, Chip, Tooltip, Typography, Checkbox, Paper
 } from '@mui/material';
 import { Edit, Delete, Replay, Payment } from '@mui/icons-material';
 import { formatDate, formatTimeWithSeconds } from '../utils/dateFormat';
@@ -31,6 +31,7 @@ const PaymentRow = memo(({
 
   return (
     <TableRow
+      hover
       sx={{
         '& td': { verticalAlign: 'middle' },
         backgroundColor: (theme) =>
@@ -61,7 +62,7 @@ const PaymentRow = memo(({
             <div>
               <div>{t('payments.createdAt')}: {formatDate(payment.created_at)} {formatTimeWithSeconds(payment.created_at)}</div>
               {payment.modified_at && (
-                <div style={{ color: '#ffcc80' }}>
+                <div>
                   {t('payments.modifiedAt')}: {formatDate(payment.modified_at)} {formatTimeWithSeconds(payment.modified_at)}
                 </div>
               )}
@@ -73,13 +74,13 @@ const PaymentRow = memo(({
           <Box sx={{ lineHeight: 1, cursor: 'help' }}>
             {payment.modified_at ? (
               <>
-                <div style={{ color: '#ff9800' }}>{formatDate(payment.modified_at)}</div>
-                <div style={{ fontSize: '0.85em', color: '#ff9800' }}>{formatTimeWithSeconds(payment.modified_at)}</div>
+                <div>{formatDate(payment.modified_at)}</div>
+                <div style={{ fontSize: '0.85em' }}>{formatTimeWithSeconds(payment.modified_at)}</div>
               </>
             ) : (
               <>
                 <div>{formatDate(payment.payment_date)}</div>
-                <Box component="div" sx={{ fontSize: '0.85em', color: 'text.secondary' }}>
+                <Box component="div" sx={{ fontSize: '0.85em' }}>
                   {formatTimeWithSeconds(payment.payment_date)}
                 </Box>
               </>
@@ -153,21 +154,21 @@ const PaymentRow = memo(({
         <Chip
           label={
             payment.payment_status === 'paid' ? t('payments.statusPaid') :
-            payment.payment_status === 'offset' ? t('payments.statusOffset') :
-            t('payments.statusUnpaid')
+              payment.payment_status === 'offset' ? t('payments.statusOffset') :
+                t('payments.statusUnpaid')
           }
           color={
             payment.payment_status === 'paid' ? 'success' :
-            payment.payment_status === 'offset' ? 'info' :
-            'warning'
+              payment.payment_status === 'offset' ? 'info' :
+                'warning'
           }
           size="small"
           clickable={canManagePaymentStatus}
           onClick={canManagePaymentStatus ? () => {
             const nextStatus =
               payment.payment_status === 'unpaid' ? 'paid' :
-              payment.payment_status === 'paid' ? 'offset' :
-              'unpaid';
+                payment.payment_status === 'paid' ? 'offset' :
+                  'unpaid';
             onToggleStatus(payment.id, nextStatus);
           } : undefined}
           icon={<Payment />}
@@ -235,7 +236,7 @@ function VirtualizedContent({
   if (payments.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 4 }}>
+        <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 4, borderBottom: 'none' }}>
           <Typography color="text.secondary">{t('payments.noData')}</Typography>
         </TableCell>
       </TableRow>
@@ -320,59 +321,61 @@ function VirtualizedPaymentsTable({
   const headerBgColor = (theme) => (theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0');
 
   return (
-    <Box
-      ref={parentRef}
-      sx={{
-        maxHeight: 'calc(100vh - 400px)',
-        minHeight: 400,
-        overflowY: 'auto',
-        overflowX: 'auto'
-      }}
-    >
-      <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1050 }}>
-        <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: headerBgColor }}>
-          <TableRow sx={{ backgroundColor: headerBgColor }}>
-            {isAdmin && (
-              <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: headerBgColor }}>
-                <Checkbox
-                  size="small"
-                  checked={selectedIds?.size === payments.length && payments.length > 0}
-                  indeterminate={selectedIds?.size > 0 && selectedIds?.size < payments.length}
-                  onChange={onSelectAll}
-                  sx={{ p: 0.25 }}
-                />
-              </TableCell>
-            )}
-            {renderHeaderCell('tracking_nr', t('payments.colNumber'), 'left', 'tracking_nr', { px: 0.5 })}
-            {renderHeaderCell('payment_date', t('payments.colWhen'), 'left', 'payment_date')}
-            {renderHeaderCell('payer', t('payments.colFrom'), 'left', 'payer')}
-            {renderHeaderCell('recipient', t('payments.colTo'), 'left', 'recipient')}
-            {renderHeaderCell('amount', t('payments.colAmount'), 'left', 'amount')}
-            {renderHeaderCell('category', t('payments.colCategory'), 'left', 'category')}
-            {renderHeaderCell('description', t('payments.colComment'), 'left', 'description')}
-            {renderHeaderCell('assignment', t('payments.colShift'), 'center', 'assignment_tracking_nr')}
-            {renderHeaderCell('status', t('payments.colStatus'), 'left', 'payment_status')}
-            {renderHeaderCell('actions', t('common.actions'), 'left', null)}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          <VirtualizedContent
-            payments={payments}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onRepeat={onRepeat}
-            onToggleStatus={onToggleStatus}
-            canManagePaymentStatus={canManagePaymentStatus}
-            currencies={currencies}
-            isAdmin={isAdmin}
-            columnWidths={columnWidths}
-            parentRef={parentRef}
-            selectedIds={selectedIds}
-            onToggleSelect={onToggleSelect}
-          />
-        </TableBody>
-      </Table>
-    </Box>
+    <Paper sx={{ py: 0, px: 0 }}>
+      <Box
+        ref={parentRef}
+        sx={{
+          maxHeight: 'calc(100vh - 400px)',
+          minHeight: 400,
+          overflowY: 'auto',
+          overflowX: 'auto'
+        }}
+      >
+        <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 1000 }}>
+          <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: headerBgColor }}>
+            <TableRow sx={{ backgroundColor: headerBgColor }}>
+              {isAdmin && (
+                <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: headerBgColor }}>
+                  <Checkbox
+                    size="small"
+                    checked={selectedIds?.size === payments.length && payments.length > 0}
+                    indeterminate={selectedIds?.size > 0 && selectedIds?.size < payments.length}
+                    onChange={onSelectAll}
+                    sx={{ p: 0.25 }}
+                  />
+                </TableCell>
+              )}
+              {renderHeaderCell('tracking_nr', t('payments.colNumber'), 'left', 'tracking_nr', { px: 0.5 })}
+              {renderHeaderCell('payment_date', t('payments.colWhen'), 'left', 'payment_date')}
+              {renderHeaderCell('payer', t('payments.colFrom'), 'left', 'payer')}
+              {renderHeaderCell('recipient', t('payments.colTo'), 'left', 'recipient')}
+              {renderHeaderCell('amount', t('payments.colAmount'), 'left', 'amount')}
+              {renderHeaderCell('category', t('payments.colCategory'), 'left', 'category')}
+              {renderHeaderCell('description', t('payments.colComment'), 'left', 'description')}
+              {renderHeaderCell('assignment', t('payments.colShift'), 'center', 'assignment_tracking_nr')}
+              {renderHeaderCell('status', t('payments.colStatus'), 'center', 'payment_status')}
+              {renderHeaderCell('actions', t('common.actions'), 'left', null)}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            <VirtualizedContent
+              payments={payments}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onRepeat={onRepeat}
+              onToggleStatus={onToggleStatus}
+              canManagePaymentStatus={canManagePaymentStatus}
+              currencies={currencies}
+              isAdmin={isAdmin}
+              columnWidths={columnWidths}
+              parentRef={parentRef}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
+            />
+          </TableBody>
+        </Table>
+      </Box>
+    </Paper>
   );
 }
 
