@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation, Trans } from 'react-i18next';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import '../styles/pages.css';
 import {
-    Typography, Paper, Box, Button, Card, CardContent, Grid,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
-    TextField, MenuItem, CircularProgress, Chip, Dialog, DialogTitle,
-    DialogContent, DialogActions, Alert, IconButton, Collapse, Snackbar, ListSubheader,
-    Popover, Tooltip, Menu, Checkbox
+    Typography, Paper, Box, Button, TableCell, TableSortLabel,
+    TextField, MenuItem, CircularProgress, Dialog, DialogTitle,
+    DialogContent, DialogActions, Alert, Snackbar, ListSubheader,
+    Popover, Menu, Checkbox
 } from '@mui/material';
 import { DateRangePicker } from 'react-date-range';
-import { ru } from 'date-fns/locale';
+import { uk, ru, de, enUS } from 'date-fns/locale';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, addMonths } from 'date-fns';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import {
-    PlayArrow, Stop, AccessTime, Person, Work, Add,
-    Refresh, Timer, Edit, Delete, Pause, Coffee,
-    KeyboardArrowDown, KeyboardArrowUp, Search, DateRange,
-    ArrowDropDown, NoteAdd, Replay, BeachAccess, Sick, EventBusy, MoneyOff, DeleteSweep
+    PlayArrow, Stop, Work, Add,
+    Pause, Search, DateRange,
+    ArrowDropDown, NoteAdd, BeachAccess, Sick, EventBusy, MoneyOff, DeleteSweep
 } from '@mui/icons-material';
 import { assignments as assignmentsService, employment as employmentService, payments as paymentsService } from '../services/api';
 import { useActiveSession } from '../context/ActiveSessionContext';
@@ -26,15 +25,17 @@ import CreateAssignmentDialog from '../components/CreateAssignmentDialog';
 import VirtualizedTimeTable from '../components/VirtualizedTimeTable';
 import { formatDurationHours } from '../utils/dateFormat';
 
-// Russian localized static ranges for DateRangePicker
-const ruStaticRanges = [
-    { label: 'Сегодня', range: () => ({ startDate: new Date(), endDate: new Date() }), isSelected: () => false },
-    { label: 'Вчера', range: () => ({ startDate: addDays(new Date(), -1), endDate: addDays(new Date(), -1) }), isSelected: () => false },
-    { label: 'Эта неделя', range: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }), isSelected: () => false },
-    { label: 'Прошлая неделя', range: () => ({ startDate: startOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }), endDate: endOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }) }), isSelected: () => false },
-    { label: 'Этот месяц', range: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }), isSelected: () => false },
-    { label: 'Прошлый месяц', range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false },
-    { label: 'Этот год', range: () => ({ startDate: startOfYear(new Date()), endDate: endOfYear(new Date()) }), isSelected: () => false }
+const dateFnsLocales = { uk, ru, de, en: enUS };
+
+// Localized static ranges for DateRangePicker
+const getStaticRanges = (t) => [
+    { label: t('payments.rangeToday'), range: () => ({ startDate: new Date(), endDate: new Date() }), isSelected: () => false },
+    { label: t('payments.rangeYesterday'), range: () => ({ startDate: addDays(new Date(), -1), endDate: addDays(new Date(), -1) }), isSelected: () => false },
+    { label: t('payments.rangeThisWeek'), range: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }), isSelected: () => false },
+    { label: t('payments.rangeLastWeek'), range: () => ({ startDate: startOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }), endDate: endOfWeek(addDays(new Date(), -7), { weekStartsOn: 1 }) }), isSelected: () => false },
+    { label: t('payments.rangeThisMonth'), range: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }), isSelected: () => false },
+    { label: t('payments.rangeLastMonth'), range: () => ({ startDate: startOfMonth(addMonths(new Date(), -1)), endDate: endOfMonth(addMonths(new Date(), -1)) }), isSelected: () => false },
+    { label: t('payments.rangeThisYear'), range: () => ({ startDate: startOfYear(new Date()), endDate: endOfYear(new Date()) }), isSelected: () => false }
 ];
 
 // Helper to format Date to YYYY-MM-DD without timezone issues
@@ -135,6 +136,7 @@ const FILTERS_STORAGE_KEY = 'timetracker_filters';
 
 
 function TimeTrackerPage() {
+    const { t, i18n } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -670,7 +672,7 @@ function TimeTrackerPage() {
             fetchActiveSession(); // Refresh active session in context
         } catch (error) {
             console.error('Failed to start session:', error);
-            showError(error.response?.data?.detail || 'Ошибка при запуске сессии');
+            showError(error.response?.data?.detail || t('timetracker.startError'));
         }
     };
 
@@ -745,7 +747,7 @@ function TimeTrackerPage() {
         } else if (!keepOpen) {
             setCloneData(null);  // Clear clone data after save (only if closing dialog)
         }
-        showSuccess(`Смена ${result.data.tracking_nr} создана!`);
+        showSuccess(t('timetracker.shiftCreatedNumber', { number: result.data.tracking_nr }));
         return result.data;
     };
 
@@ -756,7 +758,7 @@ function TimeTrackerPage() {
             ...prev,
             [assignmentId]: true
         }));
-        showSuccess('Смена создана!');
+        showSuccess(t('timetracker.shiftCreated'));
     };
 
     // Handle new task creation (switch to new task in current or specified session)
@@ -776,7 +778,7 @@ function TimeTrackerPage() {
             notifySessionChange();
         } catch (error) {
             console.error('Failed to switch task:', error);
-            showError(error.response?.data?.detail || 'Ошибка при создании задания');
+            showError(error.response?.data?.detail || t('timetracker.taskCreateError'));
         }
     };
 
@@ -795,7 +797,7 @@ function TimeTrackerPage() {
             // Find the active segment (task without end_time) - its ID is needed for API
             const activeSegment = assignment.segments?.find(s => !s.end_time);
             if (!activeSegment) {
-                showError('Не найден активный сегмент');
+                showError(t('timetracker.activeSegmentNotFound'));
                 return;
             }
             const isPaused = activeSegment.session_type === 'pause';
@@ -806,7 +808,7 @@ function TimeTrackerPage() {
             notifySessionChange();
         } catch (error) {
             console.error('Failed to toggle pause:', error);
-            showError(error.response?.data?.detail || 'Ошибка при переключении паузы');
+            showError(error.response?.data?.detail || t('timetracker.pauseToggleError'));
         }
     };
 
@@ -817,7 +819,7 @@ function TimeTrackerPage() {
             // Find the active segment (task without end_time) - its ID is needed for API
             const activeSegment = assignment.segments?.find(s => !s.end_time);
             if (!activeSegment) {
-                showError('Не найден активный сегмент');
+                showError(t('timetracker.activeSegmentNotFound'));
                 return;
             }
             await assignmentsService.stop(activeSegment.id);  // Use Task ID
@@ -827,7 +829,7 @@ function TimeTrackerPage() {
             notifySessionChange();
         } catch (error) {
             console.error('Failed to stop session:', error);
-            showError(error.response?.data?.detail || 'Ошибка при остановке сессии');
+            showError(error.response?.data?.detail || t('timetracker.stopError'));
         }
     };
 
@@ -838,7 +840,7 @@ function TimeTrackerPage() {
             loadSummary();
         } catch (error) {
             console.error('Failed to stop session:', error);
-            showError(error.response?.data?.detail || 'Ошибка при остановке сессии');
+            showError(error.response?.data?.detail || t('timetracker.stopError'));
         }
     };
 
@@ -849,7 +851,7 @@ function TimeTrackerPage() {
             loadData();
         } catch (error) {
             console.error('Failed to toggle pause:', error);
-            showError(error.response?.data?.detail || 'Ошибка при переключении паузы');
+            showError(error.response?.data?.detail || t('timetracker.pauseToggleError'));
         }
     };
 
@@ -884,7 +886,7 @@ function TimeTrackerPage() {
             });
 
             if (!response.ok) {
-                let errorMessage = 'Ошибка при сохранении';
+                let errorMessage = t('timetracker.saveError');
                 try {
                     const data = await response.json();
                     errorMessage = data.detail || errorMessage;
@@ -901,7 +903,7 @@ function TimeTrackerPage() {
             loadSummary();
         } catch (error) {
             console.error('Failed to update session:', error);
-            showError('Ошибка при сохранении');
+            showError(t('timetracker.saveError'));
         }
     };
 
@@ -921,7 +923,7 @@ function TimeTrackerPage() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) {
-                let errorMessage = 'Ошибка удаления';
+                let errorMessage = t('timetracker.deleteError');
                 try {
                     const data = await response.json();
                     errorMessage = data.detail || errorMessage;
@@ -934,7 +936,7 @@ function TimeTrackerPage() {
             loadSummary();
         } catch (error) {
             console.error('Failed to delete session:', error);
-            showError(error.message || 'Ошибка при удалении');
+            showError(error.message || t('timetracker.deleteError'));
         } finally {
             setDeleteDialogOpen(false);
             setSessionToDelete(null);
@@ -973,9 +975,9 @@ function TimeTrackerPage() {
             });
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.detail || 'Ошибка сохранения');
+                throw new Error(data.detail || t('timetracker.saveError'));
             }
-            showSuccess('Смена обновлена');
+            showSuccess(t('timetracker.shiftUpdated'));
             setAssignmentEditOpen(false);
             setAssignmentToEdit(null);
             loadData();
@@ -1012,9 +1014,9 @@ function TimeTrackerPage() {
             });
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.detail || 'Ошибка удаления');
+                throw new Error(data.detail || t('timetracker.deleteError'));
             }
-            showSuccess('Смена удалена');
+            showSuccess(t('timetracker.shiftDeleted'));
             loadSummary(); // Only reload summary, not the table data
         } catch (error) {
             // Rollback on error
@@ -1075,7 +1077,7 @@ function TimeTrackerPage() {
             const { deleted_count, failed_ids, errors } = response.data;
 
             if (deleted_count > 0) {
-                showSuccess(`Удалено ${deleted_count} смен`);
+                showSuccess(t('timetracker.bulkDeletedShifts', { count: deleted_count }));
             }
 
             if (failed_ids.length > 0) {
@@ -1084,7 +1086,7 @@ function TimeTrackerPage() {
                 const restoredItems = previousAssignments.filter(a => failedSet.has(a.assignment_id));
                 setGroupedAssignments(prev => [...prev, ...restoredItems]);
                 setFilteredAssignments(prev => [...prev, ...restoredItems]);
-                showError(`Не удалось удалить: ${errors.join(', ')}`);
+                showError(t('timetracker.bulkDeleteFailed', { errors: errors.join(', ') }));
             }
 
             loadSummary();
@@ -1093,7 +1095,7 @@ function TimeTrackerPage() {
             setGroupedAssignments(previousAssignments);
             setFilteredAssignments(previousAssignments);
             // Handle various error formats
-            let errorMessage = 'Ошибка массового удаления';
+            let errorMessage = t('timetracker.bulkDeleteError');
             if (error.response?.data?.detail) {
                 const detail = error.response.data.detail;
                 if (typeof detail === 'string') {
@@ -1113,9 +1115,11 @@ function TimeTrackerPage() {
         }
     };
 
+    const currentLocale = i18n.language === 'uk' ? 'uk-UA' : i18n.language || 'uk-UA';
+
     const formatCurrency = (amount, currency = 'UAH') => {
         const symbol = currencySymbols[currency] || currency;
-        return `${symbol}${Number(amount).toLocaleString('uk-UA', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        return `${symbol}${Number(amount).toLocaleString(currentLocale, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     };
 
     const formatTime = (timeStr) => {
@@ -1185,7 +1189,7 @@ function TimeTrackerPage() {
     if (loading) {
         return (
             <div className="nursia-container">
-<Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
                     <CircularProgress />
                 </Box>
             </div>
@@ -1206,7 +1210,7 @@ function TimeTrackerPage() {
                         '& .MuiButton-endIcon': { ml: 0.5 }
                     }}
                 >
-                    Начать смену
+                    {t('timetracker.startShift')}
                 </Button>
                 <Menu
                     anchorEl={startMenuAnchor}
@@ -1226,11 +1230,11 @@ function TimeTrackerPage() {
                         disabled={!isAdmin && !!activeSession}
                     >
                         <PlayArrow sx={{ mr: 1, color: 'success.main' }} />
-                        Запустить таймер
+                        {t('timetracker.startTimer')}
                     </MenuItem>
                     <MenuItem onClick={handleManualAddClick}>
                         <NoteAdd sx={{ mr: 1, color: 'primary.main' }} />
-                        Создать запись
+                        {t('timetracker.createRecord')}
                     </MenuItem>
                 </Menu>
                 <Button
@@ -1240,7 +1244,7 @@ function TimeTrackerPage() {
                     onClick={() => activeSession && togglePause()}
                     disabled={!activeSession}
                 >
-                    {activeSession?.session_type === 'pause' ? 'Продолжить' : 'Пауза'}
+                    {activeSession?.session_type === 'pause' ? t('timetracker.resume') : t('timetracker.pause')}
                 </Button>
                 <Button
                     variant="contained"
@@ -1249,7 +1253,7 @@ function TimeTrackerPage() {
                     onClick={() => activeSession && stopSession()}
                     disabled={!activeSession}
                 >
-                    Завершить
+                    {t('timetracker.finish')}
                 </Button>
                 <Button
                     variant="contained"
@@ -1257,7 +1261,7 @@ function TimeTrackerPage() {
                     onClick={() => setNewTaskOpen(true)}
                     disabled={!activeSession}
                 >
-                    Новое задание
+                    {t('timetracker.newTask')}
                 </Button>
             </Box>
 
@@ -1277,43 +1281,43 @@ function TimeTrackerPage() {
                 return (
                     <div className="nursia-summary-cards">
                         <div className="nursia-summary-card">
-                            <h3>Смены</h3>
+                            <h3>{t('dashboard.shifts')}</h3>
                             <div className="nursia-amount" style={{ color: '#7469eb' }}>
                                 {totalSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>Задания</h3>
+                            <h3>{t('timetracker.tasks')}</h3>
                             <div className="nursia-amount" style={{ color: '#2dbfc4' }}>
                                 {totalTasks}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>Готово</h3>
+                            <h3>{t('timetracker.done')}</h3>
                             <div className="nursia-amount" style={{ color: '#10b981' }}>
                                 {completedSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>В работе</h3>
+                            <h3>{t('timetracker.inProgress')}</h3>
                             <div className="nursia-amount" style={{ color: '#f59e0b' }}>
                                 {activeSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>Часы</h3>
+                            <h3>{t('dashboard.hours')}</h3>
                             <div className="nursia-amount" style={{ color: '#3b82f6' }}>
                                 {totalHours.toFixed(1)}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>Оплачено</h3>
+                            <h3>{t('dashboard.paid')}</h3>
                             <div className="nursia-amount" style={{ color: '#10b981' }}>
                                 {paidSessions}
                             </div>
                         </div>
                         <div className="nursia-summary-card">
-                            <h3>Неоплачено</h3>
+                            <h3>{t('dashboard.unpaid')}</h3>
                             <div className="nursia-amount" style={{ color: '#bc1db4' }}>
                                 {unpaidSessions}
                             </div>
@@ -1323,14 +1327,19 @@ function TimeTrackerPage() {
             })()}
 
             {/* Filters */}
-            <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+            <Paper sx={{
+                p: 2, mb: 2,
+                background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: '12px'
+            }}>
                 <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
                     <TextField
-                        label="Поиск"
+                        label={t('timetracker.searchLabel')}
                         size="small"
                         value={filters.search}
                         onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                        placeholder="Поиск по сменам..."
+                        placeholder={t('timetracker.searchPlaceholder')}
                         InputProps={{
                             startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
                         }}
@@ -1339,13 +1348,13 @@ function TimeTrackerPage() {
                     {isAdmin && (
                         <TextField
                             select
-                            label="Исполнитель"
+                            label={t('timetracker.assignee')}
                             size="small"
                             value={filters.worker}
                             onChange={(e) => setFilters({ ...filters, worker: e.target.value })}
                             sx={{ minWidth: 150 }}
                         >
-                            <MenuItem value="">Все</MenuItem>
+                            <MenuItem value="">{t('payments.all')}</MenuItem>
                             {employmentList.map(emp => (
                                 <MenuItem key={emp.id} value={emp.employee_id}>{emp.employee_name}</MenuItem>
                             ))}
@@ -1353,28 +1362,28 @@ function TimeTrackerPage() {
                     )}
                     <TextField
                         select
-                        label="Тип"
+                        label={t('timetracker.type')}
                         size="small"
                         value={filters.type}
                         onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                         sx={{ minWidth: 120 }}
                     >
-                        <MenuItem value="all">Все</MenuItem>
+                        <MenuItem value="all">{t('payments.all')}</MenuItem>
                         {assignmentTypes.map(t => (
                             <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
                         ))}
                     </TextField>
                     <TextField
                         select
-                        label="Статус"
+                        label={t('common.status')}
                         size="small"
                         value={filters.status}
                         onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                         sx={{ minWidth: 120 }}
                     >
-                        <MenuItem value="all">Все</MenuItem>
-                        <MenuItem value="active">В работе</MenuItem>
-                        <MenuItem value="completed">Завершено</MenuItem>
+                        <MenuItem value="all">{t('payments.all')}</MenuItem>
+                        <MenuItem value="active">{t('timetracker.inProgress')}</MenuItem>
+                        <MenuItem value="completed">{t('timetracker.completed')}</MenuItem>
                     </TextField>
                     <Button
                         variant="outlined"
@@ -1385,7 +1394,7 @@ function TimeTrackerPage() {
                     >
                         {dateRange[0].startDate && dateRange[0].endDate
                             ? `${formatDate(toLocalDateString(dateRange[0].startDate))} — ${formatDate(toLocalDateString(dateRange[0].endDate))}`
-                            : 'Выберите период'}
+                            : t('payments.selectPeriod')}
                     </Button>
                     <Popover
                         open={Boolean(dateRangeAnchor)}
@@ -1397,11 +1406,11 @@ function TimeTrackerPage() {
                             <DateRangePicker
                                 onChange={(item) => setDateRange([item.selection])}
                                 ranges={dateRange}
-                                locale={ru}
+                                locale={dateFnsLocales[i18n.language] || uk}
                                 months={1}
                                 direction="horizontal"
                                 rangeColors={['#1976d2']}
-                                staticRanges={ruStaticRanges}
+                                staticRanges={getStaticRanges(t)}
                                 inputRanges={[]}
                             />
                             <Button
@@ -1410,7 +1419,7 @@ function TimeTrackerPage() {
                                 variant="contained"
                                 size="small"
                             >
-                                ОК
+                                {t('timetracker.ok')}
                             </Button>
                         </Box>
                     </Popover>
@@ -1421,7 +1430,7 @@ function TimeTrackerPage() {
                             setDateRange([{ startDate: null, endDate: null, key: 'selection' }]);
                         }}
                     >
-                        Очистить
+                        {t('payments.clear')}
                     </Button>
                 </Box>
             </Paper>
@@ -1447,7 +1456,7 @@ function TimeTrackerPage() {
                             sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                         />
                         <Typography sx={{ color: 'white', fontWeight: 600 }}>
-                            Выбрано: {selectedIds.size}
+                            {t('payments.selectedCount', { count: selectedIds.size })}
                         </Typography>
                         <Box sx={{ flexGrow: 1 }} />
                         <Button
@@ -1456,7 +1465,7 @@ function TimeTrackerPage() {
                             onClick={handleClearSelection}
                             sx={{ color: 'white', borderColor: 'white' }}
                         >
-                            Снять выбор
+                            {t('payments.clearSelection')}
                         </Button>
                         <Button
                             variant="contained"
@@ -1466,7 +1475,7 @@ function TimeTrackerPage() {
                             onClick={() => setBulkDeleteOpen(true)}
                             disabled={bulkDeleting}
                         >
-                            Удалить выбранные
+                            {t('payments.deleteSelected')}
                         </Button>
                     </Box>
                 )}
@@ -1512,7 +1521,7 @@ function TimeTrackerPage() {
                 {filteredAssignments.length > 0 && (
                     <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary' }}>
                         <Typography variant="body2">
-                            Всего записей: {filteredAssignments.length}
+                            {t('payments.totalRecords', { count: filteredAssignments.length })}
                         </Typography>
                     </Box>
                 )}
@@ -1521,11 +1530,11 @@ function TimeTrackerPage() {
 
             {/* Start Session Dialog */}
             <Dialog open={startDialogOpen} onClose={() => setStartDialogOpen(false)}>
-                <DialogTitle>Начать смену</DialogTitle>
+                <DialogTitle>{t('timetracker.startShift')}</DialogTitle>
                 <DialogContent sx={{ minWidth: 400 }}>
                     {employmentList.length === 0 ? (
                         <Alert severity="warning" sx={{ mt: 2 }}>
-                            Нет активных трудовых отношений. Сначала создайте их в настройках.
+                            {t('timetracker.noActiveRelationsWarning')}
                         </Alert>
                     ) : (
                         <>
@@ -1536,7 +1545,7 @@ function TimeTrackerPage() {
                                 const hasActiveSession = selectedWorkerId && activeSessions.some(s => s.worker_id === selectedWorkerId);
                                 return hasActiveSession ? (
                                     <Alert severity="warning" sx={{ mt: 2 }}>
-                                        У этого работника есть активная смена. Она будет завершена и создастся новая.
+                                        {t('timetracker.workerHasActiveShiftWarning')}
                                     </Alert>
                                 ) : null;
                             })()}
@@ -1545,7 +1554,7 @@ function TimeTrackerPage() {
                                 <TextField
                                     select
                                     fullWidth
-                                    label={isAdmin ? "Выберите работника" : "Выберите работодателя"}
+                                    label={isAdmin ? t('timetracker.selectWorker') : t('timetracker.selectEmployer')}
                                     value={selectedEmployment}
                                     onChange={(e) => setSelectedEmployment(e.target.value)}
                                     sx={{ mt: 2 }}
@@ -1564,7 +1573,7 @@ function TimeTrackerPage() {
                                             } else {
                                                 // Multiple employers - group by employer
                                                 return employers.flatMap(employer => [
-                                                    <ListSubheader key={`header-${employer}`} sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>
+                                                    <ListSubheader key={`header-${employer}`} sx={{ fontWeight: 'bold', backgroundColor: 'background.paper' }}>
                                                         {employer}
                                                     </ListSubheader>,
                                                     ...employmentList
@@ -1589,20 +1598,20 @@ function TimeTrackerPage() {
                             )}
                             <TextField
                                 fullWidth
-                                label="Комментарий смены"
+                                label={t('timetracker.shiftComment')}
                                 value={startDescription}
                                 onChange={(e) => setStartDescription(e.target.value)}
-                                placeholder="Опишите смену..."
+                                placeholder={t('timetracker.shiftCommentPlaceholder')}
                                 multiline
                                 rows={2}
                                 sx={{ mt: 2 }}
                             />
                             <TextField
                                 fullWidth
-                                label="Комментарий первого задания"
+                                label={t('timetracker.firstTaskComment')}
                                 value={startTaskDescription}
                                 onChange={(e) => setStartTaskDescription(e.target.value)}
-                                placeholder="Если отличается от смены..."
+                                placeholder={t('timetracker.firstTaskCommentPlaceholder')}
                                 multiline
                                 rows={2}
                                 sx={{ mt: 2 }}
@@ -1611,27 +1620,27 @@ function TimeTrackerPage() {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setStartDialogOpen(false)}>Отмена</Button>
+                    <Button onClick={() => setStartDialogOpen(false)}>{t('common.cancel')}</Button>
                     <Button
                         variant="contained"
                         onClick={handleStartSession}
                         disabled={!selectedEmployment}
                     >
-                        Начать
+                        {t('timetracker.start')}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* New Task Dialog (Switch Task) */}
             <Dialog open={newTaskOpen} onClose={() => setNewTaskOpen(false)}>
-                <DialogTitle>Новое задание</DialogTitle>
+                <DialogTitle>{t('timetracker.newTask')}</DialogTitle>
                 <DialogContent sx={{ minWidth: 350 }}>
                     <TextField
                         fullWidth
-                        label="Описание задания"
+                        label={t('timetracker.taskDescription')}
                         value={newTaskDescription}
                         onChange={(e) => setNewTaskDescription(e.target.value)}
-                        placeholder="Что вы будете делать?"
+                        placeholder={t('timetracker.whatWillYouDo')}
                         multiline
                         rows={2}
                         sx={{ mt: 2 }}
@@ -1639,19 +1648,19 @@ function TimeTrackerPage() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setNewTaskOpen(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={handleNewTask}>Начать</Button>
+                    <Button onClick={() => setNewTaskOpen(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={handleNewTask}>{t('timetracker.start')}</Button>
                 </DialogActions>
             </Dialog>
 
             {/* Edit Task Dialog */}
             <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-                <DialogTitle>Редактировать задание</DialogTitle>
+                <DialogTitle>{t('timetracker.editTask')}</DialogTitle>
                 <DialogContent sx={{ minWidth: 400 }}>
                     <Box display="flex" gap={2} mt={2}>
                         <TextField
                             type="time"
-                            label="Начало"
+                            label={t('timetracker.startTime')}
                             value={editForm.start_time}
                             onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
                             InputLabelProps={{ shrink: true }}
@@ -1659,7 +1668,7 @@ function TimeTrackerPage() {
                         />
                         <TextField
                             type="time"
-                            label="Конец"
+                            label={t('timetracker.endTime')}
                             value={editForm.end_time}
                             onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
                             InputLabelProps={{ shrink: true }}
@@ -1668,7 +1677,7 @@ function TimeTrackerPage() {
                     </Box>
                     <TextField
                         fullWidth
-                        label="Описание"
+                        label={t('timetracker.description')}
                         value={editForm.description}
                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                         sx={{ mt: 2 }}
@@ -1677,9 +1686,9 @@ function TimeTrackerPage() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setEditDialogOpen(false)}>Отмена</Button>
+                    <Button onClick={() => setEditDialogOpen(false)}>{t('common.cancel')}</Button>
                     <Button variant="contained" onClick={handleEditSave}>
-                        Сохранить
+                        {t('common.save')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1700,14 +1709,14 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    🗑️ Удаление сегмента
+                    🗑️ {t('timetracker.deleteSegmentTitle')}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ mb: 1 }}>
-                        Вы уверены, что хотите удалить этот сегмент?
+                        {t('timetracker.confirmDeleteSegment')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Это действие нельзя отменить.
+                        {t('payments.irreversibleAction')}
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
@@ -1716,7 +1725,7 @@ function TimeTrackerPage() {
                         onClick={() => setDeleteDialogOpen(false)}
                         sx={{ borderRadius: 2, minWidth: 100 }}
                     >
-                        Отмена
+                        {t('common.cancel')}
                     </Button>
                     <Button
                         variant="contained"
@@ -1724,7 +1733,7 @@ function TimeTrackerPage() {
                         onClick={handleDeleteConfirm}
                         sx={{ borderRadius: 2, minWidth: 100 }}
                     >
-                        Удалить
+                        {t('common.delete')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1736,21 +1745,21 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    ✏️ Редактировать смену {assignmentToEdit?.tracking_nr || ''}
+                    ✏️ {t('timetracker.editShiftTitle', { number: assignmentToEdit?.tracking_nr || '' })}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     {isAdmin && (
                         <Box display="flex" gap={2} sx={{ mt: 3, mb: 2 }}>
                             <TextField
                                 fullWidth
-                                label="Ставка за час"
+                                label={t('employment.hourlyRate')}
                                 type="number"
                                 value={assignmentForm.hourly_rate}
                                 onChange={(e) => setAssignmentForm({ ...assignmentForm, hourly_rate: e.target.value })}
                             />
                             <TextField
                                 select
-                                label="Валюта"
+                                label={t('payments.currency')}
                                 value={assignmentForm.currency}
                                 onChange={(e) => setAssignmentForm({ ...assignmentForm, currency: e.target.value })}
                                 sx={{ minWidth: 100 }}
@@ -1765,18 +1774,18 @@ function TimeTrackerPage() {
                     )}
                     <TextField
                         fullWidth
-                        label="Комментарий"
+                        label={t('timetracker.comment')}
                         multiline
                         rows={3}
                         value={assignmentForm.description}
                         onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })}
-                        placeholder="Комментарий к смене..."
+                        placeholder={t('timetracker.shiftCommentLabel')}
                         sx={{ mt: isAdmin ? 0 : 3 }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setAssignmentEditOpen(false)}>Отмена</Button>
-                    <Button variant="contained" onClick={handleSaveAssignment}>Сохранить</Button>
+                    <Button onClick={() => setAssignmentEditOpen(false)}>{t('common.cancel')}</Button>
+                    <Button variant="contained" onClick={handleSaveAssignment}>{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
 
@@ -1787,20 +1796,20 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    🗑️ Удалить смену
+                    🗑️ {t('timetracker.deleteShiftTitle')}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ mb: 1 }}>
-                        Вы уверены, что хотите удалить эту смену?
+                        {t('timetracker.confirmDeleteShift')}
                     </Typography>
                     <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
-                        Все задания будут удалены!
+                        {t('timetracker.allTasksWillBeDeleted')}
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
-                    <Button variant="outlined" onClick={() => setAssignmentDeleteOpen(false)}>Отмена</Button>
+                    <Button variant="outlined" onClick={() => setAssignmentDeleteOpen(false)}>{t('common.cancel')}</Button>
                     <Button variant="contained" color="error" onClick={handleConfirmDeleteAssignment}>
-                        Удалить всё
+                        {t('payments.deleteAll')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1812,18 +1821,22 @@ function TimeTrackerPage() {
                     color: 'white',
                     fontWeight: 'bold'
                 }}>
-                    🗑️ Массовое удаление
+                    🗑️ {t('payments.bulkDeleteTitle')}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3, pb: 2, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ mb: 1 }}>
-                        Вы уверены, что хотите удалить <strong>{selectedIds.size}</strong> смен?
+                        <Trans
+                            i18nKey="timetracker.bulkDeleteConfirmShifts"
+                            values={{ count: selectedIds.size }}
+                            components={{ b: <b /> }}
+                        />
                     </Typography>
                     <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
-                        Все связанные задания и неоплаченные платежи будут удалены!
+                        {t('timetracker.allTasksAndUnpaidDeleted')}
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
-                    <Button variant="outlined" onClick={() => setBulkDeleteOpen(false)}>Отмена</Button>
+                    <Button variant="outlined" onClick={() => setBulkDeleteOpen(false)}>{t('common.cancel')}</Button>
                     <Button
                         variant="contained"
                         color="error"
@@ -1831,7 +1844,7 @@ function TimeTrackerPage() {
                         disabled={bulkDeleting}
                         startIcon={bulkDeleting ? <CircularProgress size={16} color="inherit" /> : <DeleteSweep />}
                     >
-                        {bulkDeleting ? 'Удаление...' : 'Удалить всё'}
+                        {bulkDeleting ? t('payments.deleting') : t('payments.deleteAll')}
                     </Button>
                 </DialogActions>
             </Dialog>
