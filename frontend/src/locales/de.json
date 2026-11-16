@@ -388,6 +388,19 @@
         "saveError": "Fehler beim Speichern",
         "deleteError": "Fehler beim Löschen",
         "bulkDeleteFailed": "Löschen fehlgeschlagen: {{errors}}",
-        "bulkDeleteError": "Fehler beim Massenlöschen"
+        "bulkDeleteError": "Fehler beim Massenlöschen",
+        "shift": "Schicht",
+        "timeRangeTooltip": "Beginn: {{startTime}} {{startDate}}\nEnde: {{endTime}} {{endDate}}",
+        "daysShort": "{{count}} Tg.",
+        "clone": "Klonen",
+        "absent": "Abwesend",
+        "work": "Arbeit",
+        "now": "jetzt",
+        "noRecords": "Keine Einträge",
+        "colNumber": "Nr.",
+        "date": "Datum",
+        "time": "Zeit",
+        "duration": "Dauer",
+        "payment": "Zahlung"
     }
 }

@@ -1,7 +1,8 @@
 import React, { useRef, memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    Table, TableBody, TableCell, TableHead, TableRow,
     Box, IconButton, Chip, Collapse, Tooltip, Typography, Checkbox
 } from '@mui/material';
 import {
@@ -9,6 +10,7 @@ import {
     KeyboardArrowDown, KeyboardArrowUp, Add, Replay, Work, BeachAccess, Sick, EventBusy, MoneyOff
 } from '@mui/icons-material';
 import { formatDate as formatDateUtil, formatTime as formatTimeUtil, getDaysDifference, formatDurationHours } from '../utils/dateFormat';
+import { alpha } from '@mui/material/styles';
 
 // Assignment type icon and color configuration
 const ASSIGNMENT_TYPE_ICONS = {
@@ -46,8 +48,9 @@ const AssignmentRow = memo(({
     isSelected,
     onToggleSelect
 }) => {
+    const { t } = useTranslation();
     const iconConfig = ASSIGNMENT_TYPE_ICONS[assignment.assignment_type || 'work'];
-    const typeData = assignmentTypes?.find(t => t.value === assignment.assignment_type) || { label: 'Смена' };
+    const typeData = assignmentTypes?.find(t => t.value === assignment.assignment_type) || { label: t('timetracker.shift') };
     const Icon = iconConfig?.icon || Work;
     const hasSegments = assignment.segments && assignment.segments.length > 0;
 
@@ -62,13 +65,19 @@ const AssignmentRow = memo(({
         <>
             {/* Main assignment row */}
             <TableRow
+                hover
                 sx={{
-                    '&:hover': { backgroundColor: '#f9f9f9' },
                     cursor: hasSegments ? 'pointer' : 'default',
-                    backgroundColor: assignment.is_active ? '#e8f5e9' : (isSelected ? '#e3f2fd' : 'inherit')
+                    backgroundColor: (theme) =>
+                        assignment.is_active
+                            ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.12)
+                            : isSelected
+                                ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.12)
+                                : 'inherit'
                 }}
                 onClick={() => hasSegments && onToggleExpand(assignment.assignment_id)}
             >
+
                 {/* Checkbox column for bulk selection (admin only) */}
                 {isAdmin && (
                     <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center' }}>
@@ -99,7 +108,12 @@ const AssignmentRow = memo(({
                         <span>{assignment.tracking_nr || '-'}</span>
                     </Box>
                 </TableCell>
-                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }} title={`Начало: ${formatTimeUtil(assignment.start_time)} ${formatDateUtil(assignment.start_time)}\nОкончание: ${formatTimeUtil(assignment.end_time)} ${formatDateUtil(assignment.end_time)}`}>
+                <TableCell padding="none" sx={{ pl: 1, whiteSpace: 'nowrap', width: columnWidths.date }} title={t('timetracker.timeRangeTooltip', {
+                    startTime: formatTimeUtil(assignment.start_time),
+                    startDate: formatDateUtil(assignment.start_time),
+                    endTime: formatTimeUtil(assignment.end_time),
+                    endDate: formatDateUtil(assignment.end_time)
+                })}>
                     {(() => {
                         const dateStr = formatDate(assignment.assignment_date);
 
@@ -173,7 +187,7 @@ const AssignmentRow = memo(({
                             if (!hoursPerDay) hoursPerDay = 8;
 
                             const totalHours = days * hoursPerDay;
-                            return <span>{days} дн. ({formatDurationHours(totalHours)})</span>;
+                            return <span>{t('timetracker.daysShort', { count: days })} ({formatDurationHours(totalHours)})</span>;
                         })()
                     )}
                 </TableCell>
@@ -189,8 +203,8 @@ const AssignmentRow = memo(({
                             size="small"
                             color={
                                 assignment.payment_status === 'paid' ? "success" :
-                                assignment.payment_status === 'offset' ? "info" :
-                                "warning"
+                                    assignment.payment_status === 'offset' ? "info" :
+                                        "warning"
                             }
                             clickable
                             onClick={(e) => {
@@ -208,15 +222,15 @@ const AssignmentRow = memo(({
                         isPaused ? (
                             <Chip
                                 icon={<Coffee sx={{ fontSize: '1rem !important' }} />}
-                                label="Пауза"
+                                label={t('timetracker.pause')}
                                 color="warning"
                                 size="small"
                             />
                         ) : (
-                            <Chip label="В работе" color="warning" size="small" />
+                            <Chip label={t('timetracker.inProgress')} color="warning" size="small" />
                         )
                     ) : (
-                        <Chip label="Готово" color="success" size="small" />
+                        <Chip label={t('timetracker.done')} color="success" size="small" />
                     )}
                 </TableCell>
                 <TableCell sx={{ width: columnWidths.actions }}>
@@ -224,7 +238,7 @@ const AssignmentRow = memo(({
                         {/* Session control buttons for active sessions */}
                         {assignment.is_active && (
                             <>
-                                <Tooltip title={isPaused ? 'Продолжить' : 'Пауза'}>
+                                <Tooltip title={isPaused ? t('timetracker.resume') : t('timetracker.pause')}>
                                     <IconButton
                                         size="small"
                                         onClick={(e) => onPauseResume(assignment, e)}
@@ -233,7 +247,7 @@ const AssignmentRow = memo(({
                                         {isPaused ? <PlayArrow fontSize="small" /> : <Pause fontSize="small" />}
                                     </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Завершить">
+                                <Tooltip title={t('timetracker.finish')}>
                                     <IconButton
                                         size="small"
                                         onClick={(e) => onStop(assignment, e)}
@@ -242,7 +256,7 @@ const AssignmentRow = memo(({
                                         <Stop fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Новое задание">
+                                <Tooltip title={t('timetracker.newTask')}>
                                     <IconButton
                                         size="small"
                                         onClick={(e) => onNewTask(assignment, e)}
@@ -253,18 +267,18 @@ const AssignmentRow = memo(({
                                 </Tooltip>
                             </>
                         )}
-                        <Tooltip title="Клонировать">
+                        <Tooltip title={t('timetracker.clone')}>
                             <IconButton size="small" onClick={(e) => onClone(assignment, e)}>
                                 <Replay fontSize="small" />
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title="Редактировать">
+                        <Tooltip title={t('common.edit')}>
                             <IconButton size="small" onClick={(e) => onEdit(assignment, e)}>
                                 <Edit fontSize="small" />
                             </IconButton>
                         </Tooltip>
                         {!assignment.is_active && assignment.payment_status !== 'paid' && assignment.payment_status !== 'offset' && (
-                            <Tooltip title="Удалить">
+                            <Tooltip title={t('common.delete')}>
                                 <IconButton size="small" onClick={(e) => onDelete(assignment, e)}>
                                     <Delete fontSize="small" />
                                 </IconButton>
@@ -279,16 +293,24 @@ const AssignmentRow = memo(({
                 <TableRow>
                     <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
                         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ m: 1, ml: 6, backgroundColor: '#fafafa', borderRadius: 1, p: 1 }}>
+                            <Box sx={{ m: 1, ml: 6, bgcolor: 'background.default', borderRadius: 1, p: 1 }}>
                                 <Table size="small">
                                     <TableBody>
                                         {assignment.segments.map((seg) => (
-                                            <TableRow key={seg.id} sx={{
-                                                backgroundColor: seg.session_type === 'pause' ? '#fff3e0' : (seg.session_type === 'absent' ? '#e3f2fd' : '#e8f5e9')
-                                            }}>
+                                            <TableRow
+                                                key={seg.id}
+                                                sx={{
+                                                    backgroundColor: (theme) => {
+                                                        const isDark = theme.palette.mode === 'dark';
+                                                        if (seg.session_type === 'pause') return alpha(theme.palette.warning.main, isDark ? 0.2 : 0.14);
+                                                        if (seg.session_type === 'absent') return alpha(theme.palette.info.main, isDark ? 0.2 : 0.14);
+                                                        return alpha(theme.palette.success.main, isDark ? 0.2 : 0.14);
+                                                    }
+                                                }}
+                                            >
                                                 <TableCell width={80}>
                                                     <Chip
-                                                        label={seg.session_type === 'pause' ? 'Пауза' : (seg.session_type === 'absent' ? 'Отсутств.' : 'Работа')}
+                                                        label={seg.session_type === 'pause' ? t('timetracker.pause') : (seg.session_type === 'absent' ? t('timetracker.absent') : t('timetracker.work'))}
                                                         size="small"
                                                         sx={{
                                                             backgroundColor: seg.session_type === 'pause' ? '#ff9800' : (seg.session_type === 'absent' ? '#2196f3' : '#4caf50'),
@@ -315,7 +337,7 @@ const AssignmentRow = memo(({
                                                     })()}
                                                 </TableCell>
 
-                                                <TableCell>{formatTimeUtil(seg.start_time)} — {seg.end_time ? formatTimeUtil(seg.end_time) : 'сейчас'}</TableCell>
+                                                <TableCell>{formatTimeUtil(seg.start_time)} — {seg.end_time ? formatTimeUtil(seg.end_time) : t('timetracker.now')}</TableCell>
                                                 <TableCell>
                                                     {seg.duration_hours ? (
                                                         (() => {
@@ -330,12 +352,12 @@ const AssignmentRow = memo(({
                                                     {seg.description || ''}
                                                 </TableCell>
                                                 <TableCell align="right">
-                                                    <Tooltip title="Редактировать">
+                                                    <Tooltip title={t('common.edit')}>
                                                         <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEditSegment(seg); }}>
                                                             <Edit fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="Удалить">
+                                                    <Tooltip title={t('common.delete')}>
                                                         <IconButton size="small" onClick={(e) => onDeleteSegment(seg.id, e)}>
                                                             <Delete fontSize="small" />
                                                         </IconButton>
@@ -382,6 +404,7 @@ function VirtualizedContent({
     selectedIds,
     onToggleSelect
 }) {
+    const { t } = useTranslation();
     // Memoize virtualizer options to prevent re-creation
     const virtualizerOptions = useMemo(() => ({
         count: assignments.length,
@@ -397,7 +420,7 @@ function VirtualizedContent({
         return (
             <TableRow>
                 <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">Нет записей</Typography>
+                    <Typography color="text.secondary">{t('timetracker.noRecords')}</Typography>
                 </TableCell>
             </TableRow>
         );
@@ -488,11 +511,14 @@ function VirtualizedTimeTable({
     onToggleSelect,
     onSelectAll
 }) {
+    const { t } = useTranslation();
     const parentRef = useRef(null);
 
     if (loading) {
         return null;
     }
+
+    const headerBgColor = (theme) => (theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0');
 
     return (
         <Box
@@ -505,11 +531,10 @@ function VirtualizedTimeTable({
             }}
         >
             <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 1000 }}>
-                <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f5f5f5' }}>
-                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        {/* Checkbox column header for admin */}
+                <TableHead sx={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: headerBgColor }}>
+                    <TableRow sx={{ backgroundColor: headerBgColor }}>
                         {isAdmin && (
-                            <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: '#f5f5f5' }}>
+                            <TableCell sx={{ width: 30, minWidth: 30, p: 1, textAlign: 'center', backgroundColor: headerBgColor }}>
                                 <Checkbox
                                     size="small"
                                     checked={selectedIds?.size > 0 && selectedIds?.size === assignments.filter(a => !a.is_active && a.payment_status !== 'paid' && a.payment_status !== 'offset').length}
@@ -519,16 +544,16 @@ function VirtualizedTimeTable({
                                 />
                             </TableCell>
                         )}
-                        {renderHeaderCell('tracking_nr', '№', 'left', 'tracking_nr', { px: 0.5 })}
-                        {renderHeaderCell('date', 'Дата', 'left', 'assignment_date')}
-                        {renderHeaderCell('worker', 'Исполнитель', 'left', 'worker_name')}
-                        {renderHeaderCell('type', 'Тип', 'left', 'assignment_type')}
-                        {renderHeaderCell('time', 'Время', 'left', 'total_work_seconds')}
-                        {renderHeaderCell('duration', 'Продолж.', 'left', 'total_amount')}
-                        {renderHeaderCell('description', 'Комментарий', 'left', 'description')}
-                        {renderHeaderCell('payment', 'Платёж', 'left', 'payment_tracking_nr')}
-                        {renderHeaderCell('status', 'Статус', 'left', 'is_active')}
-                        {renderHeaderCell('actions', 'Действия', 'left', null)}
+                        {renderHeaderCell('tracking_nr', t('timetracker.colNumber'), 'left', 'tracking_nr', { px: 0.5 })}
+                        {renderHeaderCell('date', t('timetracker.date'), 'left', 'assignment_date')}
+                        {renderHeaderCell('worker', t('timetracker.assignee'), 'left', 'worker_name')}
+                        {renderHeaderCell('type', t('timetracker.type'), 'left', 'assignment_type')}
+                        {renderHeaderCell('time', t('timetracker.time'), 'left', 'total_work_seconds')}
+                        {renderHeaderCell('duration', t('timetracker.duration'), 'left', 'total_amount')}
+                        {renderHeaderCell('description', t('timetracker.comment'), 'left', 'description')}
+                        {renderHeaderCell('payment', t('timetracker.payment'), 'left', 'payment_tracking_nr')}
+                        {renderHeaderCell('status', t('common.status'), 'left', 'is_active')}
+                        {renderHeaderCell('actions', t('common.actions'), 'left', null)}
                     </TableRow>
                 </TableHead>
                 <TableBody>

@@ -388,6 +388,19 @@
         "saveError": "Ошибка при сохранении",
         "deleteError": "Ошибка удаления",
         "bulkDeleteFailed": "Не удалось удалить: {{errors}}",
-        "bulkDeleteError": "Ошибка массового удаления"
+        "bulkDeleteError": "Ошибка массового удаления",
+        "shift": "Смена",
+        "timeRangeTooltip": "Начало: {{startTime}} {{startDate}}\nОкончание: {{endTime}} {{endDate}}",
+        "daysShort": "{{count}} дн.",
+        "clone": "Клонировать",
+        "absent": "Отсутств.",
+        "work": "Работа",
+        "now": "сейчас",
+        "noRecords": "Нет записей",
+        "colNumber": "№",
+        "date": "Дата",
+        "time": "Время",
+        "duration": "Продолж.",
+        "payment": "Платёж"
     }
 }

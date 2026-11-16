@@ -307,9 +307,11 @@ function TimeTrackerPage() {
                     width: columnWidths[id],
                     minWidth: columnWidths[id],
                     position: 'relative',
+                    backgroundColor: (theme) => (theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0'),
                     ...extraSx,
                     '&:hover .resizer': { opacity: 1 }
                 }}
+
             >
                 {sortKey ? (
                     <TableSortLabel

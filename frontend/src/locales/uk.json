@@ -386,6 +386,19 @@
         "saveError": "Помилка при збереженні",
         "deleteError": "Помилка видалення",
         "bulkDeleteFailed": "Не вдалося видалити: {{errors}}",
-        "bulkDeleteError": "Помилка масового видалення"
+        "bulkDeleteError": "Помилка масового видалення",
+        "shift": "Зміна",
+        "timeRangeTooltip": "Початок: {{startTime}} {{startDate}}\nЗавершення: {{endTime}} {{endDate}}",
+        "daysShort": "{{count}} дн.",
+        "clone": "Клонувати",
+        "absent": "Відсут.",
+        "work": "Робота",
+        "now": "зараз",
+        "noRecords": "Немає записів",
+        "colNumber": "№",
+        "date": "Дата",
+        "time": "Час",
+        "duration": "Тривал.",
+        "payment": "Платіж"
     }
 }

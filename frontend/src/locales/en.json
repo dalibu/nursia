@@ -388,6 +388,19 @@
         "saveError": "Failed to save",
         "deleteError": "Delete error",
         "bulkDeleteFailed": "Failed to delete: {{errors}}",
-        "bulkDeleteError": "Bulk delete error"
+        "bulkDeleteError": "Bulk delete error",
+        "shift": "Shift",
+        "timeRangeTooltip": "Start: {{startTime}} {{startDate}}\nEnd: {{endTime}} {{endDate}}",
+        "daysShort": "{{count}} days",
+        "clone": "Clone",
+        "absent": "Absent",
+        "work": "Work",
+        "now": "now",
+        "noRecords": "No records",
+        "colNumber": "Nr.",
+        "date": "Date",
+        "time": "Time",
+        "duration": "Duration",
+        "payment": "Payment"
     }
 }
