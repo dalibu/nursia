@@ -333,7 +333,19 @@ function UsersPage() {
             {filteredUsers
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((user) => (
-                <TableRow key={user.id} sx={{ opacity: user.status === 'deleted' ? 0.5 : 1, bgcolor: user.status === 'deleted' ? 'action.hover' : 'inherit' }} hover>
+                <TableRow
+                  key={user.id}
+                  hover
+                  sx={{
+                    ...(user.status === 'deleted' && {
+                      opacity: 0.6,
+                      bgcolor: 'action.disabledBackground',
+                      '&:hover': {
+                        bgcolor: 'action.selected',
+                      },
+                    }),
+                  }}
+                >
                   <TableCell>{user.id}</TableCell>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.full_name}</TableCell>
