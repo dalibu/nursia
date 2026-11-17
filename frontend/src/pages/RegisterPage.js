@@ -108,8 +108,8 @@ function RegisterPage({ onLogin }) {
         }
         widgetId = turnstile.render(turnstileContainerRef.current, {
           sitekey: turnstileSiteKey,
-          size: 'invisible',
           execution: 'execute',
+          appearance: 'interaction-only',
           callback: (token) => registerWithTokenRef.current?.(token),
           'error-callback': () => turnstileErrorRef.current?.(),
           'expired-callback': () => turnstileErrorRef.current?.()
@@ -230,7 +230,7 @@ function RegisterPage({ onLogin }) {
           <Box
             ref={turnstileContainerRef}
             aria-hidden="true"
-            sx={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
+            sx={{ mt: 2 }}
           />
           <Button
             type="submit"
