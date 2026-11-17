@@ -1,14 +1,22 @@
 import pytest
-import time
 from unittest.mock import AsyncMock, MagicMock
 
 # Skip if telegram module not available
 telegram = pytest.importorskip("telegram")
 from telegram import Update, User
+import bot.rate_limiter as rate_limiter_module
 from bot.rate_limiter import rate_limit
 
 @pytest.mark.asyncio
-async def test_rate_limiter():
+async def test_rate_limiter(monkeypatch):
+    current_time = [1000.0]
+    monkeypatch.setattr(
+        rate_limiter_module.time,
+        "time",
+        lambda: current_time[0],
+    )
+    rate_limiter_module._rate_limit_cache.pop(12345, None)
+
     # Mock update and context
     update = MagicMock(spec=Update)
     user = MagicMock(spec=User)
@@ -38,8 +46,8 @@ async def test_rate_limiter():
     assert result is None
     assert mock_handler.call_count == 2  # Count shouldn't increase
 
-    # Wait for window to expire
-    time.sleep(1.1)
+    # Advance beyond the window without relying on wall-clock scheduling.
+    current_time[0] += 1.1
 
     # 4th call: Should pass again
     result = await decorated_handler(update, context)

@@ -1,4 +1,6 @@
+import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from database.models import Base
 from database.workspace_migration import upgrade_workspace_schema
@@ -104,5 +106,59 @@ def test_legacy_data_moves_into_admin_owned_workspace_and_names_become_scoped():
         assert "workspace_id" in {
             column["name"] for column in inspect(connection).get_columns("payment_categories")
         }
+
+    engine.dispose()
+
+
+def test_existing_workspace_schema_drops_legacy_global_category_group_uniques():
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        Base.metadata.tables["workspaces"].create(connection)
+        connection.execute(text(
+            "INSERT INTO workspaces (id, name, default_currency) VALUES "
+            "(1, 'Legacy workspace', 'UAH'), (2, 'Second workspace', 'UAH')"
+        ))
+        connection.execute(text("""
+            CREATE TABLE payment_category_groups (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                code VARCHAR(20),
+                color VARCHAR(7) NOT NULL,
+                emoji VARCHAR(10) NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                created_at DATETIME,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                UNIQUE (name),
+                UNIQUE (code),
+                UNIQUE (workspace_id, name),
+                UNIQUE (workspace_id, code)
+            )
+        """))
+        connection.execute(text(
+            "INSERT INTO payment_category_groups "
+            "(id, name, code, color, emoji, is_active, workspace_id) "
+            "VALUES (1, 'Salary', 'salary', '#11998e', '💵', 1, 1)"
+        ))
+        Base.metadata.create_all(bind=connection)
+
+        upgrade_workspace_schema(connection)
+
+        connection.execute(text(
+            "INSERT INTO payment_category_groups "
+            "(name, code, color, emoji, is_active, workspace_id) "
+            "VALUES ('Salary', 'salary', '#11998e', '💵', 1, 2)"
+        ))
+        with pytest.raises(IntegrityError):
+            connection.execute(text(
+                "INSERT INTO payment_category_groups "
+                "(name, code, color, emoji, is_active, workspace_id) "
+                "VALUES ('Second salary', 'salary', '#11998e', '💵', 1, 2)"
+            ))
+
+        # Migration remains safe to run on subsequent API startups.
+        upgrade_workspace_schema(connection)
+        assert len(inspect(connection).get_unique_constraints(
+            "payment_category_groups"
+        )) >= 2
 
     engine.dispose()

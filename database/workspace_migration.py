@@ -54,6 +54,8 @@ def upgrade_workspace_schema(connection):
     if missing_columns:
         _make_workspace_columns_required(connection, missing_columns)
 
+    _ensure_workspace_unique_constraints(connection)
+
     connection.execute(text(
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_verified_email "
         "ON users (lower(email)) "
@@ -167,3 +169,135 @@ def _make_workspace_columns_required(connection, table_names):
                 batch.create_unique_constraint(
                     "uq_payment_category_workspace_name", ["workspace_id", "name"]
                 )
+
+
+def _ensure_workspace_unique_constraints(connection):
+    operations = Operations(MigrationContext.configure(connection))
+    specs = (
+        (
+            "payment_category_groups",
+            ("name", "code"),
+            (
+                ("uq_payment_group_workspace_name", ("workspace_id", "name")),
+                ("uq_payment_group_workspace_code", ("workspace_id", "code")),
+            ),
+        ),
+        (
+            "payment_categories",
+            ("name",),
+            (
+                ("uq_payment_category_workspace_name", ("workspace_id", "name")),
+            ),
+        ),
+    )
+
+    for table_name, legacy_columns, desired_constraints in specs:
+        inspector = inspect(connection)
+        unique_constraints = inspector.get_unique_constraints(table_name)
+        unique_indexes = [
+            index
+            for index in inspector.get_indexes(table_name)
+            if index.get("unique")
+        ]
+        unique_column_sets = {
+            tuple(constraint.get("column_names") or ())
+            for constraint in unique_constraints
+        } | {
+            tuple(index.get("column_names") or ())
+            for index in unique_indexes
+        }
+        if connection.dialect.name == "sqlite":
+            for index_row in connection.exec_driver_sql(
+                f'PRAGMA index_list("{table_name}")'
+            ):
+                if not index_row[2]:
+                    continue
+                index_name = index_row[1].replace('"', '""')
+                index_columns = connection.exec_driver_sql(
+                    f'PRAGMA index_info("{index_name}")'
+                )
+                unique_column_sets.add(tuple(row[2] for row in index_columns))
+
+        existing_columns = {
+            tuple(constraint.get("column_names") or ())
+            for constraint in unique_constraints
+        }
+        missing_constraints = [
+            (name, columns)
+            for name, columns in desired_constraints
+            if columns not in existing_columns
+        ]
+        legacy_constraints = [
+            constraint
+            for constraint in unique_constraints
+            if tuple(constraint.get("column_names") or ()) in {
+                (column,) for column in legacy_columns
+            }
+        ]
+        legacy_indexes = [
+            index
+            for index in unique_indexes
+            if tuple(index.get("column_names") or ()) in {
+                (column,) for column in legacy_columns
+            }
+        ]
+        legacy_unique_columns = unique_column_sets.intersection(
+            {(column,) for column in legacy_columns}
+        )
+        if (
+            not missing_constraints
+            and not legacy_constraints
+            and not legacy_indexes
+            and not legacy_unique_columns
+        ):
+            continue
+
+        source = sa.Table(
+            table_name,
+            sa.MetaData(),
+            autoload_with=connection,
+        )
+        for constraint in list(source.constraints):
+            if (
+                isinstance(constraint, sa.UniqueConstraint)
+                and tuple(column.name for column in constraint.columns)
+                in {(column,) for column in legacy_columns}
+            ):
+                source.constraints.remove(constraint)
+        for index in list(source.indexes):
+            if (
+                index.unique
+                and tuple(column.name for column in index.columns)
+                in {(column,) for column in legacy_columns}
+            ):
+                source.indexes.remove(index)
+
+        source_unique_columns = {
+            tuple(column.name for column in constraint.columns)
+            for constraint in source.constraints
+            if isinstance(constraint, sa.UniqueConstraint)
+        }
+        for name, columns in desired_constraints:
+            if columns not in source_unique_columns:
+                source.append_constraint(
+                    sa.UniqueConstraint(
+                        *(source.c[column] for column in columns),
+                        name=name,
+                    )
+                )
+
+        with operations.batch_alter_table(
+            table_name,
+            copy_from=source,
+            recreate="always",
+        ) as batch:
+            batch.alter_column(
+                "workspace_id",
+                existing_type=sa.Integer(),
+                nullable=True,
+            )
+            batch.alter_column(
+                "workspace_id",
+                existing_type=sa.Integer(),
+                nullable=False,
+            )
