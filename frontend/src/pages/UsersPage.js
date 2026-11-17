@@ -35,6 +35,7 @@ function UsersPage() {
 
   // Состояния для создания нового пользователя
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [createFormData, setCreateFormData] = useState({
     username: '',
     full_name: '',
@@ -82,6 +83,7 @@ function UsersPage() {
   // Создание нового пользователя
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    setCreateError('');
     try {
       const response = await fetch('/api/users/', {
         method: 'POST',
@@ -94,7 +96,7 @@ function UsersPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        setMessage(t('users.errorPrefix', { detail: error.detail }));
+        setCreateError(t('users.errorPrefix', { detail: error.detail || t('users.createError') }));
         return;
       }
 
@@ -110,8 +112,13 @@ function UsersPage() {
       loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
-      setMessage(t('users.createError'));
+      setCreateError(t('users.createError'));
     }
+  };
+
+  const handleCloseCreateDialog = () => {
+    setShowCreateDialog(false);
+    setCreateError('');
   };
 
   const handleCopyPassword = () => {
@@ -294,7 +301,10 @@ function UsersPage() {
         <Button
           variant="contained"
           startIcon={<PersonAdd />}
-          onClick={() => setShowCreateDialog(true)}
+          onClick={() => {
+            setCreateError('');
+            setShowCreateDialog(true);
+          }}
         >
           {t('users.addUser')}
         </Button>
@@ -490,13 +500,18 @@ function UsersPage() {
       </Dialog>
 
       {/* Диалог создания нового пользователя */}
-      <Dialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showCreateDialog} onClose={handleCloseCreateDialog} maxWidth="sm" fullWidth>
         <DialogTitle>{t('users.addUserTitle')}</DialogTitle>
         <Box component="form" onSubmit={handleCreateUser}>
           <DialogContent>
             <Alert severity="info" sx={{ mb: 2 }}>
               {t('users.passwordGeneratedHint')}
             </Alert>
+            {createError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateError('')}>
+                {createError}
+              </Alert>
+            )}
             <TextField
               fullWidth
               label={t('users.username')}
@@ -538,7 +553,7 @@ function UsersPage() {
             </TextField>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleCloseCreateDialog}>{t('common.cancel')}</Button>
             <Button type="submit" variant="contained">{t('common.create')}</Button>
           </DialogActions>
         </Box>
