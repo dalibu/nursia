@@ -52,7 +52,7 @@ function LoginPage({ onLogin }) {
       } else {
         localStorage.removeItem('force_password_change');
         onLogin();
-        navigate('/');
+        navigate(response.data.profile_setup_pending ? '/profile' : '/');
       }
     } catch (error) {
       console.error('Login failed:', error);

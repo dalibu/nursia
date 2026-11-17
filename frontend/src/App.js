@@ -126,7 +126,7 @@ function AppContent() {
               isAuthenticated ? <Navigate to="/" replace /> : <LoginPage onLogin={() => setIsAuthenticated(true)} />
             } />
             <Route path="/register" element={
-              isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />
+              isAuthenticated ? <Navigate to="/profile" replace /> : <RegisterPage onLogin={() => setIsAuthenticated(true)} />
             } />
             <Route path="/" element={
               isAuthenticated ? (

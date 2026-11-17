@@ -139,6 +139,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     force_password_change: Mapped[bool] = mapped_column(default=False)
+    profile_setup_pending: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     last_failed_login: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

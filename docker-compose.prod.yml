@@ -20,6 +20,8 @@ services:
 
   api:
     ports: !reset []
+    environment:
+      - FORWARDED_ALLOW_IPS=*
 
 volumes:
   caddy_data:

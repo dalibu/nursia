@@ -20,6 +20,9 @@
         "passwordRulesHint": "Password must contain at least 6 characters, letters, and 1 digit",
         "userAlreadyExists": "User already exists",
         "registrationError": "Registration error",
+        "registrationRateLimit": "Too many registration attempts from this network. Please try again later.",
+        "turnstileError": "The security check failed. Please try again.",
+        "turnstileUnavailable": "The security check is unavailable. Please contact the administrator.",
         "requestSentTitle": "Request sent",
         "requestSentMessage": "Your registration request has been sent to the administrator. Please wait for approval.",
         "backToLogin": "Back to login"
@@ -109,6 +112,8 @@
         "loadError": "Failed to load profile",
         "updateSuccess": "Profile updated successfully",
         "updateError": "Failed to update profile",
+        "usernameTaken": "That username is already in use.",
+        "usernameSuggestions": "Available usernames:",
         "roleUser": "User",
         "roleAdmin": "Administrator",
         "statusActive": "Active",

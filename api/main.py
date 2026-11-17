@@ -13,10 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from api.routers import auth, payments, settings as settings_router, currencies, admin, users
 from api.routers import assignments, employment, balances, websocket, dashboard
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
+from api.middleware.rate_limiter import limiter
 from config.settings import settings
 import os
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
@@ -28,6 +31,8 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.DEBUG
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security middleware
 if settings.FORCE_HTTPS:

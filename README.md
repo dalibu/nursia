@@ -30,6 +30,16 @@ docker compose exec api python scripts/create_admin.py
 * **Frontend (SPA):** http://localhost:3000
 * **Backend API (Swagger UI):** http://localhost:8000/docs
 
+### Registration protection
+Configure a Cloudflare Turnstile widget in `.env` before enabling registration:
+
+```env
+TURNSTILE_SITE_KEY=your_site_key
+TURNSTILE_SECRET_KEY=your_secret_key
+```
+
+Keep the secret key private. Registration is disabled until both keys are configured and is limited to 5 attempts per IP per hour. New accounts are active with the `worker` role; the username is generated from the user's name.
+
 ### 2. Server Deployment with HTTPS (Production)
 For production environments (e.g., Oracle Cloud), the project uses **Caddy** as a reverse proxy. Caddy automatically provisions and renews Let's Encrypt SSL certificates and routes traffic to `/api` (including `wss://` WebSocket connections) and the frontend.
 

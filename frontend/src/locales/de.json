@@ -20,6 +20,9 @@
         "passwordRulesHint": "Das Passwort muss mindestens 6 Zeichen, Buchstaben und 1 Ziffer enthalten",
         "userAlreadyExists": "Benutzer existiert bereits",
         "registrationError": "Registrierungsfehler",
+        "registrationRateLimit": "Zu viele Registrierungsversuche aus diesem Netzwerk. Bitte versuchen Sie es später erneut.",
+        "turnstileError": "Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+        "turnstileUnavailable": "Die Sicherheitsprüfung ist nicht verfügbar. Bitte wenden Sie sich an den Administrator.",
         "requestSentTitle": "Anfrage gesendet",
         "requestSentMessage": "Ihre Registrierungsanfrage wurde an den Administrator gesendet. Bitte warten Sie auf die Bestätigung.",
         "backToLogin": "Zurück zur Anmeldung"
@@ -109,6 +112,8 @@
         "loadError": "Fehler beim Laden des Profils",
         "updateSuccess": "Profil erfolgreich aktualisiert",
         "updateError": "Fehler beim Aktualisieren des Profils",
+        "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
+        "usernameSuggestions": "Verfügbare Benutzernamen:",
         "roleUser": "Benutzer",
         "roleAdmin": "Administrator",
         "statusActive": "Aktiv",

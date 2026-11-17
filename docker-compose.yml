@@ -12,6 +12,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - NODE_OPTIONS=--no-deprecation
       - DANGEROUSLY_DISABLE_HOST_CHECK=true
+      - REACT_APP_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
 
   api:
     build: .
@@ -27,6 +28,7 @@ services:
       - DB_URL=sqlite+aiosqlite:///./data/nursia.db
       - PYTHONPATH=/app
       - PYTHONWARNINGS=ignore::DeprecationWarning
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
     command: ./scripts/startup.sh
     depends_on:
       - frontend

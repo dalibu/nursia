@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     FORCE_HTTPS: bool = False
     RATE_LIMIT_ENABLED: bool = False
     SECURITY_HEADERS_ENABLED: bool = True
+    TURNSTILE_SECRET_KEY: str = ""
     
     # JWT settings
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"

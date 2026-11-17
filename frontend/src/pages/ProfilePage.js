@@ -14,6 +14,7 @@ function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [originalData, setOriginalData] = useState({});
   const [confirmDialog, setConfirmDialog] = useState(false);
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -71,9 +72,16 @@ function ProfilePage() {
       });
       if (response.ok) {
         setMessage(t('profile.updateSuccess'));
+        setUsernameSuggestions([]);
         loadProfile();
       } else {
-        setError(t('profile.updateError'));
+        const errorData = await response.json();
+        if (response.status === 409 && errorData.detail?.code === 'username_taken') {
+          setUsernameSuggestions(errorData.detail.suggestions || []);
+          setError(t('profile.usernameTaken'));
+        } else {
+          setError(t('profile.updateError'));
+        }
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
@@ -147,9 +155,36 @@ function ProfilePage() {
             label={t('users.username')}
             margin="normal"
             value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, username: e.target.value });
+              setUsernameSuggestions([]);
+              setError('');
+            }}
             required
           />
+          {usernameSuggestions.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {t('profile.usernameSuggestions')}
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {usernameSuggestions.map((username) => (
+                  <Button
+                    key={username}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      setFormData({ ...formData, username });
+                      setUsernameSuggestions([]);
+                      setError('');
+                    }}
+                  >
+                    {username}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+          )}
           <TextField
             fullWidth
             label={t('users.fullName')}

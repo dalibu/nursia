@@ -4,7 +4,7 @@ import sys
 import hashlib
 import bcrypt
 from pathlib import Path
-from sqlalchemy import select, insert
+from sqlalchemy import inspect, select, insert, text
 
 # Добавляем корень проекта в путь
 sys.path.append(str(Path(__file__).parent.parent))
@@ -21,7 +21,16 @@ async def setup_database():
     print("Инициализация структуры базы данных...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ensure_profile_setup_column)
     print("Структура таблиц готова.")
+
+
+def ensure_profile_setup_column(conn):
+    user_columns = {column["name"] for column in inspect(conn).get_columns("users")}
+    if "profile_setup_pending" not in user_columns:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN profile_setup_pending BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
 
 
 async def init_roles(session):

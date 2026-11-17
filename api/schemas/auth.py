@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Token(BaseModel):
@@ -8,6 +8,7 @@ class Token(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     force_password_change: bool = False
+    profile_setup_pending: bool = False
 
 
 class TokenData(BaseModel):
@@ -20,10 +21,14 @@ class UserLogin(BaseModel):
 
 
 class UserRegister(BaseModel):
-    username: str
-    password: str
-    email: Optional[str] = None
-    full_name: str
+    password: str = Field(min_length=1)
+    full_name: str = Field(min_length=1, max_length=100)
+    turnstile_token: str = Field(min_length=1, max_length=2048)
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def strip_full_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class RegistrationRequestResponse(BaseModel):

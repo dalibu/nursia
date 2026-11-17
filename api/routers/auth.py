@@ -1,53 +1,84 @@
 import sys
 import asyncio
+import logging
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from database.core import get_db
-from database.models import User, RegistrationRequest
-from api.schemas.auth import Token, UserLogin, UserRegister, RegistrationRequestResponse, ChangePassword
+from database.models import Role, User
+from api.schemas.auth import Token, UserLogin, UserRegister, ChangePassword
 from api.auth.oauth import create_access_token, get_current_user
-from config.settings import settings
+from api.auth.registration import available_usernames, verify_turnstile_token
+from api.middleware.rate_limiter import limiter
 from utils.settings_helper import get_jwt_expire_minutes, get_setting
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=RegistrationRequestResponse)
+@router.post("/register", response_model=Token)
+@limiter.limit("5/hour")
 async def register(
+    request: Request,
     user_data: UserRegister,
     db: AsyncSession = Depends(get_db)
 ):
-    # Проверяем, что username уникален
-    result = await db.execute(select(User).where(User.username == user_data.username))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username already exists")
-    
-    result = await db.execute(select(RegistrationRequest).where(RegistrationRequest.username == user_data.username))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Registration request already exists")
-    
-    # Хешируем пароль с bcrypt (пароль уже SHA-256 с клиента)
+    await verify_turnstile_token(user_data.turnstile_token)
+
     from utils.password_utils import hash_password
     password_hash = hash_password(user_data.password)
     
-    # Создаем заявку на регистрацию
-    request = RegistrationRequest(
-        username=user_data.username,
-        email=user_data.email or '',
-        full_name=user_data.full_name,
-        password_hash=password_hash
-    )
-    
-    db.add(request)
-    await db.commit()
-    await db.refresh(request)
-    
-    return request
+    role_result = await db.execute(select(Role).where(Role.name == "worker"))
+    worker_role = role_result.scalar_one_or_none()
+    if worker_role is None:
+        raise HTTPException(status_code=503, detail={"code": "registration_unavailable"})
+
+    for attempt in range(5):
+        username = (await available_usernames(db, user_data.full_name))[0]
+        user = User(
+            username=username,
+            password_hash=password_hash,
+            full_name=user_data.full_name.strip(),
+            status="active",
+            profile_setup_pending=True,
+        )
+        user.roles.append(worker_role)
+        db.add(user)
+
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            existing_user = await db.execute(
+                select(User.id).where(func.lower(User.username) == username.casefold())
+            )
+            if existing_user.scalar_one_or_none() is not None and attempt < 4:
+                role_result = await db.execute(select(Role).where(Role.name == "worker"))
+                worker_role = role_result.scalar_one_or_none()
+                if worker_role is None:
+                    raise HTTPException(status_code=503, detail={"code": "registration_unavailable"})
+                continue
+            logger.exception("Failed to create a registered user")
+            raise HTTPException(status_code=500, detail={"code": "registration_error"})
+
+        expire_minutes = await get_jwt_expire_minutes()
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=timedelta(minutes=expire_minutes),
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": expire_minutes * 60,
+            "profile_setup_pending": True,
+        }
+
+    raise HTTPException(status_code=503, detail={"code": "registration_unavailable"})
 
 
 @router.post("/login", response_model=Token)
@@ -133,7 +164,8 @@ async def login(
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": expire_minutes * 60,
-        "force_password_change": user.force_password_change
+        "force_password_change": user.force_password_change,
+        "profile_setup_pending": user.profile_setup_pending,
     }
 
 
@@ -182,5 +214,6 @@ async def get_current_user_info(
         "full_name": current_user.full_name,
         "roles": [role.name for role in current_user.roles],  # RBAC roles array
         "permissions": list(permissions),  # All permissions from all roles
-        "force_password_change": current_user.force_password_change
+        "force_password_change": current_user.force_password_change,
+        "profile_setup_pending": current_user.profile_setup_pending
     }

@@ -1,6 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from api.main import app
+from api.routers import auth as auth_router
+from database.core import get_db
 
 @pytest.fixture
 def client():
@@ -19,14 +22,29 @@ def test_root_endpoint(client):
     assert response.status_code == 200
     assert "Nursia Payment Tracker API" in response.json()["message"]
 
-def test_login_validation(client):
+@pytest.mark.asyncio
+async def test_login_validation(db_session, monkeypatch):
     """Тест валидации данных логина"""
-    # Тест с некорректными данными
-    response = client.post("/api/auth/login", json={
-        "username": "nonexistent",
-        "password": "wrong"
-    })
-    assert response.status_code == 401  # User not found
+
+    async def override_get_db():
+        yield db_session
+
+    async def disable_login_delay(key, default=None):
+        return "false" if key == "security_login_delay_enabled" else "0"
+
+    app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr(auth_router, "get_setting", disable_login_delay)
+
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/auth/login", json={
+                "username": "nonexistent",
+                "password": "wrong"
+            })
+        assert response.status_code == 401  # User not found
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 def test_unauthorized_access(client):
     """Тест доступа без авторизации"""

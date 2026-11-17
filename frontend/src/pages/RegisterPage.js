@@ -1,10 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Container, Paper, TextField, Button, Typography, Box, Alert, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
 import { auth } from '../services/api';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ThemeSwitcher from '../components/ThemeSwitcher';
+
+let turnstileScriptPromise;
+
+const loadTurnstile = () => {
+  if (window.turnstile) {
+    return Promise.resolve(window.turnstile);
+  }
+  if (!turnstileScriptPromise) {
+    turnstileScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.turnstile) {
+          resolve(window.turnstile);
+        } else {
+          reject(new Error('Cloudflare Turnstile failed to initialize'));
+        }
+      };
+      script.onerror = () => reject(new Error('Cloudflare Turnstile script failed to load'));
+      document.head.appendChild(script);
+    });
+  }
+  return turnstileScriptPromise;
+};
 
 // Простое хеширование на клиенте
 const hashPassword = async (password) => {
@@ -15,39 +41,97 @@ const hashPassword = async (password) => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-function RegisterPage() {
-  const { t, i18n } = useTranslation();
+function RegisterPage({ onLogin }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const turnstileSiteKey = process.env.REACT_APP_TURNSTILE_SITE_KEY || '';
+  const turnstileContainerRef = useRef(null);
+  const turnstileWidgetIdRef = useRef(null);
+  const registerWithTokenRef = useRef(null);
+  const turnstileErrorRef = useRef(null);
   const [formData, setFormData] = useState({
-    username: '',
     password: '',
-    email: '',
     full_name: ''
   });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  const [passwordRules, setPasswordRules] = useState('');
+  const [captchaReady, setCaptchaReady] = useState(false);
+
+  const registerWithToken = async (token) => {
+    try {
+      const hashedPassword = await hashPassword(formData.password);
+      const response = await auth.register({
+        full_name: formData.full_name,
+        password: hashedPassword,
+        turnstile_token: token
+      });
+      localStorage.setItem('token', response.data.access_token);
+      localStorage.removeItem('force_password_change');
+      onLogin();
+      navigate('/profile');
+    } catch (requestError) {
+      console.error('Registration failed:', requestError);
+      const detail = requestError.response?.data?.detail;
+      if (requestError.response?.status === 429) {
+        setError(t('auth.registrationRateLimit'));
+      } else if (detail?.code === 'turnstile_failed') {
+        setError(t('auth.turnstileError'));
+      } else if (detail?.code === 'turnstile_not_configured' || detail?.code === 'turnstile_unavailable') {
+        setError(t('auth.turnstileUnavailable'));
+      } else {
+        setError(t('auth.registrationError'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  registerWithTokenRef.current = registerWithToken;
+
+  const handleTurnstileError = () => {
+    setError(t('auth.turnstileError'));
+    setLoading(false);
+  };
+  turnstileErrorRef.current = handleTurnstileError;
 
   useEffect(() => {
-    loadPasswordRules();
-  }, []);
-
-  const handleLanguageChange = (event, newLang) => {
-    if (newLang) {
-      i18n.changeLanguage(newLang);
+    if (!turnstileSiteKey) {
+      return undefined;
     }
-  };
 
-  const loadPasswordRules = async () => {
-    try {
-      const response = await fetch('/api/users/password-rules');
-      const data = await response.json();
-      setPasswordRules(data.rules);
-    } catch (error) {
-      console.error('Failed to load password rules:', error);
-    }
-  };
+    let active = true;
+    let widgetId = null;
+    loadTurnstile()
+      .then((turnstile) => {
+        if (!active || !turnstileContainerRef.current) {
+          return;
+        }
+        widgetId = turnstile.render(turnstileContainerRef.current, {
+          sitekey: turnstileSiteKey,
+          size: 'invisible',
+          execution: 'execute',
+          callback: (token) => registerWithTokenRef.current?.(token),
+          'error-callback': () => turnstileErrorRef.current?.(),
+          'expired-callback': () => turnstileErrorRef.current?.()
+        });
+        turnstileWidgetIdRef.current = widgetId;
+        setCaptchaReady(true);
+      })
+      .catch((loadError) => {
+        console.error('Failed to load Cloudflare Turnstile:', loadError);
+        if (active) {
+          setError(t('auth.turnstileUnavailable'));
+        }
+      });
+
+    return () => {
+      active = false;
+      if (widgetId !== null && window.turnstile) {
+        window.turnstile.remove(widgetId);
+        turnstileWidgetIdRef.current = null;
+      }
+    };
+  }, [turnstileSiteKey, t]);
 
   const validatePassword = (password) => {
     if (password.length < 6) {
@@ -78,26 +162,18 @@ function RegisterPage() {
       return;
     }
 
+    if (!turnstileSiteKey || !captchaReady || turnstileWidgetIdRef.current === null) {
+      setError(t('auth.turnstileUnavailable'));
+      return;
+    }
+
     setLoading(true);
-
     try {
-      // Хешируем пароль на клиенте
-      const hashedPassword = await hashPassword(formData.password);
-      const submitData = {
-        ...formData,
-        password: hashedPassword
-      };
-
-      await auth.register(submitData);
-      setSuccess(true);
-    } catch (error) {
-      console.error('Registration failed:', error);
-      if (error.response?.status === 400) {
-        setError(error.response.data.detail || t('auth.userAlreadyExists'));
-      } else {
-        setError(t('auth.registrationError'));
-      }
-    } finally {
+      window.turnstile.reset(turnstileWidgetIdRef.current);
+      window.turnstile.execute(turnstileWidgetIdRef.current);
+    } catch (turnstileError) {
+      console.error('Failed to execute Cloudflare Turnstile:', turnstileError);
+      setError(t('auth.turnstileError'));
       setLoading(false);
     }
   };
@@ -108,31 +184,6 @@ function RegisterPage() {
       <ThemeSwitcher />
     </Box>
   );
-
-  if (success) {
-    return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          {languageSwitcher}
-          <Typography variant="h6" align="center" gutterBottom>
-            {t('auth.requestSentTitle')}
-          </Typography>
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {t('auth.requestSentMessage')}
-          </Alert>
-          <Button
-            component={Link}
-            to="/login"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 2 }}
-          >
-            {t('auth.backToLogin')}
-          </Button>
-        </Paper>
-      </Container>
-    );
-  }
 
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
@@ -151,13 +202,18 @@ function RegisterPage() {
             {error}
           </Alert>
         )}
+        {!turnstileSiteKey && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {t('auth.turnstileUnavailable')}
+          </Alert>
+        )}
         <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            label={t('auth.username')}
+            label={t('auth.fullName')}
             margin="normal"
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+            value={formData.full_name}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             required
           />
           <TextField
@@ -171,27 +227,16 @@ function RegisterPage() {
             helperText={passwordError || (formData.password ? '' : t('auth.passwordRulesHint'))}
             required
           />
-          <TextField
-            fullWidth
-            label={t('auth.emailOptional')}
-            type="email"
-            margin="normal"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-          <TextField
-            fullWidth
-            label={t('auth.fullName')}
-            margin="normal"
-            value={formData.full_name}
-            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-            required
+          <Box
+            ref={turnstileContainerRef}
+            aria-hidden="true"
+            sx={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
           />
           <Button
             type="submit"
             fullWidth
             variant="contained"
-            disabled={loading}
+            disabled={loading || !captchaReady}
             sx={{ mt: 3 }}
           >
             {loading ? t('auth.registering') : t('auth.registerButton')}

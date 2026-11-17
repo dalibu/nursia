@@ -6,11 +6,12 @@ from typing import List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from database.core import get_db
 from database.models import User, Role
 from api.auth.oauth import get_current_user, get_admin_user
+from api.auth.registration import available_usernames
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -94,7 +95,8 @@ async def get_current_user_profile(
         "roles": [role.name for role in current_user.roles],
         "status": current_user.status,
         "created_at": current_user.created_at,
-        "updated_at": current_user.updated_at
+        "updated_at": current_user.updated_at,
+        "profile_setup_pending": current_user.profile_setup_pending,
     }
 
 @router.put("/me")
@@ -104,14 +106,29 @@ async def update_current_user_profile(
     current_user: User = Depends(get_current_user)
 ):
     """Обновить профиль текущего пользователя"""
+    username = user_data.username.strip().casefold()
     # Проверяем уникальность username если он изменился
-    if user_data.username != current_user.username:
-        result = await db.execute(select(User).where(User.username == user_data.username))
-        if result.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Username already exists")
-        current_user.username = user_data.username
-    
-    current_user.full_name = user_data.full_name
+    if username != current_user.username.casefold():
+        result = await db.execute(
+            select(User.id).where(
+                func.lower(User.username) == username,
+                User.id != current_user.id,
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            suggestions = await available_usernames(
+                db,
+                user_data.full_name,
+                count=3,
+                exclude_user_id=current_user.id,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "username_taken", "suggestions": suggestions},
+            )
+        current_user.username = username
+
+    current_user.full_name = user_data.full_name.strip()
     if user_data.email:
         current_user.email = user_data.email
     
@@ -122,6 +139,7 @@ async def update_current_user_profile(
     
     # Устанавливаем updated_at при редактировании
     current_user.updated_at = datetime.now(timezone.utc)
+    current_user.profile_setup_pending = False
     
     await db.commit()
     await db.refresh(current_user)

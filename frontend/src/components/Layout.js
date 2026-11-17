@@ -50,6 +50,9 @@ function Layout({ onLogout }) {
       const roles = response.data.roles || [];
       const isAdminUser = roles.includes('admin');
       setIsAdmin(isAdminUser);
+      if (response.data.profile_setup_pending && window.location.pathname !== '/profile') {
+        navigate('/profile');
+      }
       if (isAdminUser) {
         checkRequests();
       }
