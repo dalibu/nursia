@@ -8,7 +8,7 @@ Payment tracking service for household spending management with multi-currency s
 - **OAuth Authentication** with JWT tokens
 - **Database** with migrations (Alembic + SQLite)
 - **Telegram Bot** for mobile access
-- **React Frontend** (SPA с Material-UI)
+- **React Frontend** (SPA with Material-UI)
 - **Multi-currency Support** (UAH, EUR, USD)
 - **Payment Categories** management
 - **Detailed Reports** with filtering by period and currency
@@ -40,6 +40,21 @@ TURNSTILE_SECRET_KEY=your_secret_key
 
 Keep the secret key private. Registration is disabled until both keys are configured and is limited to 5 attempts per IP per hour. New accounts are active with the `worker` role; the username is generated from the user's name.
 
+#### Local Testing with Cloudflare Turnstile
+For local development (`localhost`) and automated testing, use Cloudflare's official dummy keys instead of production keys:
+
+| Key Type | Test Key | Behavior |
+| :--- | :--- | :--- |
+| **Site Key (Visible)** | `1x00000000000000000000AA` | Always passes |
+| **Site Key (Visible)** | `2x00000000000000000000AB` | Always blocks |
+| **Site Key (Invisible)** | `1x00000000000000000000BB` | Always passes |
+| **Site Key (Force)** | `3x00000000000000000000FF` | Forces an interactive challenge |
+| **Secret Key** | `1x0000000000000000000000000000000AA` | Always returns `success: true` |
+| **Secret Key** | `2x0000000000000000000000000000000AA` | Always returns `success: false` |
+| **Secret Key** | `3x0000000000000000000000000000000AA` | Yields `timeout-or-duplicate` error |
+
+> **Note:** Test site keys generate dummy tokens that will fail validation if paired with a production secret key. Always switch both keys together.
+
 ### 2. Server Deployment with HTTPS (Production)
 For production environments (e.g., Oracle Cloud), the project uses **Caddy** as a reverse proxy. Caddy automatically provisions and renews Let's Encrypt SSL certificates and routes traffic to `/api` (including `wss://` WebSocket connections) and the frontend.
 
@@ -54,7 +69,7 @@ For production environments (e.g., Oracle Cloud), the project uses **Caddy** as 
    docker compose exec api python scripts/create_admin.py
    ```
 
-* **Application URL:** `https://your-domain.duckdns.org`
+* **Application URL:** `https://duckdns.org`
 
 ## Manual Installation
 
@@ -89,7 +104,7 @@ python scripts/create_admin.py
 # REST API
 python scripts/run_api.py
 
-# React Frontend (в отдельном терминале)
+# React Frontend (in a separate terminal)
 cd frontend && npm start
 
 # Telegram Bot
@@ -99,7 +114,10 @@ python bot/main.py
 ## API Endpoints
 
 ### Authentication
-- `POST /auth/login` - User login
+All protected endpoints require a valid JWT token passed in the header: `Authorization: Bearer <token>`.
+
+- `POST /auth/register` - Register a new user account (requires valid Turnstile token)
+- `POST /auth/login` - User login (returns JWT access token)
 
 ### Payment Categories
 - `GET /payments/categories` - List categories
@@ -135,17 +153,17 @@ python scripts/run_tests.py --coverage
 
 ## Project Structure
 
-```
+```text
 nursia/
-├── frontend/              # React приложение
-│   ├── public/            # Статические файлы
+├── frontend/              # React application
+│   ├── public/            # Static files
 │   ├── src/
-│   │   ├── components/    # React компоненты
-│   │   ├── pages/         # Страницы приложения
-│   │   ├── services/      # API клиенты
-│   │   ├── App.js         # Главный компонент
-│   │   └── index.js       # Точка входа
-│   └── package.json       # NPM зависимости
+│   │   ├── components/    # React components
+│   │   ├── pages/         # Application pages
+│   │   ├── services/      # API clients
+│   │   ├── App.js         # Main component
+│   │   └── index.js       # Entry point
+│   └── package.json       # NPM dependencies
 ├── api/                   # REST API
 │   ├── auth/              # OAuth authentication
 │   ├── routers/           # API endpoints
@@ -176,12 +194,36 @@ nursia/
 
 ## Configuration
 
-Create `.env` file in the project root:
+Create a `.env` file in the project root (or copy `.env.example`):
 
 ```env
-TELEGRAM_TOKEN=your_bot_token_here
-ADMIN_IDS=[123456789]
+# Core & Database
 DB_URL=sqlite+aiosqlite:///./data/nursia.db
+DOMAIN_NAME=localhost
+
+# JWT Authentication
+JWT_SECRET_KEY=your_generated_secret_key_here
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# Telegram Bot
+TELEGRAM_TOKEN=your_bot_token_here
+ADMIN_IDS=
+
+# Cloudflare Turnstile (use dummy keys for local dev)
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+```
+
+#### Generating a JWT Secret Key
+Never use a weak or default secret key in production. Generate a cryptographically strong 256-bit key using Python or OpenSSL:
+
+```bash
+# Using Python
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# Using OpenSSL
+openssl rand -hex 32
 ```
 
 ## License
