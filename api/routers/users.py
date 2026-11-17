@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 from database.core import get_db
-from database.models import User, Role
-from api.auth.oauth import get_current_user, get_admin_user
+from database.models import User, Workspace, WorkspaceMember
+from api.auth.oauth import get_current_user, get_workspace_admin_user
 from api.auth.registration import available_usernames
 from pydantic import BaseModel
 
@@ -64,22 +64,23 @@ async def get_all_users(
 ):
     """Получить список всех активных пользователей (для выбора в формах)"""
     result = await db.execute(
-        select(User)
-        .options(selectinload(User.roles))
+        select(User, WorkspaceMember.role)
+        .join(WorkspaceMember, WorkspaceMember.user_id == User.id)
+        .where(WorkspaceMember.workspace_id == current_user.active_workspace_id)
         .where(User.status == "active")
         .order_by(User.full_name)
     )
-    users = result.scalars().all()
+    users = result.all()
     return [
         {
-            "id": u.id, 
-            "username": u.username, 
-            "full_name": u.full_name,
-            "name": u.full_name,   # Backwards compatibility
-            "type": "user",        # Backwards compatibility
-            "roles": [r.name for r in u.roles]  # For filtering admins vs workers
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "name": user.full_name,
+            "type": "user",
+            "roles": [workspace_role],
         }
-        for u in users
+        for user, workspace_role in users
     ]
 
 @router.get("/me")
@@ -92,7 +93,7 @@ async def get_current_user_profile(
         "username": current_user.username,
         "full_name": current_user.full_name,
         "email": current_user.email,
-        "roles": [role.name for role in current_user.roles],
+        "roles": [current_user.workspace_role],
         "status": current_user.status,
         "created_at": current_user.created_at,
         "updated_at": current_user.updated_at,
@@ -129,14 +130,13 @@ async def update_current_user_profile(
         current_user.username = username
 
     current_user.full_name = user_data.full_name.strip()
-    if user_data.email:
-        current_user.email = user_data.email
+    if user_data.email and user_data.email.casefold() != (current_user.email or "").casefold():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "email_change_requires_verification"},
+        )
     
     # Админы могут изменять статус (роли управляются через отдельный API)
-    if current_user.is_admin:
-        if user_data.status:
-            current_user.status = user_data.status
-    
     # Устанавливаем updated_at при редактировании
     current_user.updated_at = datetime.now(timezone.utc)
     current_user.profile_setup_pending = False
@@ -150,35 +150,39 @@ async def update_current_user_profile(
 async def get_all_users_admin(
     include_deleted: bool = Query(False, description="Включить удалённых пользователей"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
-    """Получить всех пользователей (только для админов)"""
-    query = select(User).options(selectinload(User.roles))
+    """Получить участников текущего рабочего пространства."""
+    query = (
+        select(WorkspaceMember)
+        .options(joinedload(WorkspaceMember.user))
+        .where(WorkspaceMember.workspace_id == current_user.active_workspace_id)
+    )
     if not include_deleted:
-        query = query.where(User.status != "deleted")
+        query = query.join(User).where(User.status != "deleted")
     
     result = await db.execute(query)
-    users = result.scalars().all()
+    members = result.unique().scalars().all()
     
     return [
         {
-            "id": user.id,
-            "username": user.username,
-            "full_name": user.full_name,
-            "email": user.email,
-            "roles": [role.name for role in user.roles],
-            "status": user.status,
-            "created_at": user.created_at,
-            "updated_at": user.updated_at
+            "id": member.user.id,
+            "username": member.user.username,
+            "full_name": member.user.full_name,
+            "email": member.user.email,
+            "roles": [member.role],
+            "status": member.user.status,
+            "created_at": member.user.created_at,
+            "updated_at": member.user.updated_at,
         }
-        for user in users
+        for member in members
     ]
 
 @router.post("/")
 async def create_user(
     user_data: AdminUserCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Создать нового пользователя (только для админов).
     
@@ -187,18 +191,22 @@ async def create_user(
     """
     import hashlib
     from utils.password_utils import hash_password
-    # from database.models import Role # Removed local import, now imported globally
-    
-    # Проверяем уникальность username
-    result = await db.execute(select(User).where(User.username == user_data.username))
+
+    if user_data.role not in {"admin", "worker"}:
+        raise HTTPException(status_code=400, detail="Invalid workspace role")
+
+    result = await db.execute(
+        select(User.id).where(func.lower(User.username) == user_data.username.casefold())
+    )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already exists")
-    
-    # Получаем роль из БД
-    role_result = await db.execute(select(Role).where(Role.name == user_data.role))
-    role = role_result.scalar_one_or_none()
-    if not role:
-        raise HTTPException(status_code=400, detail=f"Role '{user_data.role}' not found")
+
+    if user_data.email:
+        email_result = await db.execute(
+            select(User.id).where(func.lower(User.email) == user_data.email.strip().casefold())
+        )
+        if email_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Email already exists")
     
     # Генерируем пароль
     plain_password = generate_password()
@@ -216,11 +224,15 @@ async def create_user(
         status="active",
         force_password_change=True  # Требуем смену пароля при первом входе
     )
-    new_user.roles.append(role)
-    
     db.add(new_user)
+    await db.flush()
+    db.add(WorkspaceMember(
+        workspace_id=current_user.active_workspace_id,
+        user_id=new_user.id,
+        role=user_data.role,
+    ))
     await db.commit()
-    await db.refresh(new_user, attribute_names=["roles"]) # Changed
+    await db.refresh(new_user)
     
     return {
         "message": "User created successfully",
@@ -229,7 +241,7 @@ async def create_user(
             "username": new_user.username,
             "full_name": new_user.full_name,
             "email": new_user.email,
-            "roles": [r.name for r in new_user.roles],
+            "roles": [user_data.role],
             "status": new_user.status
         },
         "generated_password": plain_password  # Показываем пароль администратору
@@ -240,37 +252,44 @@ async def update_user(
     user_id: int,
     user_data: AdminUserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
-    """Обновить пользователя (только для админов)"""
-    # from database.models import Role # Removed local import, now imported globally
-    
-    result = await db.execute(select(User).where(User.id == user_id).options(selectinload(User.roles))) # Changed
-    user = result.scalar_one_or_none()
-    
-    if not user:
+    """Обновить участника только в текущем рабочем пространстве."""
+    result = await db.execute(
+        select(WorkspaceMember, User)
+        .join(User, User.id == WorkspaceMember.user_id)
+        .where(
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.workspace_id == current_user.active_workspace_id,
+        )
+    )
+    membership, user = result.one_or_none() or (None, None)
+    if membership is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    if user_data.role not in {"admin", "worker"}:
+        raise HTTPException(status_code=400, detail="Invalid workspace role")
+
     # Проверяем уникальность username если он изменился
     if user_data.username != user.username:
-        result = await db.execute(select(User).where(User.username == user_data.username))
+        result = await db.execute(
+            select(User.id).where(
+                func.lower(User.username) == user_data.username.casefold(),
+                User.id != user.id,
+            )
+        )
         if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Username already exists")
         user.username = user_data.username
     
     user.full_name = user_data.full_name
-    if user_data.email:
-        user.email = user_data.email
-    
-    # Обновляем роли (очищаем и добавляем новую)
-    if user_data.role:
-        role_result = await db.execute(select(Role).where(Role.name == user_data.role))
-        role = role_result.scalar_one_or_none()
-        if role:
-            user.roles.clear()
-            user.roles.append(role)
-    
-    user.status = user_data.status
+    if user_data.email and user_data.email.casefold() != (user.email or "").casefold():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "email_change_requires_verification"},
+        )
+
+    membership.role = user_data.role
     user.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
@@ -282,26 +301,28 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
-    """Удалить пользователя (soft delete - только для админов).
-    
-    Устанавливает статус 'deleted' вместо физического удаления,
-    чтобы сохранить ссылочную целостность с платежами и другими данными.
-    """
+    """Удалить участника из текущего рабочего пространства."""
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
+
+    result = await db.execute(
+        select(WorkspaceMember, User)
+        .join(User, User.id == WorkspaceMember.user_id)
+        .where(
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.workspace_id == current_user.active_workspace_id,
+        )
+    )
+    membership, user = result.one_or_none() or (None, None)
+    if membership is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.status == "deleted":
-        raise HTTPException(status_code=400, detail="User already deleted")
-    
-    # Деактивируем трудовые отношения пользователя
+
+    workspace = await db.get(Workspace, current_user.active_workspace_id)
+    if workspace and workspace.owner_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot remove the workspace owner")
+
     from database.models import EmploymentRelation
     emp_result = await db.execute(
         select(EmploymentRelation).where(
@@ -311,35 +332,22 @@ async def delete_user(
     )
     for emp in emp_result.scalars().all():
         emp.is_active = False
-    
-    # Soft delete: меняем статус вместо физического удаления
-    user.status = "deleted"
-    user.updated_at = datetime.now(timezone.utc)
+
+    await db.delete(membership)
     await db.commit()
-    
-    return {"message": "User deleted successfully"}
+
+    return {"message": "Workspace member removed"}
 
 @router.post("/{user_id}/restore")
 async def restore_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
-    """Восстановить удалённого пользователя (только для админов)"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.status != "deleted":
-        raise HTTPException(status_code=400, detail="User is not deleted")
-    
-    user.status = "active"
-    user.updated_at = datetime.now(timezone.utc)
-    await db.commit()
-    
-    return {"message": "User restored successfully"}
+    raise HTTPException(
+        status_code=410,
+        detail={"code": "use_workspace_invitation"},
+    )
 
 @router.put("/me/password")
 async def change_password(
@@ -367,20 +375,21 @@ async def change_password(
 async def reset_user_password(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Сбросить пароль пользователя (только для админов)"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
+    membership = await db.execute(
+        select(WorkspaceMember.id).where(
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.workspace_id == current_user.active_workspace_id,
+        )
+    )
+    if membership.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    user.force_password_change = True
-    user.updated_at = datetime.now(timezone.utc)
-    
-    await db.commit()
-    return {"message": "Password reset. User must change password on next login"}
+    raise HTTPException(
+        status_code=410,
+        detail={"code": "password_reset_requires_user"},
+    )
 
 @router.get("/password-rules")
 async def get_password_rules():

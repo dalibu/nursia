@@ -31,14 +31,24 @@ docker compose exec api python scripts/create_admin.py
 * **Backend API (Swagger UI):** http://localhost:8000/docs
 
 ### Registration protection
-Configure a Cloudflare Turnstile widget in `.env` before enabling registration:
+Public registration uses Cloudflare Turnstile and email verification. Configure a Turnstile widget and SMTP delivery in `.env`:
 
 ```env
 TURNSTILE_SITE_KEY=your_site_key
 TURNSTILE_SECRET_KEY=your_secret_key
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=your_smtp_username
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM_EMAIL=noreply@example.com
+SMTP_STARTTLS=true
+SMTP_USE_SSL=false
+APP_BASE_URL=https://your-domain.example
 ```
 
-Keep the secret key private. Registration is disabled until both keys are configured and is limited to 5 attempts per IP per hour. New accounts are active with the `worker` role; the username is generated from the user's name.
+Keep the Turnstile secret and SMTP credentials private. Registration is limited to 5 attempts per IP per hour. New users verify a six-digit code by email; successful verification activates the account, creates a workspace, and makes the owner its administrator. The username is generated from the email address and can be changed in the profile.
+
+Workspace administrators can invite members by email. Invitees join the existing workspace through a one-time link. Existing data is assigned to a `Legacy workspace` during setup.
 
 #### Local Testing with Cloudflare Turnstile
 For local development (`localhost`) and automated testing, use Cloudflare's official dummy keys instead of production keys:
@@ -84,14 +94,8 @@ cd frontend && npm install
 
 ### 2. Database Setup
 ```bash
-# Apply migrations
-cd database && alembic upgrade head
-
-# Initialize payment categories
-python scripts/init_categories.py
-
-# Initialize system settings
-python scripts/init_settings.py
+# Apply schema updates and initialize system/workspace defaults
+python scripts/setup_system.py
 ```
 
 ### 3. Create Admin User
@@ -116,8 +120,14 @@ python bot/main.py
 ### Authentication
 All protected endpoints require a valid JWT token passed in the header: `Authorization: Bearer <token>`.
 
-- `POST /auth/register` - Register a new user account (requires valid Turnstile token)
+- `POST /auth/register` - Start email-verified registration (requires Turnstile)
+- `POST /auth/verify-email` - Verify the six-digit email code and receive a JWT
+- `POST /auth/resend-verification` - Resend the email code
 - `POST /auth/login` - User login (returns JWT access token)
+- `GET /workspaces/` - List the current user's workspaces
+- `POST /workspaces/switch` - Switch the active workspace
+- `POST /workspaces/invites` - Invite a member to the current workspace
+- `POST /workspaces/invites/accept` - Accept a workspace invitation
 
 ### Payment Categories
 - `GET /payments/categories` - List categories

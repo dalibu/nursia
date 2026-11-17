@@ -40,8 +40,20 @@ api.interceptors.response.use(
 export const auth = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
+  verifyEmail: (data) => api.post('/auth/verify-email', data),
+  resendVerification: (data) => api.post('/auth/resend-verification', data),
   changePassword: (data) => api.post('/auth/change-password', data),
   me: () => api.get('/auth/me'),
+};
+
+export const workspaces = {
+  list: () => api.get('/workspaces/'),
+  create: (data) => api.post('/workspaces/', data),
+  switch: (data) => api.post('/workspaces/switch', data),
+  members: () => api.get('/workspaces/members'),
+  invite: (data) => api.post('/workspaces/invites', data),
+  previewInvite: (token) => api.get(`/workspaces/invites/${encodeURIComponent(token)}`),
+  acceptInvite: (data) => api.post('/workspaces/invites/accept', data),
 };
 
 export const users = {

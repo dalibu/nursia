@@ -8,7 +8,7 @@ import MainMenu from './MainMenu';
 import AccountMenu from './AccountMenu';
 
 function PageHeader({ title = 'NURSIA', showMainMenu = true }) {
-  const { handleLogout, isAdmin, hasRequests } = useNotifications();
+  const { handleLogout, isAdmin, isSystemAdmin, hasRequests } = useNotifications();
   const { t } = useTranslation();
 
   return (
@@ -39,7 +39,9 @@ function PageHeader({ title = 'NURSIA', showMainMenu = true }) {
           </IconButton>
         </Tooltip>
 
-        {showMainMenu && <MainMenu isAdmin={isAdmin} hasRequests={hasRequests} />}
+        {showMainMenu && (
+          <MainMenu isAdmin={isAdmin} isSystemAdmin={isSystemAdmin} hasRequests={hasRequests} />
+        )}
         <AccountMenu onLogout={handleLogout} />
       </div>
     </div>

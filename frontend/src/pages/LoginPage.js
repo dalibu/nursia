@@ -56,7 +56,10 @@ function LoginPage({ onLogin }) {
       }
     } catch (error) {
       console.error('Login failed:', error);
-      const detail = error.response?.data?.detail || '';
+      const errorCode = error.response?.data?.detail?.code;
+      const detail = typeof error.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : '';
       const [, delay] = detail.split('|');
 
       if (error.response?.status === 401) {
@@ -66,7 +69,9 @@ function LoginPage({ onLogin }) {
         }
         setError(errorMsg);
       } else if (error.response?.status === 403) {
-        setError(t('auth.accountNotActivated'));
+        setError(errorCode === 'email_verification_required'
+          ? t('auth.emailVerificationRequired')
+          : t('auth.accountNotActivated'));
       } else {
         setError(t('auth.serverError'));
       }
@@ -99,7 +104,7 @@ function LoginPage({ onLogin }) {
         <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            label={t('auth.username')}
+            label={t('auth.emailOrUsername')}
             margin="normal"
             value={credentials.username}
             onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}

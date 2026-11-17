@@ -20,6 +20,7 @@ import CurrenciesPage from './pages/CurrenciesPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import InvitePage from './pages/InvitePage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import TimeTrackerPage from './pages/TimeTrackerPage';
@@ -127,6 +128,9 @@ function AppContent() {
             } />
             <Route path="/register" element={
               isAuthenticated ? <Navigate to="/profile" replace /> : <RegisterPage onLogin={() => setIsAuthenticated(true)} />
+            } />
+            <Route path="/invite/:token" element={
+              <InvitePage onLogin={() => setIsAuthenticated(true)} />
             } />
             <Route path="/" element={
               isAuthenticated ? (

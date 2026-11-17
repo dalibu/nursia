@@ -1,5 +1,7 @@
 import sys
 import warnings
+import asyncio
+import logging
 from pathlib import Path
 
 # Suppress DeprecationWarnings from FastAPI and Starlette (e.g. on_event)
@@ -17,10 +19,13 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from api.routers import auth, payments, settings as settings_router, currencies, admin, users
 from api.routers import assignments, employment, balances, websocket, dashboard
+from api.routers import workspaces
 from api.middleware.security import SecurityHeadersMiddleware
 from api.middleware.logging import SecurityLoggingMiddleware
 from api.middleware.rate_limiter import limiter
 from config.settings import settings
+from database.core import AsyncSessionLocal
+from sqlalchemy.exc import SQLAlchemyError
 import os
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
@@ -31,6 +36,8 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.DEBUG
 )
+logger = logging.getLogger(__name__)
+_registration_cleanup_task: asyncio.Task | None = None
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -66,21 +73,45 @@ app.include_router(employment.router, prefix="/api")
 app.include_router(balances.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(workspaces.router, prefix="/api")
 
 
 # Startup/shutdown events for background tasks
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on app startup."""
+    global _registration_cleanup_task
     from api.routers.websocket import start_timer_broadcast
+    from api.routers.auth import cleanup_expired_registrations
+
+    async def cleanup_unverified_accounts():
+        while True:
+            try:
+                async with AsyncSessionLocal() as db:
+                    deleted_count = await cleanup_expired_registrations(db)
+                if deleted_count:
+                    logger.info("Removed %s expired unverified accounts", deleted_count)
+            except SQLAlchemyError:
+                logger.exception("Failed to remove expired unverified accounts")
+            await asyncio.sleep(60 * 60)
+
     start_timer_broadcast()
+    _registration_cleanup_task = asyncio.create_task(cleanup_unverified_accounts())
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Stop background tasks on app shutdown."""
+    global _registration_cleanup_task
     from api.routers.websocket import stop_timer_broadcast
     stop_timer_broadcast()
+    if _registration_cleanup_task is not None:
+        _registration_cleanup_task.cancel()
+        try:
+            await _registration_cleanup_task
+        except asyncio.CancelledError:
+            pass
+        _registration_cleanup_task = None
 
 # React статические файлы
 if os.path.exists("frontend/build/static"):

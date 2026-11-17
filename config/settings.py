@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = False
     SECURITY_HEADERS_ENABLED: bool = True
     TURNSTILE_SECRET_KEY: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
+    APP_BASE_URL: str = "http://localhost:3000"
     
     # JWT settings
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"

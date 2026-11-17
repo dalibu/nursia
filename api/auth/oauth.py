@@ -10,7 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from database.core import get_db
-from database.models import User
+from database.models import User, WorkspaceMember
 from sqlalchemy import select
 from config.settings import settings
 
@@ -33,25 +33,40 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    # For general endpoints, missing or invalid credentials are Unauthorized (401)
-    unauthorized_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    user, payload = await _load_authenticated_user(credentials, db, unauthorized=True)
+    workspace_id = payload.get("workspace_id")
+    membership_query = select(WorkspaceMember).where(WorkspaceMember.user_id == user.id)
+    if workspace_id is not None:
+        membership_query = membership_query.where(WorkspaceMember.workspace_id == int(workspace_id))
+    membership = (await db.execute(
+        membership_query.order_by(WorkspaceMember.workspace_id).limit(1)
+    )).scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No workspace access")
 
+    user.workspace_role = membership.role
+    user.active_workspace_id = membership.workspace_id
+    db.sync_session.info["workspace_id"] = membership.workspace_id
+    db.sync_session.info["user_id"] = user.id
+    return user
+
+
+async def _load_authenticated_user(credentials, db, *, unauthorized):
+    error_status = status.HTTP_401_UNAUTHORIZED if unauthorized else status.HTTP_403_FORBIDDEN
+    unauthorized_exception = HTTPException(
+        status_code=error_status,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"} if unauthorized else None,
+    )
     if credentials is None:
         raise unauthorized_exception
 
     try:
         payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            raise unauthorized_exception
-    except JWTError:
+        user_id = int(payload["sub"])
+    except (JWTError, KeyError, TypeError, ValueError):
         raise unauthorized_exception
 
-    # Загружаем пользователя с ролями и их permissions
     from database.models import Role
     result = await db.execute(
         select(User).options(
@@ -61,45 +76,46 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise unauthorized_exception
-    return user
+    return user, payload
 
 
 async def get_admin_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    # Admin-only endpoints should return Forbidden (403) for missing/invalid creds
-    forbidden_exception = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not authenticated",
+    user, _ = await _load_authenticated_user(credentials, db, unauthorized=False)
+    membership_result = await db.execute(
+        select(WorkspaceMember.id)
+        .where(WorkspaceMember.user_id == user.id)
+        .limit(1)
     )
-
-    if credentials is None:
-        raise forbidden_exception
-
-    try:
-        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            raise forbidden_exception
-    except JWTError:
-        raise forbidden_exception
-
-    # Загружаем пользователя с ролями и их permissions
-    from database.models import Role
-    result = await db.execute(
-        select(User).options(
-            selectinload(User.roles).selectinload(Role.permissions)
-        ).where(User.id == user_id)
-    )
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise forbidden_exception
-
-    # Проверяем роль admin через RBAC
-    if not user.is_admin:
+    if membership_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Workspace administrators cannot access platform administration",
+        )
+    if not user.has_role("admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
         )
+    return user
+
+
+async def get_workspace_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Workspace administrator access required",
+        )
+    return current_user
+
+
+async def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    user, _ = await _load_authenticated_user(credentials, db, unauthorized=True)
     return user

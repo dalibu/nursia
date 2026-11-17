@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-from database.models import Base, User, Payment, PaymentCategory, PaymentCategoryGroup, PaymentGroupCode, PaymentStatus
+from database.models import Base, User, Payment, PaymentCategory, PaymentCategoryGroup, PaymentGroupCode, PaymentStatus, Workspace
 from api.routers.payments import update_payment
 from api.schemas.payment import PaymentCreate
 
@@ -25,6 +25,10 @@ async def test_auto_offset_on_debt_payment():
     async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     async with async_session_maker() as db:
+        db.add(Workspace(id=1, name="Test workspace"))
+        await db.flush()
+        db.sync_session.info["workspace_id"] = 1
+
         # Create test users with minimal required fields
         admin = User(telegram_id=123, username="admin", full_name="Admin", password_hash="hash")
         worker = User(telegram_id=456, username="worker", full_name="Worker", password_hash="hash")

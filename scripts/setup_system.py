@@ -5,6 +5,7 @@ import hashlib
 import bcrypt
 from pathlib import Path
 from sqlalchemy import inspect, select, insert, text
+from sqlalchemy.orm import selectinload
 
 # Добавляем корень проекта в путь
 sys.path.append(str(Path(__file__).parent.parent))
@@ -12,8 +13,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 from database.core import engine, AsyncSessionLocal
 from database.models import (
     Base, User, SystemSetting, PaymentCategory, PaymentCategoryGroup,
-    Currency, Role, Permission
+    Currency, Role, Permission, Workspace, WorkspaceMember
 )
+from database.workspace_migration import upgrade_workspace_schema
 
 
 async def setup_database():
@@ -22,6 +24,7 @@ async def setup_database():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(ensure_profile_setup_column)
+        await conn.run_sync(upgrade_workspace_schema)
     print("Структура таблиц готова.")
 
 
@@ -303,21 +306,60 @@ async def init_admin(session):
     
     print("Администратор создан (admin + employer). Статус: Активен. Требуется смена пароля при входе.") 
     
-    # Create EmploymentRelation for admin so they can also track work time
-    from database.models import EmploymentRelation
-    from decimal import Decimal
-    
+
+async def ensure_default_workspace(session):
     result = await session.execute(
-        select(EmploymentRelation).where(EmploymentRelation.user_id == admin.id)
+        select(Workspace).where(Workspace.name == "Legacy workspace").order_by(Workspace.id).limit(1)
     )
-    if not result.scalars().first():
-        admin_employment = EmploymentRelation(
-            user_id=admin.id,
-            hourly_rate=Decimal("100.00"),
-            currency="UAH"
+    workspace = result.scalar_one_or_none()
+    if workspace is None:
+        any_workspace = await session.execute(select(Workspace.id).limit(1))
+        if any_workspace.scalar_one_or_none() is not None:
+            return None
+
+        users_result = await session.execute(
+            select(User).options(selectinload(User.roles)).order_by(User.id)
         )
-        session.add(admin_employment)
-        print("Создано трудовое отношение для администратора (ставка 100 UAH/час).")
+        users = users_result.scalars().all()
+        if not users:
+            return None
+
+        owner = next((user for user in users if user.is_admin), users[0])
+        workspace = Workspace(
+            name="Legacy workspace",
+            owner_id=owner.id,
+            default_currency="UAH",
+        )
+        session.add(workspace)
+        await session.flush()
+
+    users_result = await session.execute(
+        select(User).options(selectinload(User.roles)).order_by(User.id)
+    )
+    for user in users_result.scalars().all():
+        membership_result = await session.execute(
+            select(WorkspaceMember.id).where(
+                WorkspaceMember.workspace_id == workspace.id,
+                WorkspaceMember.user_id == user.id,
+            )
+        )
+        if membership_result.scalar_one_or_none() is None:
+            session.add(WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=user.id,
+                role="admin" if user.is_admin else "worker",
+            ))
+
+    if workspace.owner_id is None:
+        owner_result = await session.execute(
+            select(User).options(selectinload(User.roles)).order_by(User.id)
+        )
+        owner = next((user for user in owner_result.scalars().all() if user.is_admin), None)
+        if owner is not None:
+            workspace.owner_id = owner.id
+
+    await session.flush()
+    return workspace.id
 
 
 async def init_employment_relations(session):
@@ -383,11 +425,14 @@ async def main():
         await session.flush()
         await init_role_permissions(session)
         await init_settings(session)
-        await init_category_groups(session)
-        await init_role_category_groups(session)
-        await init_categories(session)
         await init_currencies(session)
         await init_admin(session)
+        workspace_id = await ensure_default_workspace(session)
+        if workspace_id is not None:
+            session.sync_session.info["workspace_id"] = workspace_id
+            await init_category_groups(session)
+            await init_role_category_groups(session)
+            await init_categories(session)
         await init_employment_relations(session)  # Ensure all workers have employment
         await session.commit()
     

@@ -14,8 +14,8 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, EmploymentRelation
-from api.auth.oauth import get_current_user, get_admin_user
+from database.models import User, EmploymentRelation, WorkspaceMember
+from api.auth.oauth import get_current_user, get_workspace_admin_user
 
 router = APIRouter(prefix="/employment", tags=["employment"])
 
@@ -91,12 +91,17 @@ async def get_employment_relations(
 async def create_employment_relation(
     data: EmploymentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Создать трудовые отношения"""
     # Проверяем, что пользователь существует и активен
     result = await db.execute(
-        select(User).where(User.id == data.user_id)
+        select(User)
+        .join(WorkspaceMember, WorkspaceMember.user_id == User.id)
+        .where(
+            User.id == data.user_id,
+            WorkspaceMember.workspace_id == current_user.active_workspace_id,
+        )
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -156,7 +161,7 @@ async def update_employment_relation(
     relation_id: int,
     data: EmploymentUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Обновить трудовые отношения"""
     result = await db.execute(
@@ -197,7 +202,7 @@ async def update_employment_relation(
 async def delete_employment_relation(
     relation_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Удалить (деактивировать) трудовые отношения"""
     result = await db.execute(

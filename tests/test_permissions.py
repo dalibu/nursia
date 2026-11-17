@@ -61,12 +61,14 @@ def test_worker_can_access_users_all():
     
     mock_worker = User(id=2, username="worker", status="active")
     mock_worker.roles = []
+    mock_worker.active_workspace_id = 1
     
     mock_db = AsyncMock()
     mock_execute_result = MagicMock()
     mock_db.execute.return_value = mock_execute_result
     mock_execute_result.scalars = MagicMock()
     mock_execute_result.scalars.return_value.all.return_value = []
+    mock_execute_result.all.return_value = []
     mock_execute_result.scalar_one_or_none = MagicMock(return_value=None)
     
     app.dependency_overrides[get_current_user] = lambda: mock_worker

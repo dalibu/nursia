@@ -28,7 +28,7 @@ import {
   SettingsApplications
 } from '@mui/icons-material';
 
-const MainMenu = ({ isAdmin, hasRequests }) => {
+const MainMenu = ({ isAdmin, isSystemAdmin, hasRequests }) => {
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const theme = useTheme();
@@ -42,15 +42,17 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
     setIsMenuOpen(false);
   };
 
-  const menuItems = [
+  const workspaceMenuItems = [
     { to: '/users', icon: <People />, label: t('nav.users') },
-    { to: '/roles', icon: <Security />, label: t('nav.roles') },
-    { to: '/requests', icon: <Assignment />, label: t('nav.requests'), badge: hasRequests },
     { to: '/categories', icon: <Folder />, label: t('nav.categories') },
     { to: '/employment', icon: <Work />, label: t('nav.employment') },
-    { to: '/currencies', icon: <AttachMoney />, label: t('nav.currencies') },
     { to: '/reports', icon: <Assessment />, label: t('nav.reports') },
-    { to: '/settings', icon: <SettingsApplications />, label: t('nav.parameters') }
+  ];
+  const systemMenuItems = [
+    { to: '/roles', icon: <Security />, label: t('nav.roles') },
+    { to: '/requests', icon: <Assignment />, label: t('nav.requests'), badge: hasRequests },
+    { to: '/currencies', icon: <AttachMoney />, label: t('nav.currencies') },
+    { to: '/settings', icon: <SettingsApplications />, label: t('nav.parameters') },
   ];
 
   return (
@@ -93,7 +95,7 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
           </IconButton>
         </Box>
 
-        {isAdmin && (
+        {(isAdmin || isSystemAdmin) && (
           <>
             <Box sx={{ px: 2, pt: 2, pb: 1 }}>
               <Typography
@@ -110,7 +112,7 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
             </Box>
 
             <List>
-              {menuItems.map((item) => (
+              {workspaceMenuItems.map((item) => (
                 <ListItem key={item.to} disablePadding>
                   <ListItemButton
                     component={Link}
@@ -141,6 +143,26 @@ const MainMenu = ({ isAdmin, hasRequests }) => {
               ))}
             </List>
           </>
+        )}
+        {isSystemAdmin && (
+          <List>
+            {systemMenuItems.map((item) => (
+              <ListItem key={item.to} disablePadding>
+                <ListItemButton component={Link} to={item.to} onClick={closeMenu}>
+                  <ListItemIcon sx={{ color: 'var(--accent-blue)', minWidth: 40 }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.label}
+                    primaryTypographyProps={{ sx: { color: 'var(--text-primary)' } }}
+                  />
+                  {item.badge && (
+                    <Typography variant="body2" sx={{ color: 'var(--accent-red)' }}>⚠️</Typography>
+                  )}
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
         )}
       </Drawer>
     </>

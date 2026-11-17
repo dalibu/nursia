@@ -20,9 +20,9 @@ def test_settings_endpoint_exists(client):
 
 def test_users_endpoint_exists(client):
     """Тест существования endpoint пользователей"""
-    # GET /users/ uses get_admin_user -> 403
+    # GET /users/ requires a workspace administrator.
     response = client.get("/api/users/")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 def test_registration_requests_endpoint_exists(client):
     """Тест существования endpoint заявок на регистрацию"""
@@ -80,9 +80,9 @@ def test_settings_crud_endpoints_exist(client):
 
 def test_user_management_endpoints_exist(client):
     """Тест существования endpoints управления пользователями"""
-    # All user management endpoints use get_admin_user -> 403
+    # User management routes require an authenticated workspace administrator.
     response = client.get("/api/users/")
-    assert response.status_code == 403
+    assert response.status_code == 401
     
     response = client.put("/api/users/1", json={
         "username": "test",
@@ -91,10 +91,10 @@ def test_user_management_endpoints_exist(client):
         "role": "user",
         "status": "active"
     })
-    assert response.status_code == 403
+    assert response.status_code == 401
     
     response = client.delete("/api/users/1")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 def test_admin_endpoints_exist(client):
     """Тест существования admin endpoints"""

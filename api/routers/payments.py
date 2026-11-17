@@ -8,19 +8,57 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 from database.core import get_db
-from database.models import User, Payment, PaymentCategory, PaymentCategoryGroup, Currency, Assignment, Role, PaymentGroupCode, PaymentStatus
+from database.models import (
+    Assignment,
+    Currency,
+    Payment,
+    PaymentCategory,
+    PaymentCategoryGroup,
+    PaymentGroupCode,
+    PaymentStatus,
+    User,
+    Workspace,
+    WorkspaceMember,
+)
 from api.schemas.payment import (
     PaymentCreate, Payment as PaymentSchema,
     PaymentCategoryCreate, PaymentCategory as PaymentCategorySchema,
     PaymentCategoryGroupCreate, PaymentCategoryGroupResponse,
     PaymentReport
 )
-from api.auth.oauth import get_current_user, get_admin_user
+from api.auth.oauth import get_current_user, get_workspace_admin_user
 from utils.timeutil import now_server
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+async def _require_workspace_member(
+    db: AsyncSession,
+    user_id: int,
+    workspace_id: int,
+) -> WorkspaceMember:
+    result = await db.execute(
+        select(WorkspaceMember).where(
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.workspace_id == workspace_id,
+        )
+    )
+    membership = result.scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(status_code=400, detail="User is not a workspace member")
+    return membership
+
+
+async def _validate_category_group(db: AsyncSession, group_id: Optional[int]) -> None:
+    if group_id is None:
+        return
+    result = await db.execute(
+        select(PaymentCategoryGroup.id).where(PaymentCategoryGroup.id == group_id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="Category group not found in workspace")
 
 
 # ==================== Payment Category Groups ====================
@@ -43,7 +81,7 @@ async def get_groups(
 async def create_group(
     group: PaymentCategoryGroupCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Создать новую группу категорий"""
     db_group = PaymentCategoryGroup(**group.model_dump())
@@ -58,7 +96,7 @@ async def update_group(
     group_id: int,
     group: PaymentCategoryGroupCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Обновить группу категорий"""
     result = await db.execute(select(PaymentCategoryGroup).where(PaymentCategoryGroup.id == group_id))
@@ -78,7 +116,7 @@ async def update_group(
 async def delete_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     """Деактивировать группу категорий"""
     result = await db.execute(select(PaymentCategoryGroup).where(PaymentCategoryGroup.id == group_id))
@@ -97,8 +135,9 @@ async def delete_group(
 async def create_category(
     category: PaymentCategoryCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
+    await _validate_category_group(db, category.group_id)
     db_category = PaymentCategory(**category.model_dump())
     db.add(db_category)
     await db.commit()
@@ -127,9 +166,8 @@ async def create_payment(
     
     # Устанавливаем валюту по умолчанию если не указана
     if not payment_data.get('currency'):
-        result = await db.execute(select(Currency).where(Currency.is_default == True))
-        default_currency = result.scalar_one_or_none()
-        payment_data['currency'] = default_currency.code if default_currency else 'UAH'
+        workspace = await db.get(Workspace, current_user.active_workspace_id)
+        payment_data['currency'] = workspace.default_currency if workspace else "UAH"
     
     # Если payment_date без времени, добавляем текущее время
     if payment_data['payment_date'].time() == datetime.min.time():
@@ -143,26 +181,46 @@ async def create_payment(
     # payer_id обязателен
     if not payment_data.get('payer_id'):
         raise HTTPException(status_code=400, detail="payer_id is required")
+    workspace_id = current_user.active_workspace_id
+    payer_membership = await _require_workspace_member(
+        db, payment_data["payer_id"], workspace_id
+    )
+
+    category_result = await db.execute(
+        select(PaymentCategory.id).where(
+            PaymentCategory.id == payment_data["category_id"]
+        )
+    )
+    if category_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="Category not found in workspace")
+    if payment_data.get("assignment_id") is not None:
+        assignment_result = await db.execute(
+            select(Assignment.id).where(Assignment.id == payment_data["assignment_id"])
+        )
+        if assignment_result.scalar_one_or_none() is None:
+            raise HTTPException(status_code=400, detail="Assignment not found in workspace")
     
     # Single-employer модель: автоматически устанавливаем recipient_id
     # Если worker платит → recipient = employer (первый admin)
     # Если admin платит worker'у → recipient уже должен быть указан
-    if not payment_data.get('recipient_id'):
-        payer_id = payment_data['payer_id']
-        # Проверяем, является ли payer админом
-        payer_result = await db.execute(
-            select(User).options(selectinload(User.roles)).where(User.id == payer_id)
+    if payment_data.get("recipient_id") is not None:
+        await _require_workspace_member(
+            db, payment_data["recipient_id"], workspace_id
         )
-        payer = payer_result.scalar_one_or_none()
-        
-        if payer and not payer.is_admin:
-            # Worker платит → recipient = первый admin (employer)
+    else:
+        if payer_membership.role != "admin":
             admin_result = await db.execute(
-                select(User).join(User.roles).where(Role.name == 'admin').limit(1)
+                select(WorkspaceMember.user_id)
+                .where(
+                    WorkspaceMember.workspace_id == workspace_id,
+                    WorkspaceMember.role == "admin",
+                )
+                .order_by(WorkspaceMember.joined_at)
+                .limit(1)
             )
-            admin_user = admin_result.scalar_one_or_none()
-            if admin_user:
-                payment_data['recipient_id'] = admin_user.id
+            admin_user_id = admin_result.scalar_one_or_none()
+            if admin_user_id is not None:
+                payment_data["recipient_id"] = admin_user_id
     
     # Обрабатываем payment_status и paid_at
     payment_status = payment_data.get('payment_status', 'unpaid')
@@ -196,14 +254,15 @@ async def create_payment(
     
     # WebSocket broadcast: уведомляем плательщика, получателя и всех админов
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "payment_created",
         "payment_id": db_payment.id,
         "payer_id": db_payment.payer_id,
         "recipient_id": db_payment.recipient_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return PaymentSchema.model_validate(db_payment)
 
@@ -286,6 +345,15 @@ async def get_payment_reports(
             Payment.payment_date <= end_date
         )
     ).order_by(Payment.payment_date.desc())
+    if not current_user.is_admin:
+        from sqlalchemy import or_
+
+        query = query.where(
+            or_(
+                Payment.payer_id == current_user.id,
+                Payment.recipient_id == current_user.id,
+            )
+        )
     
     result = await db.execute(query)
     payments = []
@@ -323,8 +391,9 @@ async def update_category(
     category_id: int,
     category: PaymentCategoryCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
+    await _validate_category_group(db, category.group_id)
     result = await db.execute(select(PaymentCategory).where(PaymentCategory.id == category_id))
     db_category = result.scalar_one_or_none()
     if not db_category:
@@ -342,7 +411,7 @@ async def update_category(
 async def delete_category(
     category_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_workspace_admin_user)
 ):
     result = await db.execute(select(PaymentCategory).where(PaymentCategory.id == category_id))
     db_category = result.scalar_one_or_none()
@@ -378,6 +447,25 @@ async def update_payment(
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
     payment_data = payment.model_dump()
+    workspace_id = current_user.active_workspace_id
+    payer_id = payment_data.get("payer_id") or db_payment.payer_id
+    recipient_id = payment_data.get("recipient_id", db_payment.recipient_id)
+    category_id = payment_data.get("category_id", db_payment.category_id)
+    assignment_id = payment_data.get("assignment_id") or db_payment.assignment_id
+    await _require_workspace_member(db, payer_id, workspace_id)
+    if recipient_id is not None:
+        await _require_workspace_member(db, recipient_id, workspace_id)
+    category_result = await db.execute(
+        select(PaymentCategory.id).where(PaymentCategory.id == category_id)
+    )
+    if category_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="Category not found in workspace")
+    if assignment_id is not None:
+        assignment_result = await db.execute(
+            select(Assignment.id).where(Assignment.id == assignment_id)
+        )
+        if assignment_result.scalar_one_or_none() is None:
+            raise HTTPException(status_code=400, detail="Assignment not found in workspace")
     
     # Если указан payment_status, обновляем paid_at
     if 'payment_status' in payment_data:
@@ -453,19 +541,20 @@ async def update_payment(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "payment_updated",
         "payment_id": db_payment.id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     # Уведомления об автоматически зачтенных платежах
     for offset_payment_id in auto_offset_ids:
         await manager.broadcast({
             "type": "payment_updated",
             "payment_id": offset_payment_id
-        }, user_ids=target_users)
+        }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"id": db_payment.id, "message": "Payment updated successfully"}
 
@@ -498,12 +587,13 @@ async def delete_payment(
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
     # For deleted payment, we use IDs from the db_payment object before it was fully detached
-    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([db_payment.payer_id, db_payment.recipient_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "payment_deleted",
         "payment_id": payment_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"message": "Payment deleted"}
 
@@ -565,11 +655,12 @@ async def bulk_delete_payments(
     # WebSocket broadcast
     if deleted_count > 0:
         from api.routers.websocket import manager, get_admin_ids
-        target_users = list(set(list(affected_user_ids) + await get_admin_ids()))
+        workspace_id = current_user.active_workspace_id
+        target_users = list(set(list(affected_user_ids) + await get_admin_ids(workspace_id)))
         await manager.broadcast({
             "type": "payments_bulk_deleted",
             "count": deleted_count
-        }, user_ids=target_users)
+        }, user_ids=target_users, workspace_id=workspace_id)
     
     return BulkDeleteResponse(
         deleted_count=deleted_count,

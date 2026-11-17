@@ -5,6 +5,7 @@ import axios from 'axios';
 import useIdleTimer from '../hooks/useIdleTimer';
 import FloatingTimer from './FloatingTimer';
 import PageHeader from './PageHeader';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 const NotificationContext = createContext();
 
@@ -19,6 +20,7 @@ export const useNotifications = () => {
 function Layout({ onLogout }) {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [hasRequests, setHasRequests] = useState(false);
   const [checkInterval, setCheckInterval] = useState(30);
 
@@ -27,19 +29,19 @@ function Layout({ onLogout }) {
   }, []);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isSystemAdmin) {
       loadCheckInterval();
       checkRequests();
     }
-  }, [isAdmin]);
+  }, [isSystemAdmin]);
 
   useEffect(() => {
-    if (isAdmin && checkInterval) {
+    if (isSystemAdmin && checkInterval) {
       const intervalMs = checkInterval * 60 * 1000;
       const interval = setInterval(checkRequests, intervalMs);
       return () => clearInterval(interval);
     }
-  }, [isAdmin, checkInterval]);
+  }, [isSystemAdmin, checkInterval]);
 
   const checkUserRole = async () => {
     try {
@@ -48,12 +50,13 @@ function Layout({ onLogout }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       const roles = response.data.roles || [];
-      const isAdminUser = roles.includes('admin');
-      setIsAdmin(isAdminUser);
+      setIsAdmin(roles.includes('admin'));
+      const isSystemAdminUser = (response.data.system_roles || []).includes('admin');
+      setIsSystemAdmin(isSystemAdminUser);
       if (response.data.profile_setup_pending && window.location.pathname !== '/profile') {
         navigate('/profile');
       }
-      if (isAdminUser) {
+      if (isSystemAdminUser) {
         checkRequests();
       }
     } catch (error) {
@@ -95,10 +98,11 @@ function Layout({ onLogout }) {
   useIdleTimer(handleLogout, 30 * 60 * 1000);
 
   return (
-    <NotificationContext.Provider value={{ checkRequests, handleLogout, isAdmin, hasRequests }}>
+    <NotificationContext.Provider value={{ checkRequests, handleLogout, isAdmin, isSystemAdmin, hasRequests }}>
       <FloatingTimer />
       <Box sx={{ flexGrow: 1 }}>
         <Container maxWidth="lg" sx={{ mt: 4 }}>
+          <WorkspaceSwitcher />
           <PageHeader isAdmin={isAdmin} hasRequests={hasRequests} />
           <Outlet />
         </Container>

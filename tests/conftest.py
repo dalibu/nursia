@@ -2,7 +2,8 @@ import pytest
 import pytest_asyncio
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from database.models import Base
+from database.core import get_db
+from database.models import Base, Workspace
 
 # Use in-memory SQLite for testing
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
@@ -27,6 +28,9 @@ async def db_session():
     )
 
     async with AsyncSessionLocal() as session:
+        session.add(Workspace(id=1, name="Test workspace"))
+        await session.commit()
+        session.sync_session.info["workspace_id"] = 1
         yield session
     
     async with engine.begin() as conn:

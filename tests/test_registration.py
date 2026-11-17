@@ -1,4 +1,6 @@
 import pytest
+import re
+import time
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import inspect, select
@@ -10,7 +12,7 @@ from api.routers import users as users_router
 from api.auth.registration import available_usernames, username_base, verify_turnstile_token
 from config.settings import settings
 from database.core import get_db
-from database.models import RegistrationRequest, Role, User
+from database.models import RegistrationRequest, User, Workspace, WorkspaceMember
 from scripts.setup_system import ensure_profile_setup_column
 
 
@@ -60,7 +62,9 @@ def test_existing_database_gets_profile_setup_column():
 
 
 @pytest.mark.asyncio
-async def test_registration_creates_active_worker_and_authenticates(db_session, monkeypatch):
+async def test_registration_verifies_email_before_creating_workspace(db_session, monkeypatch):
+    sent_emails = []
+
     async def override_get_db():
         yield db_session
 
@@ -70,39 +74,63 @@ async def test_registration_creates_active_worker_and_authenticates(db_session, 
     async def test_expiry():
         return 480
 
-    db_session.add(Role(name="worker", type="business"))
-    await db_session.commit()
+    async def send_test_email(recipient, subject, body):
+        sent_emails.append((recipient, subject, body))
+
     main_module.app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(auth_router, "verify_turnstile_token", verify_test_token)
     monkeypatch.setattr(auth_router, "get_jwt_expire_minutes", test_expiry)
+    monkeypatch.setattr(auth_router, "send_email", send_test_email)
+    monkeypatch.setattr(auth_router, "is_disposable_email", lambda _email: False)
 
     try:
         transport = ASGITransport(app=main_module.app, client=("127.0.0.2", 12345))
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/api/auth/register", json={
+            registration_data = {
+                "email": "alex.smith@example.com",
                 "full_name": "Alex Smith",
+                "workspace_name": "Alex household",
                 "password": "a" * 64,
                 "turnstile_token": "valid-turnstile-token",
+                "website": "",
+                "form_started_at": int(time.time() * 1000) - 5_000,
+            }
+            response = await client.post("/api/auth/register", json=registration_data)
+            pending_response = await client.post("/api/auth/register", json=registration_data)
+            verification_code = re.search(r"\b(\d{6})\b", sent_emails[0][2]).group(1)
+            verification_response = await client.post("/api/auth/verify-email", json={
+                "email": "alex.smith@example.com",
+                "code": verification_code,
             })
-            second_response = await client.post("/api/auth/register", json={
-                "full_name": "Alex Smith",
+            login_response = await client.post("/api/auth/login", json={
+                "username": "alex.smith@example.com",
                 "password": "a" * 64,
-                "turnstile_token": "valid-turnstile-token",
             })
 
-        assert response.status_code == 200
-        assert response.json()["access_token"]
-        assert response.json()["profile_setup_pending"] is True
-        assert second_response.status_code == 200
+        assert response.status_code == 202
+        assert response.json() == {"message": "verification_sent"}
+        assert pending_response.status_code == 409
+        assert pending_response.json()["detail"]["code"] == "verification_pending"
+        assert verification_response.status_code == 200
+        assert verification_response.json()["profile_setup_pending"] is True
+        assert login_response.status_code == 200
 
-        result = await db_session.execute(
-            select(User).options(selectinload(User.roles)).order_by(User.id)
-        )
+        result = await db_session.execute(select(User).order_by(User.id))
         users = result.scalars().all()
-        assert [user.username for user in users] == ["alex.smith", "alex.smith2"]
-        assert all(user.status == "active" for user in users)
-        assert all(user.profile_setup_pending for user in users)
-        assert all([role.name for role in user.roles] == ["worker"] for user in users)
+        assert [user.username for user in users] == ["alex.smith"]
+        assert users[0].status == "active"
+        assert users[0].email_verified is True
+        assert users[0].profile_setup_pending is True
+        workspace = (await db_session.execute(
+            select(Workspace).where(Workspace.name == "Alex household")
+        )).scalar_one()
+        membership = (await db_session.execute(
+            select(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == workspace.id,
+                WorkspaceMember.user_id == users[0].id,
+            )
+        )).scalar_one()
+        assert membership.role == "admin"
     finally:
         main_module.app.dependency_overrides.pop(get_db, None)
 

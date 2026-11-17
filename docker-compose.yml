@@ -29,6 +29,14 @@ services:
       - PYTHONPATH=/app
       - PYTHONWARNINGS=ignore::DeprecationWarning
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
+      - SMTP_USE_SSL=${SMTP_USE_SSL:-false}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:3000}
     command: ./scripts/startup.sh
     depends_on:
       - frontend

@@ -27,7 +27,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database.models import (
-    Base, User, Payment, PaymentCategory, PaymentCategoryGroup
+    Base, User, Payment, PaymentCategory, PaymentCategoryGroup, Workspace
 )
 from api.routers.balances import get_balance_summary
 
@@ -66,6 +66,10 @@ async def setup_async_test_db(fixture_data: dict):
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     async with async_session() as session:
+        session.add(Workspace(id=1, name="Test workspace"))
+        await session.flush()
+        session.sync_session.info["workspace_id"] = 1
+
         # Create category groups
         groups = {}
         group_codes = {

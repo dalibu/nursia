@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean, Table, Column, Integer, TypeDecorator
+from sqlalchemy import BigInteger, String, DateTime, Date, Time, func, Numeric, ForeignKey, Text, Boolean, Table, Column, Integer, TypeDecorator, Index, UniqueConstraint, and_
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -49,6 +49,10 @@ class CleanDateTime(TypeDecorator):
 
 class Base(DeclarativeBase):
     pass
+
+
+class WorkspaceScoped:
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
 
 
 # ================================
@@ -135,7 +139,8 @@ class User(Base):
     telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     username: Mapped[str] = mapped_column(String(50), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     full_name: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     force_password_change: Mapped[bool] = mapped_column(default=False)
@@ -149,13 +154,30 @@ class User(Base):
     payments_made: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="Payment.payer_id", back_populates="payer")
     payments_received: Mapped[list["Payment"]] = relationship("Payment", foreign_keys="Payment.recipient_id", back_populates="recipient")
     assignments: Mapped[list["Assignment"]] = relationship("Assignment", back_populates="worker")
+    workspace_memberships: Mapped[list["WorkspaceMember"]] = relationship(
+        "WorkspaceMember", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    @property
+    def workspace_role(self) -> Optional[str]:
+        return self.__dict__.get("_workspace_role")
+
+    @workspace_role.setter
+    def workspace_role(self, value: Optional[str]) -> None:
+        self.__dict__["_workspace_role"] = value
 
     def has_role(self, role_name: str) -> bool:
         """Проверить наличие роли у пользователя"""
+        if self.workspace_role is not None and role_name in {"admin", "worker", "employer"}:
+            if role_name in {"admin", "employer"}:
+                return self.workspace_role == "admin"
+            return self.workspace_role == "worker"
         return any(r.name == role_name for r in self.roles)
 
     def has_permission(self, permission_name: str) -> bool:
         """Проверить наличие разрешения у пользователя через роли"""
+        if self.workspace_role is not None:
+            return self.workspace_role == "admin" and permission_name == "view_all_reports"
         for role in self.roles:
             if any(p.name == permission_name for p in role.permissions):
                 return True
@@ -163,18 +185,32 @@ class User(Base):
 
     @property
     def is_admin(self) -> bool:
+        if self.workspace_role is not None:
+            return self.workspace_role == "admin"
         return self.has_role("admin")
 
     @property
     def is_employer(self) -> bool:
+        if self.workspace_role is not None:
+            return self.workspace_role == "admin"
         return self.has_role("employer")
 
     @property
     def is_worker(self) -> bool:
+        if self.workspace_role is not None:
+            return self.workspace_role == "worker"
         return self.has_role("worker")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username})>"
+
+
+Index(
+    "uq_users_verified_email",
+    func.lower(User.email),
+    unique=True,
+    sqlite_where=and_(User.email.is_not(None), User.email != "", User.email_verified.is_(True)),
+)
 
 
 class UserStatus(Base):
@@ -212,6 +248,83 @@ class RegistrationRequest(Base):
         return f"<RegistrationRequest(id={self.id}, username={self.username}, status={self.status})>"
 
 
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    default_currency: Mapped[str] = mapped_column(String(3), default="UAH")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[owner_id])
+    members: Mapped[list["WorkspaceMember"]] = relationship(
+        "WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    invites: Mapped[list["WorkspaceInvite"]] = relationship(
+        "WorkspaceInvite", back_populates="workspace", cascade="all, delete-orphan"
+    )
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_members_workspace_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    role: Mapped[str] = mapped_column(String(20), default="worker")
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="members")
+    user: Mapped["User"] = relationship("User", back_populates="workspace_memberships")
+
+
+class WorkspaceInvite(Base):
+    __tablename__ = "workspace_invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    role: Mapped[str] = mapped_column(String(20), default="worker")
+    invited_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[datetime] = mapped_column(CleanDateTime())
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(CleanDateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="invites")
+    inviter: Mapped["User"] = relationship("User", foreign_keys=[invited_by])
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    workspace_name: Mapped[str] = mapped_column(String(100))
+    expires_at: Mapped[datetime] = mapped_column(CleanDateTime())
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User")
+
+
+class WorkspaceSetting(WorkspaceScoped, Base):
+    __tablename__ = "workspace_settings"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "key", name="uq_workspace_settings_workspace_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(100))
+    value: Mapped[str] = mapped_column(String(500))
+    updated_at: Mapped[datetime] = mapped_column(CleanDateTime(), onupdate=func.now(), server_default=func.now())
+
+
 # ================================
 # Payment Categories
 # ================================
@@ -230,13 +343,17 @@ class PaymentStatus(str, Enum):
     PAID = "paid"          # Оплачено
     OFFSET = "offset"      # Зачтено в счет долга
 
-class PaymentCategoryGroup(Base):
+class PaymentCategoryGroup(WorkspaceScoped, Base):
     """Группы категорий платежей (Зарплата, Расходы, Премии, Долги и т.д.)"""
     __tablename__ = "payment_category_groups"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "name", name="uq_payment_group_workspace_name"),
+        UniqueConstraint("workspace_id", "code", name="uq_payment_group_workspace_code"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
-    code: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)  # salary, expense, bonus, debt
+    name: Mapped[str] = mapped_column(String(100))
+    code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # salary, expense, bonus, debt
     color: Mapped[str] = mapped_column(String(7), default="#808080")
     emoji: Mapped[str] = mapped_column(String(10), default="💰")
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -249,11 +366,14 @@ class PaymentCategoryGroup(Base):
         return f"<PaymentCategoryGroup(id={self.id}, name={self.name}, code={self.code})>"
 
 
-class PaymentCategory(Base):
+class PaymentCategory(WorkspaceScoped, Base):
     __tablename__ = "payment_categories"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "name", name="uq_payment_category_workspace_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
     group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payment_category_groups.id"), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -269,7 +389,7 @@ class PaymentCategory(Base):
 # Payments (упрощённая структура)
 # ================================
 
-class Payment(Base):
+class Payment(WorkspaceScoped, Base):
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -336,7 +456,7 @@ class Currency(Base):
 # Employment & Assignments (упрощённая структура)
 # ================================
 
-class EmploymentRelation(Base):
+class EmploymentRelation(WorkspaceScoped, Base):
     """Трудовые отношения работника с системой"""
     __tablename__ = "employment_relations"
 
@@ -369,7 +489,7 @@ class AssignmentType(str, Enum):
     UNPAID_LEAVE = "unpaid_leave"  # Отпуск за свой счёт
 
 
-class Assignment(Base):
+class Assignment(WorkspaceScoped, Base):
     """Посещение/смена - родительская сущность для tasks"""
     __tablename__ = "assignments"
 
@@ -415,7 +535,7 @@ class Assignment(Base):
         return f"<Assignment(id={self.id}, user_id={self.user_id}, type={self.assignment_type})>"
 
 
-class Task(Base):
+class Task(WorkspaceScoped, Base):
     """Рабочий или паузный сегмент внутри assignment"""
     __tablename__ = "tasks"
 

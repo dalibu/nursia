@@ -16,7 +16,17 @@ from sqlalchemy.orm import joinedload
 from pydantic import BaseModel
 
 from database.core import get_db
-from database.models import User, Assignment, Task, EmploymentRelation, Payment, PaymentCategory, AssignmentType, TaskType
+from database.models import (
+    Assignment,
+    AssignmentType,
+    EmploymentRelation,
+    Payment,
+    PaymentCategory,
+    Task,
+    TaskType,
+    User,
+    WorkspaceMember,
+)
 from api.auth.oauth import get_current_user
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -296,13 +306,14 @@ async def start_work_session(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([target_worker_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "assignment_started",
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return return_response
 
@@ -480,14 +491,19 @@ async def create_manual_assignment(
             full_description = full_description[:497] + "..."
         
         from utils.tracking import format_payment_tracking_nr
-        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
-        
-        # Get employer (user with employer role)
+        from database.models import PaymentCategoryGroup, PaymentGroupCode
+
         employer_result = await db.execute(
-            select(User).join(User.roles).where(Role.name == "employer")
+            select(WorkspaceMember.user_id)
+            .where(
+                WorkspaceMember.workspace_id == current_user.active_workspace_id,
+                WorkspaceMember.role == "admin",
+            )
+            .order_by(WorkspaceMember.joined_at)
+            .limit(1)
         )
-        employer = employer_result.scalar_one_or_none()
-        payer_id = employer.id if employer else target_worker_id
+        employer_id = employer_result.scalar_one_or_none()
+        payer_id = employer_id if employer_id is not None else target_worker_id
         
         # Find salary category
         salary_cat_result = await db.execute(
@@ -524,13 +540,14 @@ async def create_manual_assignment(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([target_worker_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "assignment_started",
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     if payment:
         await manager.broadcast({
@@ -538,7 +555,7 @@ async def create_manual_assignment(
             "payment_id": payment.id,
             "payer_id": payment.payer_id,
             "recipient_id": payment.recipient_id
-        }, user_ids=target_users)
+        }, user_ids=target_users, workspace_id=workspace_id)
     
     return ManualAssignmentResponse(
         assignment_id=new_assignment.id,
@@ -687,14 +704,19 @@ async def create_time_off(
     payment = None
     if total_amount > 0:
         from utils.tracking import format_payment_tracking_nr
-        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
-        
-        # Get employer
+        from database.models import PaymentCategoryGroup, PaymentGroupCode
+
         employer_result = await db.execute(
-            select(User).join(User.roles).where(Role.name == "employer")
+            select(WorkspaceMember.user_id)
+            .where(
+                WorkspaceMember.workspace_id == current_user.active_workspace_id,
+                WorkspaceMember.role == "admin",
+            )
+            .order_by(WorkspaceMember.joined_at)
+            .limit(1)
         )
-        employer = employer_result.scalar_one_or_none()
-        payer_id = employer.id if employer else target_worker_id
+        employer_id = employer_result.scalar_one_or_none()
+        payer_id = employer_id if employer_id is not None else target_worker_id
         
         # Get salary category
         salary_cat_result = await db.execute(
@@ -727,13 +749,14 @@ async def create_time_off(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([target_worker_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([target_worker_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "assignment_started",
         "assignment_id": new_assignment.id,
         "user_id": target_worker_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
 
     # Формируем ответ
     response = ManualAssignmentResponse(
@@ -776,6 +799,9 @@ async def stop_work_session(
         raise HTTPException(status_code=400, detail="Сессия уже завершена")
     
     assignment = task.assignment
+    if not current_user.is_admin and assignment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет прав на эту смену")
+
     from utils.timeutil import now_server
     now = now_server()
     task.end_time = now  # Full datetime now
@@ -831,11 +857,17 @@ async def stop_work_session(
 
         # Generate tracking number for payment
         from utils.tracking import format_payment_tracking_nr
-        from database.models import Role, PaymentCategoryGroup, PaymentGroupCode
-        
-        # Get employer (user with employer role)
+        from database.models import PaymentCategoryGroup, PaymentGroupCode
+
         employer_result = await db.execute(
-            select(User).join(User.roles).where(Role.name == "employer")
+            select(User)
+            .join(WorkspaceMember, WorkspaceMember.user_id == User.id)
+            .where(
+                WorkspaceMember.workspace_id == current_user.active_workspace_id,
+                WorkspaceMember.role == "admin",
+            )
+            .order_by(WorkspaceMember.joined_at)
+            .limit(1)
         )
         employer = employer_result.scalar_one_or_none()
         payer_id = employer.id if employer else assignment.user_id  # fallback
@@ -877,7 +909,8 @@ async def stop_work_session(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     
     # Notify about the new payment if it was created
     if total_amount > 0:
@@ -886,13 +919,13 @@ async def stop_work_session(
             "payment_id": payment.id,
             "payer_id": payment.payer_id,
             "recipient_id": payment.recipient_id
-        }, user_ids=target_users)
+        }, user_ids=target_users, workspace_id=workspace_id)
 
     await manager.broadcast({
         "type": "assignment_stopped",
         "assignment_id": assignment.id,
         "user_id": assignment.user_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return return_response
 
@@ -956,14 +989,15 @@ async def switch_task(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "task_created",
         "assignment_id": assignment_id,
         "task_id": new_task.id,
         "user_id": assignment.user_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return _task_to_response(
         new_task, assignment,
@@ -1062,13 +1096,14 @@ async def update_work_session(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "payment_updated", # Re-using this to trigger refresh as it affects balances/times
         "assignment_id": assignment.id,
         "task_id": task.id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return _task_to_response(
         task, assignment,
@@ -1133,13 +1168,14 @@ async def delete_work_session(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     
     await manager.broadcast({
         "type": "task_deleted",
         "assignment_id": assignment.id,
         "task_id": session_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"message": "Сессия удалена"}
 
@@ -1176,11 +1212,12 @@ async def update_assignment(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     await manager.broadcast({
         "type": "assignment_updated",
         "assignment_id": assignment_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"message": "Assignment обновлён", "id": assignment_id}
 
@@ -1234,11 +1271,12 @@ async def delete_assignment(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     await manager.broadcast({
         "type": "assignment_deleted",
         "assignment_id": assignment_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"message": "Assignment удалён", "id": assignment_id}
 
@@ -1304,11 +1342,12 @@ async def bulk_delete_assignments(
     # WebSocket broadcast
     if deleted_count > 0:
         from api.routers.websocket import manager, get_admin_ids
-        target_users = list(set(list(deleted_user_ids) + await get_admin_ids()))
+        workspace_id = current_user.active_workspace_id
+        target_users = list(set(list(deleted_user_ids) + await get_admin_ids(workspace_id)))
         await manager.broadcast({
             "type": "assignments_bulk_deleted",
             "count": deleted_count
-        }, user_ids=target_users)
+        }, user_ids=target_users, workspace_id=workspace_id)
     
     return BulkDeleteResponse(
         deleted_count=deleted_count,
@@ -1394,12 +1433,13 @@ async def update_task(
     
     # WebSocket broadcast
     from api.routers.websocket import manager, get_admin_ids
-    target_users = list(set([assignment.user_id] + await get_admin_ids()))
+    workspace_id = current_user.active_workspace_id
+    target_users = list(set([assignment.user_id] + await get_admin_ids(workspace_id)))
     await manager.broadcast({
         "type": "task_updated",
         "assignment_id": assignment.id,
         "task_id": task_id
-    }, user_ids=target_users)
+    }, user_ids=target_users, workspace_id=workspace_id)
     
     return {"message": "Task обновлён", "id": task_id}
 

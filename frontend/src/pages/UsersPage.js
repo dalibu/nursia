@@ -6,9 +6,10 @@ import {
   DialogContent, DialogActions, TextField, Button, MenuItem,
   DialogContentText, Chip, Alert, Tooltip
 } from '@mui/material';
-import { Edit, Delete, PersonAdd, ContentCopy, Restore } from '@mui/icons-material';
+import { Edit, Delete, PersonAdd, ContentCopy, Restore, Email } from '@mui/icons-material';
 import { useNotifications } from '../components/Layout';
 import CustomTablePagination from '../components/CustomTablePagination';
+import { workspaces } from '../services/api';
 
 function UsersPage() {
   const { t } = useTranslation();
@@ -45,6 +46,10 @@ function UsersPage() {
   const [createdUserInfo, setCreatedUserInfo] = useState(null);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -52,16 +57,23 @@ function UsersPage() {
   }, []);
 
   const loadRoles = async () => {
+    setRoles([{ id: 'admin', name: 'admin' }, { id: 'worker', name: 'worker' }]);
+  };
+
+  const handleInvite = async (event) => {
+    event.preventDefault();
+    setInviteSending(true);
+    setInviteError('');
     try {
-      const response = await fetch('/api/admin/roles', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      setRoles(data);
+      await workspaces.invite({ email: inviteEmail });
+      setShowInviteDialog(false);
+      setInviteEmail('');
+      setMessage(t('workspace.invitationSent'));
     } catch (error) {
-      console.error('Failed to load roles:', error);
+      const code = error.response?.data?.detail?.code;
+      setInviteError(t(`workspace.${code || 'inviteAcceptFailed'}`));
+    } finally {
+      setInviteSending(false);
     }
   };
 
@@ -108,7 +120,7 @@ function UsersPage() {
       });
       setShowCreateDialog(false);
       setShowPasswordDialog(true);
-      setCreateFormData({ username: '', full_name: '', email: '', role: 'user' });
+      setCreateFormData({ username: '', full_name: '', email: '', role: 'worker' });
       loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
@@ -298,16 +310,28 @@ function UsersPage() {
             {t('users.showDeleted')}
           </label>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<PersonAdd />}
-          onClick={() => {
-            setCreateError('');
-            setShowCreateDialog(true);
-          }}
-        >
-          {t('users.addUser')}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Email />}
+            onClick={() => {
+              setInviteError('');
+              setShowInviteDialog(true);
+            }}
+          >
+            {t('workspace.inviteMember')}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={() => {
+              setCreateError('');
+              setShowCreateDialog(true);
+            }}
+          >
+            {t('users.addUser')}
+          </Button>
+        </Box>
       </Box>
 
       <Box sx={{ mb: 2 }}>
@@ -497,6 +521,38 @@ function UsersPage() {
           <Button onClick={() => setConfirmDialog(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleConfirmSave} variant="contained">{t('common.save')}</Button>
         </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={showInviteDialog}
+        onClose={() => setShowInviteDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{t('workspace.inviteMember')}</DialogTitle>
+        <Box component="form" onSubmit={handleInvite}>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {t('workspace.inviteHint')}
+            </Typography>
+            {inviteError && <Alert severity="error" sx={{ mb: 2 }}>{inviteError}</Alert>}
+            <TextField
+              fullWidth
+              type="email"
+              label={t('auth.email')}
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              required
+              autoFocus
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowInviteDialog(false)}>{t('common.cancel')}</Button>
+            <Button type="submit" variant="contained" disabled={inviteSending}>
+              {inviteSending ? t('workspace.sendingInvite') : t('workspace.sendInvite')}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
 
       {/* Диалог создания нового пользователя */}

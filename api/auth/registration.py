@@ -1,8 +1,12 @@
+import hashlib
+import hmac
 import re
+import secrets
 import unicodedata
 import logging
 
 import httpx
+from disposable_email_domains import blocklist
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +37,28 @@ def username_base(full_name: str) -> str:
     if len(name_parts) == 1:
         return name_parts[0][:50]
     return f"{name_parts[0]}.{name_parts[-1]}"[:50]
+
+
+def is_disposable_email(email: str) -> bool:
+    domain = email.rpartition("@")[2].casefold()
+    return domain in blocklist
+
+
+def new_email_verification_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_email_verification_code(email: str, code: str) -> str:
+    payload = f"{email.casefold()}:{code}".encode()
+    return hmac.new(settings.JWT_SECRET_KEY.encode(), payload, hashlib.sha256).hexdigest()
+
+
+def new_invite_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_invite_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 async def available_usernames(
