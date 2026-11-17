@@ -72,6 +72,19 @@ function ThemedApp() {
           },
         },
       },
+      MuiTableRow: {
+        styleOverrides: {
+          root: {
+            '&.deleted-row': {
+              opacity: 0.65,
+              backgroundColor: p.tableRowDeletedBg,
+              '&.MuiTableRow-hover:hover': {
+                backgroundColor: p.tableRowDeletedHoverBg,
+              },
+            },
+          },
+        },
+      },
       MuiTablePagination: {
         defaultProps: {
           labelRowsPerPage: t('common.rowsPerPage'),

@@ -336,15 +336,7 @@ function UsersPage() {
                 <TableRow
                   key={user.id}
                   hover
-                  sx={{
-                    ...(user.status === 'deleted' && {
-                      opacity: 0.6,
-                      bgcolor: 'action.disabledBackground',
-                      '&:hover': {
-                        bgcolor: 'action.selected',
-                      },
-                    }),
-                  }}
+                  className={user.status === 'deleted' ? 'deleted-row' : undefined}
                 >
                   <TableCell>{user.id}</TableCell>
                   <TableCell>{user.username}</TableCell>

@@ -21,6 +21,8 @@ export const THEMES = {
       iconColor: '#475569',
       tableHeaderBg: '#e2e8f0',
       tableHeaderText: '#0f172a',
+      tableRowDeletedBg: 'rgba(15, 23, 42, 0.03)',
+      tableRowDeletedHoverBg: 'rgba(15, 23, 42, 0.08)',
     },
     cssVars: {
       '--bg-primary': '#f1f5f9',
@@ -71,6 +73,8 @@ export const THEMES = {
       iconColor: '#e2e8f0',
       tableHeaderBg: '#334155',
       tableHeaderText: '#f8fafc',
+      tableRowDeletedBg: 'rgba(255, 255, 255, 0.03)',
+      tableRowDeletedHoverBg: 'rgba(255, 255, 255, 0.12)',
     },
     cssVars: {
       '--bg-primary': '#0f172a',
@@ -121,6 +125,8 @@ export const THEMES = {
       iconColor: '#27272a',
       tableHeaderBg: '#e4e4e7',
       tableHeaderText: '#18181b',
+      tableRowDeletedBg: 'rgba(24, 24, 27, 0.04)',
+      tableRowDeletedHoverBg: 'rgba(24, 24, 27, 0.1)',
     },
     cssVars: {
       '--bg-primary': '#f4f4f5',
@@ -171,6 +177,8 @@ export const THEMES = {
       iconColor: '#ffffff',
       tableHeaderBg: '#18181b',
       tableHeaderText: '#ffffff',
+      tableRowDeletedBg: 'rgba(255, 255, 255, 0.06)',
+      tableRowDeletedHoverBg: 'rgba(255, 255, 255, 0.2)',
     },
     cssVars: {
       '--bg-primary': '#000000',
