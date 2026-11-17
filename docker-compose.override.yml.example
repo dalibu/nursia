@@ -1,0 +1,24 @@
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: nursia_mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP server for receiving emails from FastAPI
+      - "127.0.0.1:8025:8025" # Web interface (mailbox) in the browser
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  api:
+    depends_on:
+      - mailpit
+    environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_FROM_EMAIL: nursia@example.test
+      SMTP_STARTTLS: "false"
+      SMTP_USE_SSL: "false"

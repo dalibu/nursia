@@ -30,6 +30,16 @@ docker compose exec api python scripts/create_admin.py
 * **Frontend (SPA):** http://localhost:3000
 * **Backend API (Swagger UI):** http://localhost:8000/docs
 
+#### Local email testing with Mailpit
+To test email verification without sending messages externally, copy the Mailpit override and start the services:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+docker compose up -d
+```
+
+Mailpit captures application email at http://localhost:8025. The SMTP and web UI ports are bound to localhost only. The local override is ignored by Git; edit the `.example` file if the shared development setup should change.
+
 ### Registration protection
 Public registration uses Cloudflare Turnstile and email verification. Configure a Turnstile widget and SMTP delivery in `.env`:
 
